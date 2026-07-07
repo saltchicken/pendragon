@@ -4,8 +4,7 @@ from typing import List, Optional, Tuple
 
 from gscrib import GCodeBuilder
 
-logger = logging.getLogger(__name__)
-
+from loguru import logger
 
 @dataclass
 class PenConfig:
