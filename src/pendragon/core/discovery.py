@@ -1,7 +1,9 @@
 import importlib
 from pathlib import Path
 import sys
+
 import pendragon
+
 
 def load_plugins():
     """Dynamically loads all modules in the plugins directory and subdirectories."""
@@ -27,5 +29,3 @@ def load_plugins():
         except Exception as e:
             print(f"Warning: Failed to load plugin '{relative_path}': {e}",
                   file=sys.stderr)
-
-
