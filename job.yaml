@@ -1,6 +1,6 @@
 - operation: grid_lines
   settings:
-    spacing: 0.25
+    spacing: 10
     orientation: crosshatch
 
 - operation: image_mask
