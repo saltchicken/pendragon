@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pendragon"
+version = "0.1.0"
+description = "A Python tool for generating CNC G-code using a pen/drag tool."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["ezdxf", "gscrib", "shapely", "Pillow", "numpy", "scikit-image", "scipy", "PyYAML", "argcomplete", "pydantic"]
+
+[project.scripts]
+pendragon = "pendragon.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"pendragon.presets" = ["*.yaml"]
