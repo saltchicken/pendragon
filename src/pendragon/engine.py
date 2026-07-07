@@ -1,34 +1,45 @@
 # src/pendragon/core/engine.py
 
 from typing import List, Optional
-import numpy as np
-from vispy import app, scene
+
 from loguru import logger
-from shapely.geometry import Polygon, LineString
+import numpy as np
+from shapely.geometry import LineString
+from shapely.geometry import Polygon
+from vispy import app
+from vispy import scene
 
 from pendragon.core.models import PipelineState
-from pendragon.core.runner import PipelineRunner
 from pendragon.core.registry import OPERATION_REGISTRY
-from pendragon.pen import PenTool, PenConfig
+
+from .pen import PenConfig
+from .pen import PenTool
+from .runner import PipelineRunner
 
 
 class PipelineViewer(scene.SceneCanvas):
+
     def __init__(self, history: List[PipelineState]):
         # Keep window title clean and static
-        super().__init__(keys='interactive', size=(800, 800), title="Pendragon Pipeline Visualizer", show=True)
+        super().__init__(keys='interactive',
+                         size=(800, 800),
+                         title="Pendragon Pipeline Visualizer",
+                         show=True)
         self.unfreeze()
         self.history = history
         self.current_step = 0
-        
+
         # Setup view and camera
         self.view = self.central_widget.add_view()
         self.view.camera = 'panzoom'
         self.view.camera.aspect = 1.0
 
         # Geometry visuals
-        self.lines_visual = scene.visuals.Line(parent=self.view.scene, color='white')
-        self.boundary_visual = scene.visuals.Line(parent=self.view.scene, color='red')
-        
+        self.lines_visual = scene.visuals.Line(parent=self.view.scene,
+                                               color='white')
+        self.boundary_visual = scene.visuals.Line(parent=self.view.scene,
+                                                  color='red')
+
         # Screen-space Text HUD for current step metrics
         # Parented directly to the canvas widget so it stays fixed in place during pan/zoom
         self.hud_text = scene.visuals.Text(
@@ -40,7 +51,7 @@ class PipelineViewer(scene.SceneCanvas):
             anchor_y='top',
             pos=(15, 15)  # Offset slightly from top-left corner
         )
-        
+
         self.freeze()
 
         self.update_view()
@@ -55,7 +66,8 @@ class PipelineViewer(scene.SceneCanvas):
 
     def on_key_press(self, event):
         if event.key.name == 'Right':
-            self.current_step = min(self.current_step + 1, len(self.history) - 1)
+            self.current_step = min(self.current_step + 1,
+                                    len(self.history) - 1)
             self.update_view()
         elif event.key.name == 'Left':
             self.current_step = max(self.current_step - 1, 0)
@@ -65,17 +77,15 @@ class PipelineViewer(scene.SceneCanvas):
 
     def update_view(self):
         state = self.history[self.current_step]
-        
+
         # Calculate totals
         total_vertices = sum(len(line.coords) for line in state.lines)
-        
+
         # Construct single-line textbox string
-        hud_string = (
-            f"Step: {self.current_step + 1}/{len(self.history)} | "
-            f"Operation: {state.operation_name} | "
-            f"Lines: {len(state.lines)} | "
-            f"Vertices: {total_vertices}"
-        )
+        hud_string = (f"Step: {self.current_step + 1}/{len(self.history)} | "
+                      f"Operation: {state.operation_name} | "
+                      f"Lines: {len(state.lines)} | "
+                      f"Vertices: {total_vertices}")
         self.hud_text.text = hud_string
 
         if state.boundary:
@@ -96,21 +106,25 @@ class PipelineViewer(scene.SceneCanvas):
                 for i in range(n_pts - 1):
                     connect.append([idx + i, idx + i + 1])
                 idx += n_pts
-            self.lines_visual.set_data(pos=np.vstack(pos), connect=np.array(connect))
+            self.lines_visual.set_data(pos=np.vstack(pos),
+                                       connect=np.array(connect))
             self.lines_visual.visible = True
         else:
             self.lines_visual.visible = False
 
 
 class PendragonEngine:
+
     def __init__(self, recipe: list, boundary: Optional[Polygon] = None):
         """
         Initializes the engine with a recipe and an optional boundary.
         """
         self.recipe = recipe
-        self.boundary = boundary or Polygon([(0, 0), (200, 0), (200, 200), (0, 200), (0, 0)])
-        
-        initial_state = PipelineState(boundary=self.boundary, operation_name="base_geometry")
+        self.boundary = boundary or Polygon([(0, 0), (200, 0), (200, 200),
+                                             (0, 200), (0, 0)])
+
+        initial_state = PipelineState(boundary=self.boundary,
+                                      operation_name="base_geometry")
         self.runner = PipelineRunner(initial_state)
 
     def build_pipeline(self) -> bool:
@@ -121,7 +135,9 @@ class PendragonEngine:
         for step in self.recipe:
             op_name = step.get("operation")
             if not op_name:
-                logger.error(f"Invalid step configuration, missing 'operation' key: {step}")
+                logger.error(
+                    f"Invalid step configuration, missing 'operation' key: {step}"
+                )
                 return False
 
             op_info = OPERATION_REGISTRY.get(op_name)
@@ -131,19 +147,20 @@ class PendragonEngine:
 
             PluginClass = op_info["class"]
             ConfigClass = op_info["config"]
-            
+
             validated_config = None
             if ConfigClass:
                 try:
                     validated_config = ConfigClass(**step.get("settings", {}))
-                    logger.success(f"Successfully validated config for {op_name}")
+                    logger.success(
+                        f"Successfully validated config for {op_name}")
                 except Exception as e:
                     logger.error(f"Configuration error for '{op_name}': {e}")
                     return False
-                    
+
             plugin_instance = PluginClass(config=validated_config)
             self.runner.add_operation(plugin_instance)
-            
+
         return True
 
     def run(self) -> List[LineString]:
@@ -153,17 +170,20 @@ class PendragonEngine:
         self.runner.execute_all()
         return self.runner.get_final_lines()
 
-    def export_gcode(self, lines: List[LineString], output_path: str, pen_config: Optional[PenConfig] = None):
+    def export_gcode(self,
+                     lines: List[LineString],
+                     output_path: str,
+                     pen_config: Optional[PenConfig] = None):
         """
         Translates LineStrings into G-code using the PenTool context manager.
         """
         if not lines:
             logger.warning("No lines to export!")
             return
-            
+
         config = pen_config or PenConfig()
         logger.info(f"Generating G-code to {output_path}...")
-        
+
         with PenTool(config=config, output_filename=output_path) as pen:
             for line in lines:
                 points = list(line.coords)
@@ -177,8 +197,10 @@ class PendragonEngine:
         if not history:
             logger.warning("No pipeline history to visualize!")
             return
-            
-        logger.info("Opening visualization window. Use Left/Right arrows to step through operations.")
-        
+
+        logger.info(
+            "Opening visualization window. Use Left/Right arrows to step through operations."
+        )
+
         canvas = PipelineViewer(history)
         app.run()

@@ -1,4 +1,5 @@
-from abc import ABC, abstractmethod
+from abc import ABC
+from abc import abstractmethod
 from typing import Type
 
 from pydantic import BaseModel
@@ -9,6 +10,7 @@ OPERATION_REGISTRY = {}
 
 
 def register_operation(name: str, config_class: Type[BaseModel] | None = None):
+
     def decorator(cls: Type['PipelineOperation']):
         if not issubclass(cls, PipelineOperation):
             raise TypeError(
@@ -21,6 +23,7 @@ def register_operation(name: str, config_class: Type[BaseModel] | None = None):
 
 
 class PipelineOperation(ABC):
+
     def __init__(self, config: BaseModel | None = None) -> None:
         """
         Base initialization for all pipeline operations.

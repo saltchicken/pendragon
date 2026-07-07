@@ -1,27 +1,37 @@
 from typing import List
-from pydantic import BaseModel, Field
-from shapely.geometry import LineString, MultiLineString
-from loguru import logger
 
+from loguru import logger
+from pydantic import BaseModel
+from pydantic import Field
+from shapely.geometry import LineString
+from shapely.geometry import MultiLineString
+
+from pendragon.core import PipelineOperation
 from pendragon.core import PipelineState
-from pendragon.core import PipelineOperation, register_operation
+from pendragon.core import register_operation
 
 
 class GridLinesConfig(BaseModel):
-    spacing: float = Field(default=0.5, description="Distance between consecutive lines.")
-    orientation: str = Field(default="horizontal", description="Orientation of lines: 'horizontal', 'vertical', or 'crosshatch'.")
+    spacing: float = Field(default=0.5,
+                           description="Distance between consecutive lines.")
+    orientation: str = Field(
+        default="horizontal",
+        description=
+        "Orientation of lines: 'horizontal', 'vertical', or 'crosshatch'.")
 
 
 @register_operation("grid_lines", config_class=GridLinesConfig)
 class GridLinesGen(PipelineOperation):
-    
+
     def process(self, state: PipelineState) -> PipelineState:
         active_config = self.config or GridLinesConfig()
         boundary = state.boundary
-        
+
         # 1. Get the bounding box of the current boundary
         minx, miny, maxx, maxy = boundary.bounds
-        logger.info(f"Generating {active_config.orientation} lines with spacing {active_config.spacing}")
+        logger.info(
+            f"Generating {active_config.orientation} lines with spacing {active_config.spacing}"
+        )
 
         generated_lines: List[LineString] = []
 
@@ -58,7 +68,7 @@ class GridLinesGen(PipelineOperation):
         for line in generated_lines:
             if line.intersects(boundary):
                 clipped = line.intersection(boundary)
-                
+
                 # Intersection can return a LineString or MultiLineString if split by complex geometry
                 if isinstance(clipped, LineString) and not clipped.is_empty:
                     clipped_lines.append(clipped)
@@ -67,11 +77,10 @@ class GridLinesGen(PipelineOperation):
                         if not sub_line.is_empty:
                             clipped_lines.append(sub_line)
 
-        logger.success(f"Generated and clipped {len(clipped_lines)} pattern lines.")
+        logger.success(
+            f"Generated and clipped {len(clipped_lines)} pattern lines.")
 
         # 5. Return the new state payload containing the calculated line assets
-        return PipelineState(
-            boundary=boundary,
-            lines=clipped_lines,
-            operation_name="grid_lines"
-        )
+        return PipelineState(boundary=boundary,
+                             lines=clipped_lines,
+                             operation_name="grid_lines")

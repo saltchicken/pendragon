@@ -3,8 +3,8 @@ import logging
 from typing import List, Optional, Tuple
 
 from gscrib import GCodeBuilder
-
 from loguru import logger
+
 
 @dataclass
 class PenConfig:

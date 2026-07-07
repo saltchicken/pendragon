@@ -1,19 +1,23 @@
 from typing import List, Tuple
 
+from loguru import logger
 import numpy as np
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+from pydantic import Field
 from scipy.spatial import cKDTree
 from shapely.geometry import LineString
-from loguru import logger
 
 # Pendragon core imports
+from pendragon.core import PipelineOperation
 from pendragon.core import PipelineState
-from pendragon.core import PipelineOperation, register_operation
+from pendragon.core import register_operation
 
 
 class OptimizeConfig(BaseModel):
-    start_x: float = Field(default=0.0, description="X coordinate to start optimizing from.")
-    start_y: float = Field(default=0.0, description="Y coordinate to start optimizing from.")
+    start_x: float = Field(default=0.0,
+                           description="X coordinate to start optimizing from.")
+    start_y: float = Field(default=0.0,
+                           description="Y coordinate to start optimizing from.")
 
 
 def optimize_paths_nearest_neighbor(
@@ -92,14 +96,15 @@ def optimize_paths_nearest_neighbor(
 
 @register_operation("optimize", config_class=OptimizeConfig)
 class OptimizeMod(PipelineOperation):
-    
+
     def process(self, state: PipelineState) -> PipelineState:
         # Fallback to default if no config provided in YAML
         active_config = self.config or OptimizeConfig()
         current_lines = state.lines
-        
+
         if not current_lines:
-            logger.warning("No lines provided to the optimize operation. Skipping.")
+            logger.warning(
+                "No lines provided to the optimize operation. Skipping.")
             return state
 
         # Unpack Shapely LineStrings into raw coordinate lists
@@ -108,22 +113,21 @@ class OptimizeMod(PipelineOperation):
         start_x = active_config.start_x
         start_y = active_config.start_y
 
-        logger.info(f"Optimizing {len(raw_paths)} paths starting near ({start_x}, {start_y})...")
+        logger.info(
+            f"Optimizing {len(raw_paths)} paths starting near ({start_x}, {start_y})..."
+        )
 
         # Run the KD-Tree nearest neighbor algorithm
-        optimized_paths = optimize_paths_nearest_neighbor(
-            raw_paths,
-            start_pt=(start_x, start_y)
-        )
+        optimized_paths = optimize_paths_nearest_neighbor(raw_paths,
+                                                          start_pt=(start_x,
+                                                                    start_y))
 
         # Repack raw coordinates back into Shapely LineStrings
         optimized_lines = [LineString(path) for path in optimized_paths]
-        
+
         logger.success("Path optimization complete.")
 
         # Return a fresh immutable state for the next pipeline step
-        return PipelineState(
-            boundary=state.boundary,
-            lines=optimized_lines,
-            operation_name="optimize"
-        )
+        return PipelineState(boundary=state.boundary,
+                             lines=optimized_lines,
+                             operation_name="optimize")
