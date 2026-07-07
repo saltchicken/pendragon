@@ -120,7 +120,7 @@ class PipelineViewer(scene.SceneCanvas):
             self.vertices_visual.set_data(pos=stacked_pos, 
                                           face_color='red', 
                                           edge_color=None, 
-                                          size=5)
+                                          size=10)
             self.vertices_visual.visible = True
         else:
             self.lines_visual.visible = False
