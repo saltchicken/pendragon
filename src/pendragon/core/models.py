@@ -1,14 +1,13 @@
-from dataclasses import dataclass
-from dataclasses import field
-from typing import List, Protocol
+from dataclasses import dataclass, field
+from typing import List
 
 from shapely.geometry import LineString
-from shapely.geometry import Point
 from shapely.geometry import Polygon
 
 
-@dataclass
-class OperationContext:
-    """Holds state for the current fill operation."""
+@dataclass(frozen=True)
+class PipelineState:
+    """An immutable snapshot of the geometry at one stage of the pipeline."""
     boundary: Polygon
     lines: List[LineString] = field(default_factory=list)
+    operation_name: str = "initialization"

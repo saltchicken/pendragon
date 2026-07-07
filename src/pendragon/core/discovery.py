@@ -2,6 +2,7 @@ import importlib
 from pathlib import Path
 import sys
 
+from loguru import logger
 import pendragon
 
 
@@ -27,5 +28,4 @@ def load_plugins():
         try:
             importlib.import_module(module_name)
         except Exception as e:
-            print(f"Warning: Failed to load plugin '{relative_path}': {e}",
-                  file=sys.stderr)
+            logger.warning(f"Failed to load plugin '{relative_path}': {e}")

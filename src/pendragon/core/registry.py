@@ -1,20 +1,18 @@
-from typing import List, Protocol, runtime_checkable, Type
+from abc import ABC, abstractmethod
+from typing import Type
 
 from pydantic import BaseModel
-from shapely.geometry import LineString
 
-from pendragon.core.models import OperationContext
+from pendragon.core.models import PipelineState
 
 OPERATION_REGISTRY = {}
 
 
-def register_operation(name: str, config_class: Type[BaseModel] = None):
-
-    def decorator(cls: Type[PipelineOperation]):
+def register_operation(name: str, config_class: Type[BaseModel] | None = None):
+    def decorator(cls: Type['PipelineOperation']):
         if not issubclass(cls, PipelineOperation):
             raise TypeError(
-                f"Plugin '{name}' ({cls.__name__}) does not satisfy the PipelineOperation protocol. "
-                "Ensure it implements a 'process' method with the correct signature."
+                f"Plugin '{name}' ({cls.__name__}) must inherit from PipelineOperation."
             )
         OPERATION_REGISTRY[name] = {"class": cls, "config": config_class}
         return cls
@@ -22,8 +20,17 @@ def register_operation(name: str, config_class: Type[BaseModel] = None):
     return decorator
 
 
-@runtime_checkable
-class PipelineOperation(Protocol):
+class PipelineOperation(ABC):
+    def __init__(self, config: BaseModel | None = None) -> None:
+        """
+        Base initialization for all pipeline operations.
+        Automatically binds the Pydantic configuration model to the instance.
+        """
+        self.config = config
 
-    def process(self, context: OperationContext) -> List[LineString]:
-        ...
+    @abstractmethod
+    def process(self, state: PipelineState) -> PipelineState:
+        """
+        Takes the current state and returns a NEW PipelineState snapshot.
+        """
+        pass
