@@ -27,7 +27,8 @@ class PipelineViewer(scene.SceneCanvas):
                          show=True)
         self.unfreeze()
         self.history = history
-        self.current_step = 0
+        # Start on second step (index 1), or step 0 if there are no operations
+        self.current_step = min(1, len(self.history) - 1)
 
         # Setup view and camera
         self.view = self.central_widget.add_view()
@@ -39,6 +40,7 @@ class PipelineViewer(scene.SceneCanvas):
                                                color='white')
         self.boundary_visual = scene.visuals.Line(parent=self.view.scene,
                                                   color='red')
+        self.vertices_visual = scene.visuals.Markers(parent=self.view.scene)
 
         # Screen-space Text HUD for current step metrics
         # Parented directly to the canvas widget so it stays fixed in place during pan/zoom
@@ -106,11 +108,23 @@ class PipelineViewer(scene.SceneCanvas):
                 for i in range(n_pts - 1):
                     connect.append([idx + i, idx + i + 1])
                 idx += n_pts
-            self.lines_visual.set_data(pos=np.vstack(pos),
+                
+            # Stack the positions once so we can use them for both lines and markers
+            stacked_pos = np.vstack(pos)
+            
+            self.lines_visual.set_data(pos=stacked_pos,
                                        connect=np.array(connect))
             self.lines_visual.visible = True
+            
+            # Update the vertices visual
+            self.vertices_visual.set_data(pos=stacked_pos, 
+                                          face_color='red', 
+                                          edge_color=None, 
+                                          size=5)
+            self.vertices_visual.visible = True
         else:
             self.lines_visual.visible = False
+            self.vertices_visual.visible = False
 
 
 class PendragonEngine:
