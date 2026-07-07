@@ -1,5 +1,6 @@
 from PIL import Image
 
+
 class ImageSampler:
 
     def __init__(self, image_path: str, bounds: tuple):
@@ -21,4 +22,3 @@ class ImageSampler:
                 int((1.0 - ((y - self.miny) / self.height)) *
                     (self.img.height - 1)), self.img.height - 1))
         return (255 - self.img.getpixel((px, py))) / 255.0
-

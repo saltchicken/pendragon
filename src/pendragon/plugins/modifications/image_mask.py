@@ -27,5 +27,3 @@ class ImageMaskMod:
         print(boundary)
 
         return test_mask_list
-
-
