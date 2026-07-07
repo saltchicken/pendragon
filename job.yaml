@@ -1,0 +1,4 @@
+- operation: image_mask
+  settings:
+    mask_image: images/loz.jpg
+    threshold: 0.85
