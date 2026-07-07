@@ -13,7 +13,7 @@ def main():
     parser = argparse.ArgumentParser(description="Pendragon CNC G-code generator.")
     parser.add_argument("recipe", type=str, help="Path to the YAML recipe file.")
     parser.add_argument("--output", type=str, default="output.nc", help="Output path for the generated G-code.")
-    parser.add_argument("--no-vis", action="store_true", help="Disable the Matplotlib visualization window.")
+    parser.add_argument("--no-vis", action="store_true", help="Disable the Vispy visualization window.")
     args = parser.parse_args()
 
     # 1. Discover and load plugins
@@ -51,7 +51,7 @@ def main():
 
     # 7. Visualize (Optional)
     if not args.no_vis:
-        engine.visualize(lines=final_lines)
+        engine.visualize()
 
 if __name__ == "__main__":
     main()

@@ -1,7 +1,8 @@
 # src/pendragon/core/engine.py
 
 from typing import List, Optional
-import matplotlib.pyplot as plt
+import numpy as np
+from vispy import app, scene
 from loguru import logger
 from shapely.geometry import Polygon, LineString
 
@@ -9,6 +10,68 @@ from pendragon.core.models import PipelineState
 from pendragon.core.runner import PipelineRunner
 from pendragon.core.registry import OPERATION_REGISTRY
 from pendragon.pen import PenTool, PenConfig
+
+
+class PipelineViewer(scene.SceneCanvas):
+    def __init__(self, history: List[PipelineState]):
+        super().__init__(keys='interactive', size=(800, 800), show=True)
+        self.unfreeze()
+        self.history = history
+        self.current_step = 0
+        self.view = self.central_widget.add_view()
+        self.view.camera = 'panzoom'
+        self.view.camera.aspect = 1.0
+
+        self.lines_visual = scene.visuals.Line(parent=self.view.scene, color='white')
+        self.boundary_visual = scene.visuals.Line(parent=self.view.scene, color='red')
+        self.freeze()
+
+        self.update_view()
+        if self.history and self.history[0].boundary:
+            minx, miny, maxx, maxy = self.history[0].boundary.bounds
+            self.view.camera.set_range(x=(minx, maxx), y=(miny, maxy))
+        else:
+            try:
+                self.view.camera.set_range()
+            except ValueError:
+                pass
+
+    def on_key_press(self, event):
+        if event.key.name == 'Right':
+            self.current_step = min(self.current_step + 1, len(self.history) - 1)
+            self.update_view()
+        elif event.key.name == 'Left':
+            self.current_step = max(self.current_step - 1, 0)
+            self.update_view()
+        elif event.key.name == 'Escape':
+            self.close()
+
+    def update_view(self):
+        state = self.history[self.current_step]
+        self.title = f"Step {self.current_step + 1}/{len(self.history)}: {state.operation_name} ({len(state.lines)} lines)"
+
+        if state.boundary:
+            bx, by = state.boundary.exterior.xy
+            self.boundary_visual.set_data(pos=np.column_stack((bx, by)))
+            self.boundary_visual.visible = True
+        else:
+            self.boundary_visual.visible = False
+
+        if state.lines:
+            pos = []
+            connect = []
+            idx = 0
+            for line in state.lines:
+                coords = np.array(line.coords)
+                pos.append(coords)
+                n_pts = len(coords)
+                for i in range(n_pts - 1):
+                    connect.append([idx + i, idx + i + 1])
+                idx += n_pts
+            self.lines_visual.set_data(pos=np.vstack(pos), connect=np.array(connect))
+            self.lines_visual.visible = True
+        else:
+            self.lines_visual.visible = False
 
 
 class PendragonEngine:
@@ -79,26 +142,16 @@ class PendragonEngine:
                 points = list(line.coords)
                 pen.draw_path(points)
 
-    def visualize(self, lines: List[LineString]):
+    def visualize(self):
         """
-        Renders the final paths and boundary in a Matplotlib window.
+        Renders the pipeline history in an interactive Vispy window.
         """
-        if not lines:
-            logger.warning("No lines to visualize!")
+        history = self.runner.history
+        if not history:
+            logger.warning("No pipeline history to visualize!")
             return
             
-        logger.info("Opening visualization window...")
-        fig, ax = plt.subplots(figsize=(8, 8))
+        logger.info("Opening visualization window. Use Left/Right arrows to step through operations.")
         
-        # Plot boundary
-        bx, by = self.boundary.exterior.xy
-        ax.plot(bx, by, color='red', linestyle='--', label='Boundary')
-
-        # Plot paths
-        for line in lines:
-            x, y = line.xy
-            ax.plot(x, y, color='black', linewidth=1)
-            
-        ax.set_aspect('equal')
-        ax.set_title("Pendragon Generated Lines")
-        plt.show()
+        canvas = PipelineViewer(history)
+        app.run()
