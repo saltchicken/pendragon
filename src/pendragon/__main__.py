@@ -4,7 +4,6 @@ from pendragon.core import OPERATION_REGISTRY
 
 def main():
     load_plugins()
-    print(OPERATION_REGISTRY)
     op_info = OPERATION_REGISTRY.get("image_mask")
     if op_info:
         plugin_instance = op_info["class"]()

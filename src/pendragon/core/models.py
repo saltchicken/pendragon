@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from dataclasses import field
 from typing import List, Protocol
 
 from shapely.geometry import LineString
@@ -8,11 +9,6 @@ from shapely.geometry import Polygon
 
 @dataclass
 class OperationContext:
-    """Holds read-only state for the current fill operation."""
+    """Holds state for the current fill operation."""
     boundary: Polygon
-
-
-class PipelineOperation(Protocol):
-
-    def process(self, context: OperationContext) -> List[LineString]:
-        ...
+    lines: List[LineString] = field(default_factory=list)
