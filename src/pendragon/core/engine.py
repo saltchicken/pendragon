@@ -14,16 +14,33 @@ from pendragon.pen import PenTool, PenConfig
 
 class PipelineViewer(scene.SceneCanvas):
     def __init__(self, history: List[PipelineState]):
-        super().__init__(keys='interactive', size=(800, 800), show=True)
+        # Keep window title clean and static
+        super().__init__(keys='interactive', size=(800, 800), title="Pendragon Pipeline Visualizer", show=True)
         self.unfreeze()
         self.history = history
         self.current_step = 0
+        
+        # Setup view and camera
         self.view = self.central_widget.add_view()
         self.view.camera = 'panzoom'
         self.view.camera.aspect = 1.0
 
+        # Geometry visuals
         self.lines_visual = scene.visuals.Line(parent=self.view.scene, color='white')
         self.boundary_visual = scene.visuals.Line(parent=self.view.scene, color='red')
+        
+        # Screen-space Text HUD for current step metrics
+        # Parented directly to the canvas widget so it stays fixed in place during pan/zoom
+        self.hud_text = scene.visuals.Text(
+            text="",
+            parent=self.central_widget,
+            color='yellow',
+            font_size=11,
+            anchor_x='left',
+            anchor_y='top',
+            pos=(15, 15)  # Offset slightly from top-left corner
+        )
+        
         self.freeze()
 
         self.update_view()
@@ -48,7 +65,18 @@ class PipelineViewer(scene.SceneCanvas):
 
     def update_view(self):
         state = self.history[self.current_step]
-        self.title = f"Step {self.current_step + 1}/{len(self.history)}: {state.operation_name} ({len(state.lines)} lines)"
+        
+        # Calculate totals
+        total_vertices = sum(len(line.coords) for line in state.lines)
+        
+        # Construct single-line textbox string
+        hud_string = (
+            f"Step: {self.current_step + 1}/{len(self.history)} | "
+            f"Operation: {state.operation_name} | "
+            f"Lines: {len(state.lines)} | "
+            f"Vertices: {total_vertices}"
+        )
+        self.hud_text.text = hud_string
 
         if state.boundary:
             bx, by = state.boundary.exterior.xy
@@ -80,7 +108,6 @@ class PendragonEngine:
         Initializes the engine with a recipe and an optional boundary.
         """
         self.recipe = recipe
-        # Hardcoded for now, but prepped for Issue #1 (Dynamic Boundaries)
         self.boundary = boundary or Polygon([(0, 0), (200, 0), (200, 200), (0, 200), (0, 0)])
         
         initial_state = PipelineState(boundary=self.boundary, operation_name="base_geometry")
