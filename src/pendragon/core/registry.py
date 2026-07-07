@@ -8,4 +8,3 @@ def register_operation(name, config_class=None):
         return cls
 
     return decorator
-

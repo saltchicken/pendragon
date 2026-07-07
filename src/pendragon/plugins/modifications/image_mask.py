@@ -6,8 +6,8 @@ from pydantic import Field
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
-from pendragon.core import register_operation
 from pendragon.core import OperationContext
+from pendragon.core import register_operation
 
 
 class ImageMaskConfig(BaseModel):
@@ -19,38 +19,14 @@ class ImageMaskConfig(BaseModel):
 class ImageMaskMod:
 
     def process(self, context: OperationContext) -> List[LineString]:
-        params = context.config.params
 
-        mask_image = params.mask_image
-        if not mask_image:
-            return lines
+        test_mask_list: List[LineString] = []
 
-        mask_sampler = ImageSampler(mask_image, context.bounds)
-        threshold = params.threshold
-        masked_lines = []
-        step_res = 1.0
+        boundary = context.boundary
+        print(boundary)
 
-        for line in lines:
-            length = line.length
-            if length == 0:
-                continue
+        return test_mask_list
 
-            steps = max(2, int(math.ceil(length / step_res)))
-            current_segment = []
-
-            for i in range(steps + 1):
-                pt = line.interpolate(i / steps, normalized=True)
-                if mask_sampler.get_darkness(pt.x, pt.y) > threshold:
-                    current_segment.append((pt.x, pt.y))
-                else:
-                    if len(current_segment) > 1:
-                        masked_lines.append(LineString(current_segment))
-                    current_segment = []
-
-            if len(current_segment) > 1:
-                masked_lines.append(LineString(current_segment))
-
-        return masked_lines
 
 class ImageSampler:
 
@@ -73,4 +49,3 @@ class ImageSampler:
                 int((1.0 - ((y - self.miny) / self.height)) *
                     (self.img.height - 1)), self.img.height - 1))
         return (255 - self.img.getpixel((px, py))) / 255.0
-

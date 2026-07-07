@@ -1,2 +1,3 @@
 from .models import OperationContext
-from .registry import register_operation
+from .discovery import load_plugins
+from .registry import register_operation, OPERATION_REGISTRY
