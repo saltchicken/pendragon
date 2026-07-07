@@ -1,3 +1,8 @@
+- operation: grid_lines
+  settings:
+    spacing: 0.25
+    orientation: crosshatch
+
 - operation: image_mask
   settings:
     mask_image: images/loz.jpg

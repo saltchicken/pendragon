@@ -34,7 +34,7 @@ def main():
         return
     
     # 3. Initialize the Runner
-    dummy_boundary = Polygon([(0, 0), (10, 0), (10, 10), (0, 10), (0, 0)])
+    dummy_boundary = Polygon([(0, 0), (200, 0), (200, 200), (0, 200), (0, 0)])
     initial_state = PipelineState(boundary=dummy_boundary, operation_name="base_geometry")
     runner = PipelineRunner(initial_state)
 
