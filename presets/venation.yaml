@@ -1,24 +1,14 @@
 # yaml-language-server: $schema=./recipe-schema.json
 
-- operation: grid_lines
+- operation: venation
   settings:
-    overscan: 0
-    spacing: 50.0
-    orientation: crosshatch
-
-- operation: generate_in_cells
-  settings:
-    generator: venation
-    auto_center: true
-    keep_scaffolding: true
-    generator_settings:
-      num_leaves: 800
-      kill_distance: 3.0
-      attract_distance: 25.0
-      segment_length: 1.5
-      root_x: 100.0
-      root_y: 10.0
-      seed: 123
+    num_leaves: 800
+    kill_distance: 3.0
+    attract_distance: 25.0
+    segment_length: 1.5
+    root_x: 100.0
+    root_y: 10.0
+    seed: 123
 
 # Critical: Stitches the thousands of tiny growth segments into smooth continuous paths
 - operation: connect_continuous

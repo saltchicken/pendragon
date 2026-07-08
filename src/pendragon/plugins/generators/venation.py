@@ -16,6 +16,8 @@ from pendragon.core import register_operation
 
 
 class VenationConfig(BasePluginConfig):
+    center_x: float = Field(default=100.0, description="Center X for growth.")
+    center_y: float = Field(default=0.0, description="Center Y for growth.")
     num_leaves: int = Field(
         default=500,
         description="Number of attractor points (leaves) to drive the growth.")
@@ -49,6 +51,9 @@ class VenationGen(PipelineOperation):
         boundary = self.get_effective_boundary(state)
         minx, miny, maxx, maxy = boundary.bounds
 
+        root_x = cfg.center_x
+        root_y = cfg.center_y
+
         logger.info(
             f"Generating venation pattern from root ({cfg.root_x}, {cfg.root_y}) "
             f"with {cfg.num_leaves} attractors.")
@@ -71,7 +76,7 @@ class VenationGen(PipelineOperation):
             return state
 
         # 2. Initialize the network with a single root node
-        nodes = np.array([[cfg.root_x, cfg.root_y]])
+        nodes = np.array([[root_x, root_y]])
         raw_lines = []
 
         # 3. Grow the network

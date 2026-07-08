@@ -59,6 +59,12 @@
           "description": "If true, includes the original incoming lines (the grid) in the final output.",
           "title": "Keep Scaffolding",
           "type": "boolean"
+        },
+        "tolerance": {
+          "default": 1e-05,
+          "description": "Grid size for snapping vertices to resolve floating-point gaps. Set to 0 to disable.",
+          "title": "Tolerance",
+          "type": "number"
         }
       },
       "required": [
@@ -517,6 +523,25 @@
       "title": "Step_spiral",
       "type": "object"
     },
+    "Step_venation": {
+      "properties": {
+        "operation": {
+          "const": "venation",
+          "description": "Execute the 'venation' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/VenationConfig",
+          "description": "Settings for 'venation'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_venation",
+      "type": "object"
+    },
     "Step_voronoi_dual": {
       "properties": {
         "operation": {
@@ -534,6 +559,66 @@
         "operation"
       ],
       "title": "Step_voronoi_dual",
+      "type": "object"
+    },
+    "VenationConfig": {
+      "properties": {
+        "overscan": {
+          "default": 0.0,
+          "description": "Distance to expand (positive) or shrink (negative) the operation's clipping boundary.",
+          "title": "Overscan",
+          "type": "number"
+        },
+        "num_leaves": {
+          "default": 500,
+          "description": "Number of attractor points (leaves) to drive the growth.",
+          "title": "Num Leaves",
+          "type": "integer"
+        },
+        "kill_distance": {
+          "default": 2.0,
+          "description": "Distance at which an attractor is considered reached and removed.",
+          "title": "Kill Distance",
+          "type": "number"
+        },
+        "attract_distance": {
+          "default": 20.0,
+          "description": "Maximum distance an attractor can influence a growing vein.",
+          "title": "Attract Distance",
+          "type": "number"
+        },
+        "segment_length": {
+          "default": 1.0,
+          "description": "How far a vein grows in a single step.",
+          "title": "Segment Length",
+          "type": "number"
+        },
+        "root_x": {
+          "default": 100.0,
+          "description": "Starting X coordinate of the root vein.",
+          "title": "Root X",
+          "type": "number"
+        },
+        "root_y": {
+          "default": 0.0,
+          "description": "Starting Y coordinate of the root vein.",
+          "title": "Root Y",
+          "type": "number"
+        },
+        "seed": {
+          "default": 42,
+          "description": "Random seed for repeatable patterns.",
+          "title": "Seed",
+          "type": "integer"
+        },
+        "max_iterations": {
+          "default": 1000,
+          "description": "Safety limit to prevent infinite generation loops.",
+          "title": "Max Iterations",
+          "type": "integer"
+        }
+      },
+      "title": "VenationConfig",
       "type": "object"
     },
     "VoronoiDualConfig": {
@@ -578,6 +663,12 @@
   "items": {
     "anyOf": [
       {
+        "$ref": "#/$defs/Step_clip"
+      },
+      {
+        "$ref": "#/$defs/Step_deduplicate"
+      },
+      {
         "$ref": "#/$defs/Step_image_mask"
       },
       {
@@ -587,22 +678,19 @@
         "$ref": "#/$defs/Step_simplify"
       },
       {
-        "$ref": "#/$defs/Step_merge"
-      },
-      {
-        "$ref": "#/$defs/Step_deduplicate"
-      },
-      {
         "$ref": "#/$defs/Step_connect_continuous"
-      },
-      {
-        "$ref": "#/$defs/Step_polygonize"
       },
       {
         "$ref": "#/$defs/Step_generate_in_cells"
       },
       {
-        "$ref": "#/$defs/Step_clip"
+        "$ref": "#/$defs/Step_merge"
+      },
+      {
+        "$ref": "#/$defs/Step_polygonize"
+      },
+      {
+        "$ref": "#/$defs/Step_grid_lines"
       },
       {
         "$ref": "#/$defs/Step_guilloche"
@@ -611,13 +699,13 @@
         "$ref": "#/$defs/Step_spiral"
       },
       {
-        "$ref": "#/$defs/Step_grid_lines"
+        "$ref": "#/$defs/Step_venation"
       },
       {
         "$ref": "#/$defs/Step_voronoi_dual"
       }
     ]
   },
-  "title": "RootModel[List[Union[Step_image_mask, Step_optimize, Step_simplify, Step_merge, Step_deduplicate, Step_connect_continuous, Step_polygonize, Step_generate_in_cells, Step_clip, Step_guilloche, Step_spiral, Step_grid_lines, Step_voronoi_dual]]]",
+  "title": "RootModel[List[Union[Step_clip, Step_deduplicate, Step_image_mask, Step_optimize, Step_simplify, Step_connect_continuous, Step_generate_in_cells, Step_merge, Step_polygonize, Step_grid_lines, Step_guilloche, Step_spiral, Step_venation, Step_voronoi_dual]]]",
   "type": "array"
 }
