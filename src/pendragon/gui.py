@@ -5,7 +5,7 @@ from vispy import scene
 
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QSlider, QLabel, 
-    QFormLayout, QApplication, QCheckBox, QGroupBox
+    QFormLayout, QApplication, QCheckBox, QGroupBox, QPushButton
 )
 from PyQt5.QtCore import Qt, QTimer
 
@@ -54,6 +54,19 @@ QSlider::sub-page:horizontal {
     background: #007acc;
     border-radius: 3px;
 }
+QPushButton {
+    background-color: #333333;
+    border: 1px solid #555555;
+    border-radius: 4px;
+    padding: 6px;
+    color: #cccccc;
+}
+QPushButton:hover {
+    background-color: #444444;
+}
+QPushButton:pressed {
+    background-color: #222222;
+}
 """
 
 
@@ -101,6 +114,17 @@ class LiveEditorWindow(QMainWindow):
         self.final_view_checkbox.setChecked(False)
         self.final_view_checkbox.toggled.connect(self._on_view_mode_toggled)
         self.control_layout.addWidget(self.final_view_checkbox)
+
+        self.nav_layout = QHBoxLayout()
+        self.btn_prev = QPushButton("Previous Step")
+        self.btn_next = QPushButton("Next Step")
+        
+        self.btn_prev.clicked.connect(self.viewer.step_backward)
+        self.btn_next.clicked.connect(self.viewer.step_forward)
+        
+        self.nav_layout.addWidget(self.btn_prev)
+        self.nav_layout.addWidget(self.btn_next)
+        self.control_layout.addLayout(self.nav_layout)
 
         # Dynamic form area for sliders
         self.dynamic_form_widget = QWidget()
@@ -241,28 +265,31 @@ class PipelineViewer(scene.SceneCanvas):
             except ValueError:
                 pass
 
-    def on_key_press(self, event):
-        step_changed = False
+    def step_forward(self):
         max_step = len(self.engine.runner.operations)
-        
+        if self.current_step < max_step:
+            self.current_step += 1
+            self.update_view()
+            if self.on_step_changed is not None:
+                self.on_step_changed()
+
+    def step_backward(self):
+        if self.current_step > 0:
+            self.current_step -= 1
+            self.update_view()
+            if self.on_step_changed is not None:
+                self.on_step_changed()
+
+    def on_key_press(self, event):
         if event.key.name == 'Right':
-            if self.current_step < max_step:
-                self.current_step += 1
-                step_changed = True
+            self.step_forward()
         elif event.key.name == 'Left':
-            if self.current_step > 0:
-                self.current_step -= 1
-                step_changed = True
+            self.step_backward()
         elif event.key.name == 'Escape':
             if self.on_close_requested is not None:
                 self.on_close_requested()
             else:
                 self.close()
-
-        if step_changed:
-            self.update_view()
-            if self.on_step_changed is not None:
-                self.on_step_changed()
 
     def update_view(self):
         # 1. Determine how far we need to compute based on the view mode
