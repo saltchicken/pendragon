@@ -1,15 +1,19 @@
+import yaml
 from typing import List
 import numpy as np
 from shapely.geometry import Polygon, MultiPolygon
 from vispy import scene
+from loguru import logger
 
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QSlider, QLabel, 
-    QFormLayout, QApplication, QCheckBox, QGroupBox, QPushButton
+    QFormLayout, QApplication, QCheckBox, QGroupBox, QPushButton,
+    QFileDialog
 )
 from PyQt5.QtCore import Qt, QTimer
 
 from pendragon.core.models import PipelineState
+from pendragon.core.registry import OPERATION_REGISTRY
 
 
 DARK_THEME_STYLESHEET = """
@@ -126,6 +130,22 @@ class LiveEditorWindow(QMainWindow):
         self.nav_layout.addWidget(self.btn_next)
         self.control_layout.addLayout(self.nav_layout)
 
+        # --- Action Buttons ---
+        self.action_layout = QHBoxLayout()
+        self.btn_load_recipe = QPushButton("Load Recipe")
+        self.btn_export_gcode = QPushButton("Export G-Code")
+        self.btn_save_recipe = QPushButton("Save Recipe")
+        
+        self.btn_load_recipe.clicked.connect(self._load_live_recipe)
+        self.btn_export_gcode.clicked.connect(self._export_live_gcode)
+        self.btn_save_recipe.clicked.connect(self._save_live_recipe)
+        
+        self.action_layout.addWidget(self.btn_load_recipe)
+        self.action_layout.addWidget(self.btn_save_recipe)
+        self.action_layout.addWidget(self.btn_export_gcode)
+        self.control_layout.addLayout(self.action_layout)
+        # ----------------------
+
         # Dynamic form area for sliders
         self.dynamic_form_widget = QWidget()
         self.form_layout = QFormLayout(self.dynamic_form_widget)
@@ -227,6 +247,91 @@ class LiveEditorWindow(QMainWindow):
             target = len(self.engine.runner.operations) if self.viewer.show_final_view else self.viewer.current_step
             self.engine.runner.recompute_from(self._pending_op_index, target)
             self.viewer.update_view()
+
+    def _load_live_recipe(self):
+        """Prompts the user to select a YAML recipe, loads it, and refreshes the GUI."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Load Recipe", "", "YAML Files (*.yaml *.yml);;All Files (*)"
+        )
+        
+        if not file_path:
+            return
+
+        try:
+            with open(file_path, 'r') as f:
+                new_recipe = yaml.safe_load(f)
+                
+            # Basic validation to ensure it matches the current expected schema
+            if not isinstance(new_recipe, list):
+                logger.error("Invalid recipe format: must be a list of operations.")
+                return
+
+            # 1. Inject the new recipe into the engine
+            success = self.engine.load_recipe(new_recipe)
+            
+            if success:
+                # 2. Reset the viewer state to the end of the new pipeline
+                self.viewer.current_step = len(self.engine.runner.operations)
+                
+                # 3. Rebuild the dynamic sliders for the current step
+                self.build_ui_for_current_step()
+                
+                # 4. Force Vispy to recalculate and redraw the canvas
+                self.viewer.update_view()
+                
+        except Exception as e:
+            logger.error(f"Error loading recipe from {file_path}: {e}")
+
+    def _export_live_gcode(self):
+        """Prompts the user for a save location and exports the current final paths."""
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Export G-Code", "output.nc", "G-Code Files (*.nc *.gcode);;All Files (*)"
+        )
+        
+        if file_path:
+            # Ensure the pipeline is fully computed to the end
+            self.engine.runner.recompute_from(0, len(self.engine.runner.operations))
+            final_lines = self.engine.runner.get_final_lines()
+            self.engine.export_gcode(lines=final_lines, output_path=file_path)
+
+    def _save_live_recipe(self):
+        """Serializes the current pipeline state back into a YAML recipe."""
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Save Recipe", "preset.yaml", "YAML Files (*.yaml *.yml);;All Files (*)"
+        )
+        
+        if not file_path:
+            return
+
+        current_recipe = []
+        
+        # Iterate through the live operations to reconstruct the recipe
+        for op in self.engine.runner.operations:
+            # Reverse-lookup the operation name from the registry
+            op_name = next(
+                (name for name, info in OPERATION_REGISTRY.items() if isinstance(op, info["class"])), 
+                None
+            )
+            
+            if not op_name:
+                continue
+                
+            # Build the step dictionary
+            step = {"operation": op_name}
+            
+            # Serialize the Pydantic config back to a standard dictionary
+            if op.config:
+                step["settings"] = op.config.model_dump()
+                
+            current_recipe.append(step)
+
+        # Write the reconstructed recipe to disk
+        try:
+            with open(file_path, 'w') as f:
+                yaml.safe_dump(current_recipe, f, sort_keys=False, default_flow_style=False)
+            logger.success(f"Recipe successfully saved to {file_path}")
+        except Exception as e:
+            logger.error(f"Failed to save recipe: {e}")
 
 
 class PipelineViewer(scene.SceneCanvas):
