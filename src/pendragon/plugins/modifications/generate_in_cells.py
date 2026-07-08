@@ -1,6 +1,7 @@
 from typing import Any, Dict
 from loguru import logger
 from pydantic import BaseModel, Field
+from shapely import set_precision  # <-- New import to handle topological snapping
 from shapely.ops import polygonize, unary_union
 
 from pendragon.core import PipelineOperation, PipelineState, register_operation
@@ -16,6 +17,12 @@ class GenerateInCellsConfig(BasePluginConfig):
     keep_scaffolding: bool = Field(
         default=False, 
         description="If true, includes the original incoming lines (the grid) in the final output."
+    )
+    
+    # New tolerance parameter for floating-point cleanup
+    tolerance: float = Field(
+        default=1e-5,
+        description="Grid size for snapping vertices to resolve floating-point gaps. Set to 0 to disable."
     )
 
 
@@ -40,7 +47,13 @@ class GenerateInCellsOp(PipelineOperation):
         # 3. Slice all lines at their intersection points
         noded_lines = unary_union(all_lines)
 
-        # 4. Now polygonize can successfully detect the closed loops
+        # 4. Resolve floating-point inaccuracies
+        if cfg.tolerance > 0:
+            logger.debug(f"Applying precision snapping with tolerance {cfg.tolerance}")
+            # set_precision aligns vertices to a grid, closing microscopic gaps
+            noded_lines = set_precision(noded_lines, grid_size=cfg.tolerance)
+
+        # 5. Now polygonize can successfully detect the closed loops
         polygons = list(polygonize(noded_lines))
         # --------------------------------------------
 
@@ -50,7 +63,7 @@ class GenerateInCellsOp(PipelineOperation):
 
         logger.info(f"Formed {len(polygons)} cells. Running '{cfg.generator}' inside each...")
 
-        # 2. Look up the requested sub-generator in the registry
+        # 6. Look up the requested sub-generator in the registry
         op_info = OPERATION_REGISTRY.get(cfg.generator)
         if not op_info:
             logger.error(f"Sub-generator '{cfg.generator}' not found in registry.")
@@ -61,7 +74,7 @@ class GenerateInCellsOp(PipelineOperation):
 
         all_new_lines = []
 
-        # 3. Iterate over every isolated cell
+        # 7. Iterate over every isolated cell
         for poly in polygons:
             cell_settings = cfg.generator_settings.copy()
             
@@ -82,15 +95,15 @@ class GenerateInCellsOp(PipelineOperation):
             
             sub_gen = SubGenClass(config=sub_config)
             
-            # 4. Create a temporary local state where the boundary is ONLY this cell
-            #    and the lines are empty so the generator starts fresh.
+            # Create a temporary local state where the boundary is ONLY this cell
+            # and the lines are empty so the generator starts fresh.
             temp_state = PipelineState(
                 boundary=poly,
                 lines=[], 
                 operation_name=f"cell_{cfg.generator}"
             )
             
-            # 5. Execute the sub-generator and collect the output
+            # Execute the sub-generator and collect the output
             result_state = sub_gen.process(temp_state)
             all_new_lines.extend(result_state.lines)
 
@@ -101,7 +114,7 @@ class GenerateInCellsOp(PipelineOperation):
             logger.info("Keeping original scaffolding lines in the output.")
             final_lines = current_lines + all_new_lines
 
-        # 6. Return the unified lines, but PRESERVE the original global boundary
+        # 8. Return the unified lines, but PRESERVE the original global boundary
         return PipelineState(
             boundary=state.boundary,
             lines=final_lines,
