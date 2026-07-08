@@ -30,7 +30,7 @@ class VoronoiDualConfig(BasePluginConfig):
     )
 
 
-@register_operation("voronoi-dual", config_class=VoronoiDualConfig)
+@register_operation("voronoi_dual", config_class=VoronoiDualConfig)
 class VoronoiDualGen(PipelineOperation):
     """Generates Voronoi cells, Delaunay triangulations, or both overlaid."""
 
@@ -47,7 +47,7 @@ class VoronoiDualGen(PipelineOperation):
         height = maxy - miny
 
         if width <= 0 or height <= 0:
-            logger.warning("Effective boundary has no area. Skipping voronoi-dual generation.")
+            logger.warning("Effective boundary has no area. Skipping voronoi_dual generation.")
             return state
 
         logger.info(f"Generating {cfg.mode} diagram...")
@@ -123,5 +123,5 @@ class VoronoiDualGen(PipelineOperation):
         return PipelineState(
             boundary=state.boundary,
             lines=current_lines + clipped_lines,
-            operation_name="voronoi-dual"
+            operation_name="voronoi_dual"
         )

@@ -520,14 +520,14 @@
     "Step_voronoi_dual": {
       "properties": {
         "operation": {
-          "const": "voronoi-dual",
-          "description": "Execute the 'voronoi-dual' operation.",
+          "const": "voronoi_dual",
+          "description": "Execute the 'voronoi_dual' operation.",
           "title": "Operation",
           "type": "string"
         },
         "settings": {
           "$ref": "#/$defs/VoronoiDualConfig",
-          "description": "Settings for 'voronoi-dual'."
+          "description": "Settings for 'voronoi_dual'."
         }
       },
       "required": [
