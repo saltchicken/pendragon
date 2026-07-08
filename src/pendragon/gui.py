@@ -1,5 +1,5 @@
 import yaml
-from typing import List
+from typing import List, Dict, Any
 import numpy as np
 from shapely.geometry import Polygon, MultiPolygon
 from vispy import scene
@@ -203,8 +203,8 @@ class LiveEditorWindow(QMainWindow):
         for field_name, field_info in operation.config.model_fields.items():
             current_value = getattr(operation.config, field_name)
             
+            # --- Handle Root Float Parameters ---
             if field_info.annotation == float:
-                # 1. Create a container widget and horizontal layout
                 container = QWidget()
                 h_layout = QHBoxLayout(container)
                 h_layout.setContentsMargins(0, 0, 0, 0)
@@ -214,25 +214,72 @@ class LiveEditorWindow(QMainWindow):
                 slider.setMaximum(1000)
                 slider.setValue(int(current_value * 10)) 
                 
-                # 2. Create the label to display the numerical value
                 value_label = QLabel(f"{current_value:.1f}")
                 value_label.setMinimumWidth(35)
                 value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 
-                # 3. Add both widgets to the row's layout
                 h_layout.addWidget(slider)
                 h_layout.addWidget(value_label)
                 
-                # 4. Use a closure to update both the engine state and the UI label
                 def update_wrapper(val, fname=field_name, idx=op_index, lbl=value_label):
                     real_val = val / 10.0
                     lbl.setText(f"{real_val:.1f}")
                     self.update_parameter(idx, fname, real_val)
                     
                 slider.valueChanged.connect(update_wrapper)
-                
-                # 5. Add the combined container to the form layout instead of just the slider
                 self.form_layout.addRow(field_name, container)
+
+            # --- Dynamic Poly-morphic Nested Settings Section ---
+            elif isinstance(current_value, dict) or field_info.annotation == dict or getattr(field_info.annotation, '__origin__', None) is dict:
+                # Infer what the target sub-registry schema is by checking adjacent sibling attributes
+                # e.g., if we are looking at generator_settings, check if self.config.generator exists.
+                registry_key = None
+                
+                # Dynamic inference strategy: Look for a field named like the root prefix (e.g. "generator")
+                prefix = field_name.split('_')[0] if '_' in field_name else ""
+                if prefix and hasattr(operation.config, prefix):
+                    registry_key = getattr(operation.config, prefix)
+                elif hasattr(operation.config, "generator"): # Fallback standard
+                    registry_key = getattr(operation.config, "generator")
+
+                op_info = OPERATION_REGISTRY.get(registry_key) if registry_key else None
+                
+                if op_info and op_info["config"]:
+                    sub_config_class = op_info["config"]
+                    self.form_layout.addRow(QLabel(f"<br><i>Nested Context: {registry_key} ({field_name})</i>"))
+                    
+                    for sub_field_name, sub_field_info in sub_config_class.model_fields.items():
+                        if sub_field_info.annotation == float:
+                            # Safely capture current map value or use the fallback default
+                            sub_current_value = current_value.get(
+                                sub_field_name, 
+                                sub_field_info.default if sub_field_info.default is not None else 0.0
+                            )
+                            
+                            sub_container = QWidget()
+                            sub_h_layout = QHBoxLayout(sub_container)
+                            sub_h_layout.setContentsMargins(0, 0, 0, 0)
+
+                            sub_slider = QSlider(Qt.Horizontal)
+                            sub_slider.setMinimum(0)
+                            sub_slider.setMaximum(1000)
+                            sub_slider.setValue(int(sub_current_value * 10)) 
+                            
+                            sub_value_label = QLabel(f"{sub_current_value:.1f}")
+                            sub_value_label.setMinimumWidth(35)
+                            sub_value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                            
+                            sub_h_layout.addWidget(sub_slider)
+                            sub_h_layout.addWidget(sub_value_label)
+                            
+                            # Closure passes the targeted container dictionary name dynamically
+                            def sub_update_wrapper(val, parent_dict=field_name, fname=sub_field_name, idx=op_index, lbl=sub_value_label):
+                                real_val = val / 10.0
+                                lbl.setText(f"{real_val:.1f}")
+                                self.update_nested_parameter(idx, parent_dict, fname, real_val)
+                                
+                            sub_slider.valueChanged.connect(sub_update_wrapper)
+                            self.form_layout.addRow(f"↳ {sub_field_name}", sub_container)
 
     def update_parameter(self, op_index, field_name, new_value):
         operation = self.engine.runner.operations[op_index]
@@ -240,6 +287,17 @@ class LiveEditorWindow(QMainWindow):
         
         self._pending_op_index = op_index
         self.debounce_timer.start()
+
+    def update_nested_parameter(self, op_index, parent_dict_name, sub_field_name, new_value):
+        operation = self.engine.runner.operations[op_index]
+        
+        if hasattr(operation.config, parent_dict_name):
+            target_dict = getattr(operation.config, parent_dict_name)
+            if isinstance(target_dict, dict):
+                target_dict[sub_field_name] = new_value
+                
+                self._pending_op_index = op_index
+                self.debounce_timer.start()
 
     def _execute_recalculation(self):
         if self._pending_op_index is not None:
