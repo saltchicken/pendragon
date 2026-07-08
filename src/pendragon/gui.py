@@ -1,13 +1,10 @@
-# src/pendragon/gui.py
-
 from typing import List
-
 import numpy as np
 from shapely.geometry import Polygon, MultiPolygon
 from vispy import scene
 
 from PyQt5.QtWidgets import (
-    QMainWindow, QWidget, QHBoxLayout, QSlider, QLabel, QFormLayout, QApplication
+    QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QSlider, QLabel, QFormLayout, QApplication, QCheckBox
 )
 from PyQt5.QtCore import Qt, QTimer
 
@@ -55,34 +52,46 @@ class LiveEditorWindow(QMainWindow):
 
         self.setStyleSheet(DARK_THEME_STYLESHEET)
         
-        # Central widget and layout
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QHBoxLayout(central_widget)
 
-        # 1. The Vispy Canvas (Left Side)
-        self.viewer = PipelineViewer(self.engine.runner.history)
+        # 1. The Vispy Canvas (Left Side) - Now accepts the engine instead of just history
+        self.viewer = PipelineViewer(self.engine)
         main_layout.addWidget(self.viewer.native, stretch=3)
 
         # 2. Parameter Control Panel (Right Side)
         self.control_panel = QWidget()
-        self.form_layout = QFormLayout(self.control_panel)
+        self.control_layout = QVBoxLayout(self.control_panel)
         main_layout.addWidget(self.control_panel, stretch=1)
+
+        # View Mode Toggle
+        self.final_view_checkbox = QCheckBox("Show Final View")
+        self.final_view_checkbox.setChecked(False)
+        self.final_view_checkbox.toggled.connect(self._on_view_mode_toggled)
+        self.control_layout.addWidget(self.final_view_checkbox)
+
+        # Dynamic form area for sliders
+        self.dynamic_form_widget = QWidget()
+        self.form_layout = QFormLayout(self.dynamic_form_widget)
+        self.control_layout.addWidget(self.dynamic_form_widget)
 
         self.viewer.on_step_changed = self.build_ui_for_current_step
         self.viewer.on_close_requested = self.close
         
-        # --- Debounce Timer Setup ---
+        # Debounce Timer Setup
         self.debounce_timer = QTimer()
         self.debounce_timer.setSingleShot(True)
-        self.debounce_timer.setInterval(300)  # 300ms delay
+        self.debounce_timer.setInterval(300) 
         self.debounce_timer.timeout.connect(self._execute_recalculation)
         self._pending_op_index = None
-        # ----------------------------
 
-        # Build initial UI for the current step
         self.build_ui_for_current_step()
 
+    def _on_view_mode_toggled(self, checked):
+        """Swaps the viewer mode and forces a visual update."""
+        self.viewer.show_final_view = checked
+        self.viewer.update_view()
 
     def build_ui_for_current_step(self):
         while self.form_layout.count():
@@ -116,7 +125,6 @@ class LiveEditorWindow(QMainWindow):
                 )
                 self.form_layout.addRow(field_name, slider)
 
-
     def update_parameter(self, op_index, field_name, new_value):
         operation = self.engine.runner.operations[op_index]
         setattr(operation.config, field_name, new_value)
@@ -124,23 +132,24 @@ class LiveEditorWindow(QMainWindow):
         self._pending_op_index = op_index
         self.debounce_timer.start()
 
-
     def _execute_recalculation(self):
         if self._pending_op_index is not None:
-            self.engine.runner.recompute_from(self._pending_op_index)
-            self.viewer.history = self.engine.runner.history
+            # Determine the calculation target based on view mode state
+            target = len(self.engine.runner.operations) if self.viewer.show_final_view else self.viewer.current_step
+            self.engine.runner.recompute_from(self._pending_op_index, target)
             self.viewer.update_view()
 
 
 class PipelineViewer(scene.SceneCanvas):
-    def __init__(self, history: List[PipelineState]):
+    def __init__(self, engine):
         super().__init__(keys='interactive',
                          size=(800, 800),
                          title="Pendragon Pipeline Visualizer",
                          show=True)
         self.unfreeze()
-        self.history = history
-        self.current_step = min(1, len(self.history) - 1)
+        self.engine = engine
+        self.current_step = min(1, len(self.engine.runner.operations))
+        self.show_final_view = False
 
         self.on_step_changed = None
         self.on_close_requested = None
@@ -166,8 +175,9 @@ class PipelineViewer(scene.SceneCanvas):
         self.freeze()
         self.update_view()
         
-        if self.history and self.history[0].boundary:
-            minx, miny, maxx, maxy = self.history[0].boundary.bounds
+        history = self.engine.runner.history
+        if history and history[0].boundary:
+            minx, miny, maxx, maxy = history[0].boundary.bounds
             self.view.camera.set_range(x=(minx, maxx), y=(miny, maxy))
         else:
             try:
@@ -177,9 +187,10 @@ class PipelineViewer(scene.SceneCanvas):
 
     def on_key_press(self, event):
         step_changed = False
+        max_step = len(self.engine.runner.operations)
         
         if event.key.name == 'Right':
-            if self.current_step < len(self.history) - 1:
+            if self.current_step < max_step:
                 self.current_step += 1
                 step_changed = True
         elif event.key.name == 'Left':
@@ -198,16 +209,33 @@ class PipelineViewer(scene.SceneCanvas):
                 self.on_step_changed()
 
     def update_view(self):
-        state = self.history[self.current_step]
+        # 1. Determine how far we need to compute based on the view mode
+        target_step = len(self.engine.runner.operations) if self.show_final_view else self.current_step
+
+        # 2. Lazily compute history if we haven't reached the required target step yet
+        current_history_max = len(self.engine.runner.history) - 1
+        if current_history_max < target_step:
+            self.engine.runner.recompute_from(current_history_max, target_step)
+
+        # 3. Fetch the appropriate state to display
+        display_step = len(self.engine.runner.history) - 1 if self.show_final_view else self.current_step
+        state = self.engine.runner.history[display_step]
 
         total_vertices = sum(len(line.coords) for line in state.lines)
+        total_ops = len(self.engine.runner.operations)
 
-        hud_string = (f"Step: {self.current_step + 1}/{len(self.history)} | "
+        # 4. Update HUD to clarify what is currently being rendered
+        hud_string = (f"Step: {self.current_step}/{total_ops} | "
                       f"Operation: {state.operation_name} | "
                       f"Lines: {len(state.lines)} | "
                       f"Vertices: {total_vertices}")
+        
+        if self.show_final_view:
+            hud_string += " (FINAL VIEW)"
+            
         self.hud_text.text = hud_string
 
+        # 5. Visual Rendering logic (unchanged)
         if state.boundary and not state.boundary.is_empty:
             polygons = []
             if isinstance(state.boundary, Polygon):
