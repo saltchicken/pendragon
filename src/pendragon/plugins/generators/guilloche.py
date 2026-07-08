@@ -69,7 +69,7 @@ class GuillocheGen(PipelineOperation):
         logger.success(f"Generated guilloche pattern segments. Retained {len(clipped_lines)} continuous paths.")
 
         return PipelineState(
-            boundary=boundary,
+            boundary=state.boundary,
             lines=clipped_lines,
             operation_name="guilloche"
         )

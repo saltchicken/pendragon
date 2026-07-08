@@ -56,7 +56,7 @@ class SpiralGen(PipelineOperation):
         logger.success(f"Generated spiral segments. Retained {len(clipped_lines)} continuous paths.")
 
         return PipelineState(
-            boundary=boundary,
+            boundary=state.boundary,
             lines=clipped_lines,
             operation_name="spiral"
         )

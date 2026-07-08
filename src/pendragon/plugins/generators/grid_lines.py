@@ -81,6 +81,6 @@ class GridLinesGen(PipelineOperation):
             f"Generated and clipped {len(clipped_lines)} pattern lines.")
 
         # 5. Return the new state payload containing the calculated line assets
-        return PipelineState(boundary=boundary,
+        return PipelineState(boundary=state.boundary,
                              lines=clipped_lines,
                              operation_name="grid_lines")
