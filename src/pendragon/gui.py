@@ -1,3 +1,4 @@
+import time
 import yaml
 from typing import List, Dict, Any
 import numpy as np
@@ -8,9 +9,9 @@ from loguru import logger
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QSlider, QLabel, 
     QFormLayout, QApplication, QCheckBox, QGroupBox, QPushButton,
-    QFileDialog
+    QFileDialog, QProgressBar
 )
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QTimer, QThread, QObject, pyqtSignal, pyqtSlot
 
 from pendragon.core.models import PipelineState
 from pendragon.core.registry import OPERATION_REGISTRY
@@ -74,7 +75,58 @@ QPushButton:pressed {
 """
 
 
+class PipelineWorker(QObject):
+    computation_finished = pyqtSignal(object, int, int, bool)
+    computation_cancelled = pyqtSignal()  
+    progress_update = pyqtSignal(int, str)
+
+    def __init__(self, engine):
+        super().__init__()
+        self.engine = engine
+        self._cancel_flag = False
+
+    @pyqtSlot()
+    def request_cancel(self):
+        self._cancel_flag = True
+
+    def check_cancel(self):
+        # Explicitly yield the GIL so the main thread's GUI event loop stays responsive
+        time.sleep(0.001) 
+        if self._cancel_flag:
+            raise InterruptedError("Computation cancelled by user.")
+
+    def _emit_progress(self, percent: int, message: str):
+        self.progress_update.emit(percent, message)
+
+    @pyqtSlot(int, int, bool)
+    def compute(self, start_index: int, target_step: int, is_final: bool):
+        self._cancel_flag = False
+        try:
+            runner = self.engine.runner
+            
+            # Pass both callbacks down into the runner
+            runner.recompute_from(
+                start_index, target_step, 
+                cancel_callback=self.check_cancel,
+                progress_callback=self._emit_progress
+            )
+            
+            state_index = target_step if target_step < len(runner.history) else -1
+            state = runner.history[state_index]
+            total_ops = len(runner.operations)
+            
+            self.computation_finished.emit(state, target_step, total_ops, is_final)
+        
+        except InterruptedError:
+            logger.warning("Worker caught cancellation request.")
+            self.computation_cancelled.emit()
+        except Exception as e:
+            logger.error(f"Background computation error: {e}")
+
+
 class LiveEditorWindow(QMainWindow):
+    compute_requested = pyqtSignal(int, int, bool)
+
     def __init__(self, engine):
         super().__init__()
         self.setWindowTitle("Pendragon")
@@ -144,12 +196,45 @@ class LiveEditorWindow(QMainWindow):
         self.action_layout.addWidget(self.btn_save_recipe)
         self.action_layout.addWidget(self.btn_export_gcode)
         self.control_layout.addLayout(self.action_layout)
-        # ----------------------
 
         # Dynamic form area for sliders
         self.dynamic_form_widget = QWidget()
         self.form_layout = QFormLayout(self.dynamic_form_widget)
         self.control_layout.addWidget(self.dynamic_form_widget)
+
+        # --- Cancel & Progress UI ---
+        self.process_layout = QHBoxLayout()
+        
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setTextVisible(True)
+        self.progress_bar.setStyleSheet("QProgressBar { border: 1px solid #555; border-radius: 3px; text-align: center; } QProgressBar::chunk { background-color: #007acc; }")
+        
+        self.btn_cancel = QPushButton("Cancel & Revert")
+        self.btn_cancel.setEnabled(True)
+        self.btn_cancel.setStyleSheet("background-color: #8b0000; font-weight: bold;")
+        
+        self.process_layout.addWidget(self.progress_bar, stretch=3)
+        self.process_layout.addWidget(self.btn_cancel, stretch=1)
+        self.control_layout.addLayout(self.process_layout)
+
+        # --- QThread Setup ---
+        self.worker_thread = QThread()
+        self.worker = PipelineWorker(self.engine)
+        self.worker.moveToThread(self.worker_thread)
+        
+        # Connect core computation signals
+        self.compute_requested.connect(self.worker.compute)
+        self.worker.computation_finished.connect(self._on_computation_ready)
+        
+        # Connect Cancel & Progress signals
+        self.btn_cancel.clicked.connect(self.worker.request_cancel)
+        self.worker.computation_cancelled.connect(self._on_computation_cancelled)
+        self.worker.progress_update.connect(self._on_progress_update)
+        
+        self.worker_thread.start()
+        # ---------------------
 
         # Hook up viewer callbacks
         self.viewer.on_step_changed = self.build_ui_for_current_step
@@ -163,13 +248,64 @@ class LiveEditorWindow(QMainWindow):
         self.debounce_timer.timeout.connect(self._execute_recalculation)
         self._pending_op_index = None
 
+        self._backup_state = None  # Tuple: (op_index, field_name, old_value)
         self.build_ui_for_current_step()
-        self.viewer.update_view()  # Force initial stats update now that callbacks are bound
+
+    def closeEvent(self, event):
+        """Ensure thread is safely terminated when GUI closes."""
+        self.worker_thread.quit()
+        self.worker_thread.wait()
+        super().closeEvent(event)
+
+    @pyqtSlot(int, str)
+    def _on_progress_update(self, value, text):
+        """Update the progress bar from the background thread."""
+        self.progress_bar.setValue(value)
+        self.progress_bar.setFormat(f"{text} %p%")
+
+    def _trigger_computation(self, start_index=None):
+        self.dynamic_form_widget.setEnabled(False)
+        self.btn_cancel.setEnabled(True)
+        self.progress_bar.setValue(0)
+        
+        target = len(self.engine.runner.operations) if self.viewer.show_final_view else self.viewer.current_step
+        if start_index is None:
+            start_index = len(self.engine.runner.history) - 1
+        
+        start = max(0, min(start_index, target))
+        self.compute_requested.emit(start, target, self.viewer.show_final_view)
+
+    @pyqtSlot(object, int, int, bool)
+    def _on_computation_ready(self, state, display_step, total_ops, is_final):
+        self._backup_state = None
+        self.dynamic_form_widget.setEnabled(True)
+        self.btn_cancel.setEnabled(False)
+        self.progress_bar.setValue(100)
+        self.progress_bar.setFormat("Ready")
+        self.viewer.render_state(state, display_step, total_ops, is_final)
+
+    @pyqtSlot()
+    def _on_computation_cancelled(self):
+        if self._backup_state:
+            op_idx, field, old_val = self._backup_state
+            operation = self.engine.runner.operations[op_idx]
+            
+            setattr(operation.config, field, old_val)
+            logger.info(f"Reverted {field} back to {old_val}")
+            
+            self._backup_state = None
+            self.build_ui_for_current_step()
+            self.viewer.update_view()
+
+        self.dynamic_form_widget.setEnabled(True)
+        self.btn_cancel.setEnabled(False)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setFormat("Cancelled")
 
     def _on_view_mode_toggled(self, checked):
-        """Swaps the viewer mode and forces a visual update."""
+        """Swaps the viewer mode and triggers a background computation."""
         self.viewer.show_final_view = checked
-        self.viewer.update_view()
+        self._trigger_computation()
 
     def update_stats_ui(self, step, total_ops, op_name, lines, vertices, final_view):
         """Updates the discrete PyQt labels for pipeline statistics."""
@@ -191,11 +327,13 @@ class LiveEditorWindow(QMainWindow):
         op_index = self.viewer.current_step - 1 
         if op_index < 0 or op_index >= len(self.engine.runner.operations):
             self.form_layout.addRow(QLabel("No configurable parameters for this state."))
+            self._trigger_computation()
             return
 
         operation = self.engine.runner.operations[op_index]
         if not operation.config:
             self.form_layout.addRow(QLabel(f"{operation.__class__.__name__} has no config."))
+            self._trigger_computation()
             return
 
         self.form_layout.addRow(QLabel(f"<b>Editing: {operation.__class__.__name__}</b>"))
@@ -231,15 +369,12 @@ class LiveEditorWindow(QMainWindow):
 
             # --- Dynamic Poly-morphic Nested Settings Section ---
             elif isinstance(current_value, dict) or field_info.annotation == dict or getattr(field_info.annotation, '__origin__', None) is dict:
-                # Infer what the target sub-registry schema is by checking adjacent sibling attributes
-                # e.g., if we are looking at generator_settings, check if self.config.generator exists.
                 registry_key = None
                 
-                # Dynamic inference strategy: Look for a field named like the root prefix (e.g. "generator")
                 prefix = field_name.split('_')[0] if '_' in field_name else ""
                 if prefix and hasattr(operation.config, prefix):
                     registry_key = getattr(operation.config, prefix)
-                elif hasattr(operation.config, "generator"): # Fallback standard
+                elif hasattr(operation.config, "generator"):
                     registry_key = getattr(operation.config, "generator")
 
                 op_info = OPERATION_REGISTRY.get(registry_key) if registry_key else None
@@ -250,7 +385,6 @@ class LiveEditorWindow(QMainWindow):
                     
                     for sub_field_name, sub_field_info in sub_config_class.model_fields.items():
                         if sub_field_info.annotation == float:
-                            # Safely capture current map value or use the fallback default
                             sub_current_value = current_value.get(
                                 sub_field_name, 
                                 sub_field_info.default if sub_field_info.default is not None else 0.0
@@ -272,7 +406,6 @@ class LiveEditorWindow(QMainWindow):
                             sub_h_layout.addWidget(sub_slider)
                             sub_h_layout.addWidget(sub_value_label)
                             
-                            # Closure passes the targeted container dictionary name dynamically
                             def sub_update_wrapper(val, parent_dict=field_name, fname=sub_field_name, idx=op_index, lbl=sub_value_label):
                                 real_val = val / 10.0
                                 lbl.setText(f"{real_val:.1f}")
@@ -280,9 +413,18 @@ class LiveEditorWindow(QMainWindow):
                                 
                             sub_slider.valueChanged.connect(sub_update_wrapper)
                             self.form_layout.addRow(f"↳ {sub_field_name}", sub_container)
+        
+        # Trigger an update now that step UI is built
+        self._trigger_computation()
 
     def update_parameter(self, op_index, field_name, new_value):
         operation = self.engine.runner.operations[op_index]
+        current_val = getattr(operation.config, field_name)
+        
+        # Only backup if we aren't currently dragging/computing
+        if self._backup_state is None or self._backup_state[1] != field_name:
+            self._backup_state = (op_index, field_name, current_val)
+
         setattr(operation.config, field_name, new_value)
         
         self._pending_op_index = op_index
@@ -300,11 +442,10 @@ class LiveEditorWindow(QMainWindow):
                 self.debounce_timer.start()
 
     def _execute_recalculation(self):
+        """Fired by debounce timer; signals background thread to process the edit."""
         if self._pending_op_index is not None:
-            # Determine the calculation target based on view mode state
-            target = len(self.engine.runner.operations) if self.viewer.show_final_view else self.viewer.current_step
-            self.engine.runner.recompute_from(self._pending_op_index, target)
-            self.viewer.update_view()
+            self._trigger_computation(self._pending_op_index)
+            self._pending_op_index = None
 
     def _load_live_recipe(self):
         """Prompts the user to select a YAML recipe, loads it, and refreshes the GUI."""
@@ -319,7 +460,6 @@ class LiveEditorWindow(QMainWindow):
             with open(file_path, 'r') as f:
                 new_recipe = yaml.safe_load(f)
                 
-            # Basic validation to ensure it matches the current expected schema
             if not isinstance(new_recipe, list):
                 logger.error("Invalid recipe format: must be a list of operations.")
                 return
@@ -331,11 +471,8 @@ class LiveEditorWindow(QMainWindow):
                 # 2. Reset the viewer state to the end of the new pipeline
                 self.viewer.current_step = len(self.engine.runner.operations)
                 
-                # 3. Rebuild the dynamic sliders for the current step
+                # 3. Rebuild the dynamic sliders for the current step (implicitly triggers computation)
                 self.build_ui_for_current_step()
-                
-                # 4. Force Vispy to recalculate and redraw the canvas
-                self.viewer.update_view()
                 
         except Exception as e:
             logger.error(f"Error loading recipe from {file_path}: {e}")
@@ -347,7 +484,7 @@ class LiveEditorWindow(QMainWindow):
         )
         
         if file_path:
-            # Ensure the pipeline is fully computed to the end
+            # We enforce a synchronous computation finish for exporting accurately
             self.engine.runner.recompute_from(0, len(self.engine.runner.operations))
             final_lines = self.engine.runner.get_final_lines()
             self.engine.export_gcode(lines=final_lines, output_path=file_path)
@@ -363,9 +500,7 @@ class LiveEditorWindow(QMainWindow):
 
         current_recipe = []
         
-        # Iterate through the live operations to reconstruct the recipe
         for op in self.engine.runner.operations:
-            # Reverse-lookup the operation name from the registry
             op_name = next(
                 (name for name, info in OPERATION_REGISTRY.items() if isinstance(op, info["class"])), 
                 None
@@ -374,16 +509,12 @@ class LiveEditorWindow(QMainWindow):
             if not op_name:
                 continue
                 
-            # Build the step dictionary
             step = {"operation": op_name}
-            
-            # Serialize the Pydantic config back to a standard dictionary
             if op.config:
                 step["settings"] = op.config.model_dump()
                 
             current_recipe.append(step)
 
-        # Write the reconstructed recipe to disk
         try:
             with open(file_path, 'w') as f:
                 yaml.safe_dump(current_recipe, f, sort_keys=False, default_flow_style=False)
@@ -415,8 +546,12 @@ class PipelineViewer(scene.SceneCanvas):
         self.boundary_visual = scene.visuals.Line(parent=self.view.scene, color='red')
         self.vertices_visual = scene.visuals.Markers(parent=self.view.scene)
 
+        self.vertices_visual.set_data(pos=np.array([[0.0, 0.0]], dtype=np.float32))
+        self.vertices_visual.visible = False
+        self.lines_visual.visible = False
+        self.boundary_visual.visible = False
+
         self.freeze()
-        self.update_view()
         
         history = self.engine.runner.history
         if history and history[0].boundary:
@@ -432,14 +567,12 @@ class PipelineViewer(scene.SceneCanvas):
         max_step = len(self.engine.runner.operations)
         if self.current_step < max_step:
             self.current_step += 1
-            self.update_view()
             if self.on_step_changed is not None:
                 self.on_step_changed()
 
     def step_backward(self):
         if self.current_step > 0:
             self.current_step -= 1
-            self.update_view()
             if self.on_step_changed is not None:
                 self.on_step_changed()
 
@@ -454,23 +587,11 @@ class PipelineViewer(scene.SceneCanvas):
             else:
                 self.close()
 
-    def update_view(self):
-        # 1. Determine how far we need to compute based on the view mode
-        target_step = len(self.engine.runner.operations) if self.show_final_view else self.current_step
-
-        # 2. Lazily compute history if we haven't reached the required target step yet
-        current_history_max = len(self.engine.runner.history) - 1
-        if current_history_max < target_step:
-            self.engine.runner.recompute_from(current_history_max, target_step)
-
-        # 3. Fetch the appropriate state to display
-        display_step = len(self.engine.runner.history) - 1 if self.show_final_view else self.current_step
-        state = self.engine.runner.history[display_step]
-
+    def render_state(self, state: PipelineState, display_step: int, total_ops: int, is_final: bool):
+        """Re-renders the visualizer objects given an immutable PipelineState instance."""
         total_vertices = sum(len(line.coords) for line in state.lines)
-        total_ops = len(self.engine.runner.operations)
 
-        # 4. Trigger HUD update callback
+        # Trigger HUD update callback
         if self.on_stats_updated:
             self.on_stats_updated(
                 self.current_step, 
@@ -478,10 +599,10 @@ class PipelineViewer(scene.SceneCanvas):
                 state.operation_name, 
                 len(state.lines), 
                 total_vertices, 
-                self.show_final_view
+                is_final
             )
 
-        # 5. Visual Rendering logic
+        # Rendering Logic
         if state.boundary and not state.boundary.is_empty:
             polygons = []
             if isinstance(state.boundary, Polygon):

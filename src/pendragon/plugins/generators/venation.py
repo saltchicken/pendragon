@@ -49,7 +49,7 @@ class VenationConfig(BasePluginConfig):
 class VenationGen(PipelineOperation):
     """Generates organic branching structures using the Space Colonization Algorithm."""
 
-    def process(self, state: PipelineState) -> PipelineState:
+    def process(self, state: PipelineState, cancel_callback=None, progress_callback=None, **kwargs) -> PipelineState:
         cfg = self.config or VenationConfig()
         boundary = self.get_effective_boundary(state)
         minx, miny, maxx, maxy = boundary.bounds
@@ -61,11 +61,9 @@ class VenationGen(PipelineOperation):
 
         np.random.seed(cfg.seed)
 
-        # 1. Distribute random attractors (leaves)
         xs = np.random.uniform(minx, maxx, cfg.num_leaves)
         ys = np.random.uniform(miny, maxy, cfg.num_leaves)
         
-        # Keep only the leaves that strictly fall inside the complex boundary
         valid_leaves = []
         for lx, ly in zip(xs, ys):
             if boundary.contains(Point(lx, ly)):
@@ -76,28 +74,32 @@ class VenationGen(PipelineOperation):
             logger.warning("No attractors generated within boundary.")
             return state
 
-        # 2. Initialize the network with a single root node
         nodes = np.array([[cfg.root_x, cfg.root_y]])
         raw_lines = []
 
-        # 3. Grow the network
-        iterations = 0
         for iterations in range(cfg.max_iterations):
+            # 1. Check for cancellation
+            if cancel_callback:
+                cancel_callback()
+                
+            # 2. Update the GUI progress bar (throttle to avoid flooding the event loop)
+            if progress_callback and iterations % 5 == 0:
+                pct = int((iterations / cfg.max_iterations) * 100)
+                progress_callback(pct, f"Growing veins ({len(leaves)} leaves left)...")
+
             if len(leaves) == 0:
                 break
 
-            # Build spatial index for fast nearest-neighbor lookups
             node_tree = cKDTree(nodes)
             distances, indices = node_tree.query(leaves, distance_upper_bound=cfg.attract_distance)
 
-            active_nodes = {}  # node_index -> list of normalized direction vectors
+            active_nodes = {}  
             leaves_to_remove = []
 
             for i, (dist, node_idx) in enumerate(zip(distances, indices)):
                 if dist < cfg.kill_distance:
                     leaves_to_remove.append(i)
                 elif dist < cfg.attract_distance and node_idx != len(nodes):
-                    # Calculate vector from node to leaf
                     leaf = leaves[i]
                     node = nodes[node_idx]
                     direction = leaf - node
@@ -108,15 +110,12 @@ class VenationGen(PipelineOperation):
                             active_nodes[node_idx] = []
                         active_nodes[node_idx].append(direction)
 
-            # Halt if the network has stalled
             if not active_nodes and not leaves_to_remove:
                 break 
 
-            # Remove consumed leaves
             if leaves_to_remove:
                 leaves = np.delete(leaves, leaves_to_remove, axis=0)
 
-            # Grow active nodes toward the average direction of their attractors
             new_nodes = []
             for node_idx, vectors in active_nodes.items():
                 avg_dir = np.mean(vectors, axis=0)
@@ -130,8 +129,9 @@ class VenationGen(PipelineOperation):
             if new_nodes:
                 nodes = np.vstack((nodes, new_nodes))
 
-        # --- THE FIX: MERGE THE INTERLEAVED SEGMENTS ---
-        # linemerge joins contiguous segments into long paths, breaking only at branching junctions
+        if progress_callback:
+            progress_callback(100, "Merging contiguous branches...")
+
         merged_geometry = linemerge(raw_lines)
         
         merged_lines = []
@@ -140,11 +140,10 @@ class VenationGen(PipelineOperation):
         elif isinstance(merged_geometry, MultiLineString):
             merged_lines = list(merged_geometry.geoms)
         else:
-            merged_lines = raw_lines  # Safe fallback if something bizarre happens
+            merged_lines = raw_lines 
             
         logger.info(f"Growth complete. Merged {len(raw_lines)} micro-segments into {len(merged_lines)} contiguous branches.")
 
-        # 4. Clip final merged paths to boundary
         clipped_lines: List[LineString] = []
         for line in merged_lines:
             if line.intersects(boundary):
