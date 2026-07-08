@@ -82,7 +82,22 @@ def main():
 
     # 7. Visualize (Optional)
     if not args.no_vis:
-        engine.visualize()
+        logger.info("Opening live editor visualization window...")
+        try:
+            # Lazy load the GUI components only when requested
+            from pendragon.gui import LiveEditorWindow
+            from PyQt5.QtWidgets import QApplication
+            
+            qt_app = QApplication.instance() or QApplication([])
+            editor = LiveEditorWindow(engine)
+            editor.resize(1200, 800)
+            editor.show()
+            qt_app.exec_()
+        except ImportError as e:
+            logger.error(
+                f"Failed to launch GUI: {e}. "
+                "Ensure PyQt5 and vispy are installed, or run with --no-vis."
+            )
 
 
 if __name__ == "__main__":
