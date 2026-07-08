@@ -1,0 +1,37 @@
+# 1. Create the scaffolding (e.g., a 50x50 crosshatch grid)
+- operation: grid_lines
+  settings:
+    spacing: 50.0
+    orientation: horizontal
+    overscan: 0
+
+# 2. Run a generator inside every closed box formed by the scaffolding
+- operation: generate_in_cells
+  settings:
+    generator: spiral
+    auto_center: true
+    keep_scaffolding: true
+    generator_settings:
+      center_x: 100.0
+      center_y: 100.0
+      start_radius: 10.0
+      end_radius: 95.0
+      revolutions: 30.0
+      steps: 2000
+      overscan: 20
+
+# 3. Standard path modifications 
+- operation: clip
+
+- operation: connect_continuous
+  settings:
+    snap_distance: 0.1
+
+- operation: simplify
+  settings:
+    tolerance: 0.1
+
+- operation: optimize
+  settings:
+    start_x: 0.0
+    start_y: 0.0
