@@ -1,13 +1,12 @@
-# src/pendragon/__main__.py
-
 import argparse
 import sys
 
 from loguru import logger
 import yaml
+from shapely.geometry import Polygon
 
 from pendragon.core import load_plugins
-
+from pendragon.utils import load_dxf_boundary
 from .engine import PendragonEngine
 
 
@@ -35,6 +34,10 @@ def main():
     parser.add_argument("--no-vis",
                         action="store_true",
                         help="Disable the Vispy visualization window.")
+    parser.add_argument("--width", type=float, help="Width of the rectangular boundary.")
+    parser.add_argument("--height", type=float, help="Height of the rectangular boundary.")
+    parser.add_argument("--dxf", type=str, help="Path to a .dxf file to use as the boundary.")
+
     parser.add_argument("--generate-schema", type=str, metavar="PATH", help="Generate JSON schema for recipes and exit.")
     args = parser.parse_args()
 
@@ -63,8 +66,29 @@ def main():
         )
         sys.exit(1)
 
+    boundary = None
+    if args.dxf:
+        try:
+            logger.info(f"Loading boundary from DXF: {args.dxf}")
+            boundary = load_dxf_boundary(args.dxf)
+        except Exception as e:
+            logger.error(f"Failed to load DXF boundary: {e}")
+            sys.exit(1)
+    elif args.width is not None and args.height is not None:
+        logger.info(f"Using defined rectangular boundary: {args.width}x{args.height}")
+        boundary = Polygon([
+            (0, 0),
+            (args.width, 0),
+            (args.width, args.height),
+            (0, args.height),
+            (0, 0)
+        ])
+    else:
+        logger.info("Using default 200x200 boundary.")
+        boundary = Polygon([(0, 0), (200, 0), (200, 200), (0, 200), (0, 0)])
+
     # 3. Initialize Orchestrator
-    engine = PendragonEngine(recipe=raw_user_recipe)
+    engine = PendragonEngine(recipe=raw_user_recipe, boundary=boundary)
 
     # 4. Build Pipeline
     if not engine.build_pipeline():
