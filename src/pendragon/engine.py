@@ -5,7 +5,7 @@ from typing import List, Optional
 from loguru import logger
 import numpy as np
 from shapely.geometry import LineString
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, MultiPolygon
 from vispy import app
 from vispy import scene
 
@@ -90,12 +90,39 @@ class PipelineViewer(scene.SceneCanvas):
                       f"Vertices: {total_vertices}")
         self.hud_text.text = hud_string
 
-        if state.boundary:
-            bx, by = state.boundary.exterior.xy
-            self.boundary_visual.set_data(pos=np.column_stack((bx, by)))
-            self.boundary_visual.visible = True
+        # --- NEW BOUNDARY RENDERING LOGIC ---
+        if state.boundary and not state.boundary.is_empty:
+            polygons = []
+            if isinstance(state.boundary, Polygon):
+                polygons = [state.boundary]
+            elif isinstance(state.boundary, MultiPolygon):
+                polygons = list(state.boundary.geoms)
+
+            b_pos = []
+            b_connect = []
+            b_idx = 0
+
+            for poly in polygons:
+                # Grab the exterior perimeter + any internal holes
+                rings = [poly.exterior] + list(poly.interiors)
+                for ring in rings:
+                    coords = np.array(ring.coords)
+                    b_pos.append(coords)
+                    n_pts = len(coords)
+                    for i in range(n_pts - 1):
+                        b_connect.append([b_idx + i, b_idx + i + 1])
+                    b_idx += n_pts
+
+            if b_pos:
+                stacked_b_pos = np.vstack(b_pos)
+                self.boundary_visual.set_data(pos=stacked_b_pos,
+                                              connect=np.array(b_connect))
+                self.boundary_visual.visible = True
+            else:
+                self.boundary_visual.visible = False
         else:
             self.boundary_visual.visible = False
+        # ------------------------------------
 
         if state.lines:
             pos = []
