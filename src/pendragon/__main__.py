@@ -35,7 +35,13 @@ def main():
     parser.add_argument("--no-vis",
                         action="store_true",
                         help="Disable the Vispy visualization window.")
+    parser.add_argument("--generate-schema", type=str, metavar="PATH", help="Generate JSON schema for recipes and exit.")
     args = parser.parse_args()
+
+    if args.generate_schema:
+        from pendragon.core.schema import generate_recipe_schema
+        generate_recipe_schema(args.generate_schema)
+        sys.exit(0)
 
     # 1. Discover and load plugins
     load_plugins()
