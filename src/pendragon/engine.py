@@ -54,7 +54,7 @@ QSlider::sub-page:horizontal {
 class LiveEditorWindow(QMainWindow):
     def __init__(self, engine):
         super().__init__()
-        self.setWindowTitle("Pendragon Live Editor")
+        self.setWindowTitle("Pendragon")
         self.engine = engine
 
         self.setStyleSheet(DARK_THEME_STYLESHEET)
