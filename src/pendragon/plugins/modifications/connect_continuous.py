@@ -1,5 +1,4 @@
-# src/pendragon/plugins/modifications/connect_continuous.py
-
+import math
 from typing import List
 from loguru import logger
 from pydantic import BaseModel, Field
@@ -27,9 +26,6 @@ class ConnectContinuousMod(PipelineOperation):
         
         cfg = self.config or ConnectContinuousConfig()
         connected_lines: List[LineString] = []
-        
-        if not current_lines:
-            return state
 
         # Start with the first segment
         current_poly = list(current_lines[0].coords)
@@ -37,15 +33,20 @@ class ConnectContinuousMod(PipelineOperation):
         for next_line in current_lines[1:]:
             next_coords = list(next_line.coords)
             
-            # Check if the start of the next line matches the end of our current running line
             end_pt = current_poly[-1]
             start_pt = next_coords[0]
+            next_end_pt = next_coords[-1]
             
-            dist = ((end_pt[0] - start_pt[0])**2 + (end_pt[1] - start_pt[1])**2)**0.5
+            # Calculate distance from our current tail to both ends of the next segment
+            dist_to_start = math.hypot(end_pt[0] - start_pt[0], end_pt[1] - start_pt[1])
+            dist_to_end = math.hypot(end_pt[0] - next_end_pt[0], end_pt[1] - next_end_pt[1])
             
-            if dist <= cfg.snap_distance:
-                # Weld them together without lifting the pen (skip the duplicate joint point)
+            if dist_to_start <= cfg.snap_distance and dist_to_start <= dist_to_end:
+                # Normal connection: weld them together without lifting the pen
                 current_poly.extend(next_coords[1:])
+            elif dist_to_end <= cfg.snap_distance and dist_to_end < dist_to_start:
+                # Reversed connection: the segment was drawn backward. Reverse before welding.
+                current_poly.extend(next_coords[::-1][1:])
             else:
                 # Too far apart (true pen lift). Commit this path and start a new one
                 if len(current_poly) >= 2:
