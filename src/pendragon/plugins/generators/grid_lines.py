@@ -1,7 +1,6 @@
 from typing import List
 
 from loguru import logger
-from pydantic import BaseModel
 from pydantic import Field
 from shapely.geometry import LineString
 from shapely.geometry import MultiLineString
@@ -9,9 +8,10 @@ from shapely.geometry import MultiLineString
 from pendragon.core import PipelineOperation
 from pendragon.core import PipelineState
 from pendragon.core import register_operation
+from pendragon.core import BasePluginConfig
 
 
-class GridLinesConfig(BaseModel):
+class GridLinesConfig(BasePluginConfig):
     spacing: float = Field(default=0.5,
                            description="Distance between consecutive lines.")
     orientation: str = Field(
@@ -25,7 +25,7 @@ class GridLinesGen(PipelineOperation):
 
     def process(self, state: PipelineState) -> PipelineState:
         active_config = self.config or GridLinesConfig()
-        boundary = state.boundary
+        boundary = self.get_effective_boundary(state)
 
         # 1. Get the bounding box of the current boundary
         minx, miny, maxx, maxy = boundary.bounds

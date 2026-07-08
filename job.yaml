@@ -3,19 +3,21 @@
   settings:
     spacing: 50.0
     orientation: crosshatch
+    overscan: 20
 
 # 2. Run a generator inside every closed box formed by the scaffolding
 - operation: generate_in_cells
   settings:
-    generator: guilloche
+    generator: spiral
     auto_center: true
     keep_scaffolding: true
     generator_settings:
-      steps: 300
+      center_x: 100.0
+      center_y: 100.0
+      start_radius: 10.0
+      end_radius: 95.0
       revolutions: 30.0
-      R: 2.0
-      r: 6.0
-      p: 18.0
+      steps: 2000
 
 # 3. Standard path modifications 
 # (These now act on the combined results of all the cells)

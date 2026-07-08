@@ -5,9 +5,10 @@ from shapely.ops import polygonize, unary_union
 
 from pendragon.core import PipelineOperation, PipelineState, register_operation
 from pendragon.core.registry import OPERATION_REGISTRY
+from pendragon.core import BasePluginConfig
 
 
-class GenerateInCellsConfig(BaseModel):
+class GenerateInCellsConfig(BasePluginConfig):
     generator: str = Field(..., description="The registry name of the generator to run in each cell.")
     generator_settings: Dict[str, Any] = Field(default_factory=dict, description="Settings to pass to the sub-generator.")
     auto_center: bool = Field(default=True, description="Automatically inject center_x and center_y for the sub-generator based on cell centroid.")
@@ -22,7 +23,7 @@ class GenerateInCellsConfig(BaseModel):
 class GenerateInCellsOp(PipelineOperation):
 
     def process(self, state: PipelineState) -> PipelineState:
-        cfg = self.config
+        cfg = self.config or GenerateInCellsConfig()
         current_lines = state.lines
 
         if not current_lines:
@@ -30,7 +31,8 @@ class GenerateInCellsOp(PipelineOperation):
             return state
 
         # 1. Grab the outer perimeter of the current boundary
-        boundary_ring = state.boundary.boundary
+        effective_boundary = self.get_effective_boundary(state)
+        boundary_ring = effective_boundary.boundary
         
         # 2. Combine our grid lines with the outer perimeter
         all_lines = current_lines + [boundary_ring]

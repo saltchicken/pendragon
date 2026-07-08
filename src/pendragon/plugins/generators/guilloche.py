@@ -9,9 +9,10 @@ import numpy as np
 from shapely.geometry import LineString, MultiLineString
 
 from pendragon.core import PipelineOperation, PipelineState, register_operation
+from pendragon.core import BasePluginConfig
 
 
-class GuillocheConfig(BaseModel):
+class GuillocheConfig(BasePluginConfig):
     center_x: float = Field(default=100.0, description="X coordinate of the pattern center.")
     center_y: float = Field(default=100.0, description="Y coordinate of the pattern center.")
     R: float = Field(default=50.0, description="Radius of the fixed outer circle.")
@@ -28,7 +29,7 @@ class GuillocheGen(PipelineOperation):
 
     def process(self, state: PipelineState) -> PipelineState:
         cfg = self.config or GuillocheConfig()
-        boundary = state.boundary
+        boundary = self.get_effective_boundary(state)
 
         logger.info(
             f"Generating guilloche geometric pattern at ({cfg.center_x}, {cfg.center_y}) "
