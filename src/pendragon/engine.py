@@ -16,6 +16,141 @@ from .pen import PenConfig
 from .pen import PenTool
 from .runner import PipelineRunner
 
+from PyQt5.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QSlider, QLabel, QFormLayout, QApplication
+from PyQt5.QtCore import Qt, QTimer
+
+DARK_THEME_STYLESHEET = """
+QWidget {
+    background-color: #1e1e1e;
+    color: #cccccc;
+    font-size: 13px;
+}
+QLabel {
+    color: #cccccc;
+}
+QSlider::groove:horizontal {
+    border: 1px solid #333333;
+    height: 6px;
+    background: #333333;
+    margin: 2px 0;
+    border-radius: 3px;
+}
+QSlider::handle:horizontal {
+    background: #007acc;
+    border: 1px solid #005c99;
+    width: 14px;
+    margin: -4px 0;
+    border-radius: 7px;
+}
+QSlider::handle:horizontal:hover {
+    background: #0098ff;
+}
+QSlider::sub-page:horizontal {
+    background: #007acc;
+    border-radius: 3px;
+}
+"""
+
+class LiveEditorWindow(QMainWindow):
+    def __init__(self, engine):
+        super().__init__()
+        self.setWindowTitle("Pendragon Live Editor")
+        self.engine = engine
+
+        self.setStyleSheet(DARK_THEME_STYLESHEET)
+        
+        # Central widget and layout
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        main_layout = QHBoxLayout(central_widget)
+
+        # 1. The Vispy Canvas (Left Side)
+        self.viewer = PipelineViewer(self.engine.runner.history)
+        main_layout.addWidget(self.viewer.native, stretch=3)
+
+        # 2. Parameter Control Panel (Right Side)
+        self.control_panel = QWidget()
+        self.form_layout = QFormLayout(self.control_panel)
+        main_layout.addWidget(self.control_panel, stretch=1)
+
+        # TODO: Us there a better way to handle this so I don't need self.on_step_changed = None in PipelineViewer
+        self.viewer.on_step_changed = self.build_ui_for_current_step
+        self.viewer.on_close_requested = self.close
+        
+        # --- Debounce Timer Setup ---
+        self.debounce_timer = QTimer()
+        self.debounce_timer.setSingleShot(True)
+        self.debounce_timer.setInterval(300)  # 300ms delay
+        self.debounce_timer.timeout.connect(self._execute_recalculation)
+        self._pending_op_index = None
+        # ----------------------------
+
+        # Build initial UI for the current step
+        self.build_ui_for_current_step()
+
+
+    def build_ui_for_current_step(self):
+        # Clear existing widgets in the form layout
+        while self.form_layout.count():
+            child = self.form_layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+
+        # The viewer's current_step maps to the history index.
+        # history index 1 corresponds to operation 0.
+        op_index = self.viewer.current_step - 1 
+        if op_index < 0 or op_index >= len(self.engine.runner.operations):
+            self.form_layout.addRow(QLabel("No configurable parameters for this state."))
+            return
+
+        operation = self.engine.runner.operations[op_index]
+        if not operation.config:
+            self.form_layout.addRow(QLabel(f"{operation.__class__.__name__} has no config."))
+            return
+
+        self.form_layout.addRow(QLabel(f"<b>Editing: {operation.__class__.__name__}</b>"))
+
+        # Introspect Pydantic model
+        for field_name, field_info in operation.config.model_fields.items():
+            current_value = getattr(operation.config, field_name)
+            
+            # Handle float parameters with a slider
+            if field_info.annotation == float:
+                slider = QSlider(Qt.Horizontal)
+                slider.setMinimum(0)
+                slider.setMaximum(1000) # You'd scale this based on expected ranges
+                slider.setValue(int(current_value * 10)) 
+                
+                # Connect slider movement to our update function
+                slider.valueChanged.connect(
+                    lambda val, fname=field_name, idx=op_index: self.update_parameter(idx, fname, val / 10.0)
+                )
+                self.form_layout.addRow(field_name, slider)
+            
+            # You can add elif blocks here for int (QSpinBox), str (QLineEdit), etc.
+
+
+    def update_parameter(self, op_index, field_name, new_value):
+        """Updates the internal config immediately, but defers the heavy computation."""
+        # 1. Update the Pydantic config
+        operation = self.engine.runner.operations[op_index]
+        setattr(operation.config, field_name, new_value)
+        
+        # 2. Queue the recalculation and restart the debounce timer
+        self._pending_op_index = op_index
+        self.debounce_timer.start()
+
+
+    def _execute_recalculation(self):
+        """Executes the pipeline re-run when the debounce timer times out."""
+        if self._pending_op_index is not None:
+            # 1. Trigger partial re-run from this operation onwards
+            self.engine.runner.recompute_from(self._pending_op_index)
+            
+            # 2. Refresh the viewer
+            self.viewer.history = self.engine.runner.history
+            self.viewer.update_view()
+
 
 class PipelineViewer(scene.SceneCanvas):
 
@@ -29,6 +164,9 @@ class PipelineViewer(scene.SceneCanvas):
         self.history = history
         # Start on second step (index 1), or step 0 if there are no operations
         self.current_step = min(1, len(self.history) - 1)
+
+        self.on_step_changed = None
+        self.on_close_requested = None
 
         # Setup view and camera
         self.view = self.central_widget.add_view()
@@ -67,15 +205,26 @@ class PipelineViewer(scene.SceneCanvas):
                 pass
 
     def on_key_press(self, event):
+        step_changed = False
+        
         if event.key.name == 'Right':
-            self.current_step = min(self.current_step + 1,
-                                    len(self.history) - 1)
-            self.update_view()
+            if self.current_step < len(self.history) - 1:
+                self.current_step += 1
+                step_changed = True
         elif event.key.name == 'Left':
-            self.current_step = max(self.current_step - 1, 0)
-            self.update_view()
+            if self.current_step > 0:
+                self.current_step -= 1
+                step_changed = True
         elif event.key.name == 'Escape':
-            self.close()
+            if self.on_close_requested is not None:
+                self.on_close_requested()
+            else:
+                self.close()
+
+        if step_changed:
+            self.update_view()
+            if self.on_step_changed is not None:
+                self.on_step_changed()
 
     def update_view(self):
         state = self.history[self.current_step]
@@ -231,17 +380,18 @@ class PendragonEngine:
                 pen.draw_path(points)
 
     def visualize(self):
-        """
-        Renders the pipeline history in an interactive Vispy window.
-        """
-        history = self.runner.history
-        if not history:
+        """Renders the pipeline history in an interactive PyQt/Vispy window."""
+        if not self.runner.history:
             logger.warning("No pipeline history to visualize!")
             return
 
-        logger.info(
-            "Opening visualization window. Use Left/Right arrows to step through operations."
-        )
+        logger.info("Opening live editor visualization window...")
 
-        canvas = PipelineViewer(history)
-        app.run()
+        # Initialize Qt App
+        qt_app = QApplication.instance() or QApplication([])
+        
+        self.editor = LiveEditorWindow(self)
+        self.editor.resize(1200, 800)
+        self.editor.show()
+        
+        qt_app.exec_()

@@ -39,5 +39,23 @@ class PipelineRunner:
                 f"Step {step_index} does not exist. Returning latest state.")
             return self.history[-1]
 
+    def recompute_from(self, step_index: int):
+        """Re-runs the pipeline starting from a specific operation index."""
+        if step_index < 0 or step_index >= len(self.operations):
+            return
+
+        # Truncate history to the state just before the modified step
+        # history[0] is the initial boundary state
+        self.history = self.history[:step_index + 1]
+
+        # Re-run from the modified step to the end
+        for i in range(step_index, len(self.operations)):
+            op = self.operations[i]
+            current_state = self.history[-1]
+            logger.info(f"Recomputing operation {i}: {op.__class__.__name__}")
+            
+            new_state = op.process(current_state)
+            self.history.append(new_state)
+
     def get_final_lines(self):
         return self.history[-1].lines
