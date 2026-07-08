@@ -66,6 +66,8 @@ def main():
         )
         sys.exit(1)
 
+    # TODO: This does not work when circles are in the .dxf file
+    # ERROR    | Failed to load DXF boundary: No valid line geometries found in DXF modelspace.
     boundary = None
     if args.dxf:
         try:
