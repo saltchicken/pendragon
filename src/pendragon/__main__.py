@@ -2,24 +2,21 @@ import argparse
 import sys
 
 from loguru import logger
-import yaml
 from shapely.geometry import Polygon
+import yaml
 
 from pendragon.core import load_plugins
 from pendragon.utils import load_dxf_boundary
+
 from .engine import PendragonEngine
 
-
 logger.remove()
-logger.add(
-    sys.stderr,
-    format=(
-        "<green>{module: <20}</green>."
-        "<green>{function: <20}</green> | "
-        "<level>{level: <8}</level> | "
-        "{message}"
-    )
-)
+logger.add(sys.stderr,
+           format=("<green>{module: <20}</green>."
+                   "<green>{function: <20}</green> | "
+                   "<level>{level: <8}</level> | "
+                   "{message}"))
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -34,11 +31,20 @@ def main():
     parser.add_argument("--no-vis",
                         action="store_true",
                         help="Disable the Vispy visualization window.")
-    parser.add_argument("--width", type=float, help="Width of the rectangular boundary.")
-    parser.add_argument("--height", type=float, help="Height of the rectangular boundary.")
-    parser.add_argument("--dxf", type=str, help="Path to a .dxf file to use as the boundary.")
+    parser.add_argument("--width",
+                        type=float,
+                        help="Width of the rectangular boundary.")
+    parser.add_argument("--height",
+                        type=float,
+                        help="Height of the rectangular boundary.")
+    parser.add_argument("--dxf",
+                        type=str,
+                        help="Path to a .dxf file to use as the boundary.")
 
-    parser.add_argument("--generate-schema", type=str, metavar="PATH", help="Generate JSON schema for recipes and exit.")
+    parser.add_argument("--generate-schema",
+                        type=str,
+                        metavar="PATH",
+                        help="Generate JSON schema for recipes and exit.")
     args = parser.parse_args()
 
     if args.generate_schema:
@@ -77,14 +83,10 @@ def main():
             logger.error(f"Failed to load DXF boundary: {e}")
             sys.exit(1)
     elif args.width is not None and args.height is not None:
-        logger.info(f"Using defined rectangular boundary: {args.width}x{args.height}")
-        boundary = Polygon([
-            (0, 0),
-            (args.width, 0),
-            (args.width, args.height),
-            (0, args.height),
-            (0, 0)
-        ])
+        logger.info(
+            f"Using defined rectangular boundary: {args.width}x{args.height}")
+        boundary = Polygon([(0, 0), (args.width, 0), (args.width, args.height),
+                            (0, args.height), (0, 0)])
     else:
         logger.info("Using default 200x200 boundary.")
         boundary = Polygon([(0, 0), (200, 0), (200, 200), (0, 200), (0, 0)])
@@ -111,9 +113,10 @@ def main():
         logger.info("Opening live editor visualization window...")
         try:
             # Lazy load the GUI components only when requested
-            from pendragon.gui import LiveEditorWindow
             from PyQt5.QtWidgets import QApplication
-            
+
+            from pendragon.gui import LiveEditorWindow
+
             qt_app = QApplication.instance() or QApplication([])
             editor = LiveEditorWindow(engine)
             editor.resize(1200, 800)
@@ -122,8 +125,7 @@ def main():
         except ImportError as e:
             logger.error(
                 f"Failed to launch GUI: {e}. "
-                "Ensure PyQt5 and vispy are installed, or run with --no-vis."
-            )
+                "Ensure PyQt5 and vispy are installed, or run with --no-vis.")
 
 
 if __name__ == "__main__":

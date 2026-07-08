@@ -1,48 +1,43 @@
-import numpy as np
-from loguru import logger
-from pydantic import Field
-from scipy.spatial import cKDTree
-from shapely.geometry import LineString, MultiLineString, Point
-from shapely.ops import linemerge
 from typing import List
 
-from pendragon.core import PipelineOperation, PipelineState, register_operation
+from loguru import logger
+import numpy as np
+from pydantic import Field
+from scipy.spatial import cKDTree
+from shapely.geometry import LineString
+from shapely.geometry import MultiLineString
+from shapely.geometry import Point
+from shapely.ops import linemerge
+
 from pendragon.core import BasePluginConfig
+from pendragon.core import PipelineOperation
+from pendragon.core import PipelineState
+from pendragon.core import register_operation
 
 
 class VenationConfig(BasePluginConfig):
     num_leaves: int = Field(
-        default=500, 
-        description="Number of attractor points (leaves) to drive the growth."
-    )
+        default=500,
+        description="Number of attractor points (leaves) to drive the growth.")
     kill_distance: float = Field(
-        default=2.0, 
-        description="Distance at which an attractor is considered reached and removed."
-    )
+        default=2.0,
+        description=
+        "Distance at which an attractor is considered reached and removed.")
     attract_distance: float = Field(
-        default=20.0, 
+        default=20.0,
         description="Maximum distance an attractor can influence a growing vein."
     )
     segment_length: float = Field(
-        default=1.0, 
-        description="How far a vein grows in a single step."
-    )
-    root_x: float = Field(
-        default=100.0, 
-        description="Starting X coordinate of the root vein."
-    )
-    root_y: float = Field(
-        default=0.0, 
-        description="Starting Y coordinate of the root vein."
-    )
-    seed: int = Field(
-        default=42, 
-        description="Random seed for repeatable patterns."
-    )
+        default=1.0, description="How far a vein grows in a single step.")
+    root_x: float = Field(default=100.0,
+                          description="Starting X coordinate of the root vein.")
+    root_y: float = Field(default=0.0,
+                          description="Starting Y coordinate of the root vein.")
+    seed: int = Field(default=42,
+                      description="Random seed for repeatable patterns.")
     max_iterations: int = Field(
-        default=1000, 
-        description="Safety limit to prevent infinite generation loops."
-    )
+        default=1000,
+        description="Safety limit to prevent infinite generation loops.")
 
 
 @register_operation("venation", config_class=VenationConfig)
@@ -56,15 +51,14 @@ class VenationGen(PipelineOperation):
 
         logger.info(
             f"Generating venation pattern from root ({cfg.root_x}, {cfg.root_y}) "
-            f"with {cfg.num_leaves} attractors."
-        )
+            f"with {cfg.num_leaves} attractors.")
 
         np.random.seed(cfg.seed)
 
         # 1. Distribute random attractors (leaves)
         xs = np.random.uniform(minx, maxx, cfg.num_leaves)
         ys = np.random.uniform(miny, maxy, cfg.num_leaves)
-        
+
         # Keep only the leaves that strictly fall inside the complex boundary
         valid_leaves = []
         for lx, ly in zip(xs, ys):
@@ -88,9 +82,11 @@ class VenationGen(PipelineOperation):
 
             # Build spatial index for fast nearest-neighbor lookups
             node_tree = cKDTree(nodes)
-            distances, indices = node_tree.query(leaves, distance_upper_bound=cfg.attract_distance)
+            distances, indices = node_tree.query(
+                leaves, distance_upper_bound=cfg.attract_distance)
 
-            active_nodes = {}  # node_index -> list of normalized direction vectors
+            active_nodes = {
+            }  # node_index -> list of normalized direction vectors
             leaves_to_remove = []
 
             for i, (dist, node_idx) in enumerate(zip(distances, indices)):
@@ -110,7 +106,7 @@ class VenationGen(PipelineOperation):
 
             # Halt if the network has stalled
             if not active_nodes and not leaves_to_remove:
-                break 
+                break
 
             # Remove consumed leaves
             if leaves_to_remove:
@@ -133,7 +129,7 @@ class VenationGen(PipelineOperation):
         # --- THE FIX: MERGE THE INTERLEAVED SEGMENTS ---
         # linemerge joins contiguous segments into long paths, breaking only at branching junctions
         merged_geometry = linemerge(raw_lines)
-        
+
         merged_lines = []
         if isinstance(merged_geometry, LineString):
             merged_lines = [merged_geometry]
@@ -141,8 +137,10 @@ class VenationGen(PipelineOperation):
             merged_lines = list(merged_geometry.geoms)
         else:
             merged_lines = raw_lines  # Safe fallback if something bizarre happens
-            
-        logger.info(f"Growth complete. Merged {len(raw_lines)} micro-segments into {len(merged_lines)} contiguous branches.")
+
+        logger.info(
+            f"Growth complete. Merged {len(raw_lines)} micro-segments into {len(merged_lines)} contiguous branches."
+        )
 
         # 4. Clip final merged paths to boundary
         clipped_lines: List[LineString] = []
@@ -156,10 +154,9 @@ class VenationGen(PipelineOperation):
                         if not sub_line.is_empty:
                             clipped_lines.append(sub_line)
 
-        logger.success(f"Venation complete. Yielded {len(clipped_lines)} final toolpaths.")
+        logger.success(
+            f"Venation complete. Yielded {len(clipped_lines)} final toolpaths.")
 
-        return PipelineState(
-            boundary=state.boundary,
-            lines=clipped_lines,
-            operation_name="venation"
-        )
+        return PipelineState(boundary=state.boundary,
+                             lines=clipped_lines,
+                             operation_name="venation")

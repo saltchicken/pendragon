@@ -22,7 +22,8 @@ class ClipMod(PipelineOperation):
         boundary = state.boundary
 
         if not current_lines or not boundary:
-            logger.warning("No lines or boundary provided to clip operation. Skipping.")
+            logger.warning(
+                "No lines or boundary provided to clip operation. Skipping.")
             return state
 
         logger.info(
@@ -43,8 +44,7 @@ class ClipMod(PipelineOperation):
                             clipped_lines.append(sub_line)
 
         logger.success(
-            f"Clipping complete. Yielded {len(clipped_lines)} bounded lines."
-        )
+            f"Clipping complete. Yielded {len(clipped_lines)} bounded lines.")
 
         return PipelineState(boundary=boundary,
                              lines=clipped_lines,

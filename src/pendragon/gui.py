@@ -1,20 +1,28 @@
-import yaml
-from typing import List, Dict, Any
-import numpy as np
-from shapely.geometry import Polygon, MultiPolygon
-from vispy import scene
-from loguru import logger
+from typing import Any, Dict, List
 
-from PyQt5.QtWidgets import (
-    QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QSlider, QLabel, 
-    QFormLayout, QApplication, QCheckBox, QGroupBox, QPushButton,
-    QFileDialog
-)
-from PyQt5.QtCore import Qt, QTimer
+from loguru import logger
+import numpy as np
+from PyQt5.QtCore import Qt
+from PyQt5.QtCore import QTimer
+from PyQt5.QtWidgets import QApplication
+from PyQt5.QtWidgets import QCheckBox
+from PyQt5.QtWidgets import QFileDialog
+from PyQt5.QtWidgets import QFormLayout
+from PyQt5.QtWidgets import QGroupBox
+from PyQt5.QtWidgets import QHBoxLayout
+from PyQt5.QtWidgets import QLabel
+from PyQt5.QtWidgets import QMainWindow
+from PyQt5.QtWidgets import QPushButton
+from PyQt5.QtWidgets import QSlider
+from PyQt5.QtWidgets import QVBoxLayout
+from PyQt5.QtWidgets import QWidget
+from shapely.geometry import MultiPolygon
+from shapely.geometry import Polygon
+from vispy import scene
+import yaml
 
 from pendragon.core.models import PipelineState
 from pendragon.core.registry import OPERATION_REGISTRY
-
 
 DARK_THEME_STYLESHEET = """
 QWidget {
@@ -75,13 +83,14 @@ QPushButton:pressed {
 
 
 class LiveEditorWindow(QMainWindow):
+
     def __init__(self, engine):
         super().__init__()
         self.setWindowTitle("Pendragon")
         self.engine = engine
 
         self.setStyleSheet(DARK_THEME_STYLESHEET)
-        
+
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QHBoxLayout(central_widget)
@@ -122,10 +131,10 @@ class LiveEditorWindow(QMainWindow):
         self.nav_layout = QHBoxLayout()
         self.btn_prev = QPushButton("Previous Step")
         self.btn_next = QPushButton("Next Step")
-        
+
         self.btn_prev.clicked.connect(self.viewer.step_backward)
         self.btn_next.clicked.connect(self.viewer.step_forward)
-        
+
         self.nav_layout.addWidget(self.btn_prev)
         self.nav_layout.addWidget(self.btn_next)
         self.control_layout.addLayout(self.nav_layout)
@@ -135,11 +144,11 @@ class LiveEditorWindow(QMainWindow):
         self.btn_load_recipe = QPushButton("Load Recipe")
         self.btn_export_gcode = QPushButton("Export G-Code")
         self.btn_save_recipe = QPushButton("Save Recipe")
-        
+
         self.btn_load_recipe.clicked.connect(self._load_live_recipe)
         self.btn_export_gcode.clicked.connect(self._export_live_gcode)
         self.btn_save_recipe.clicked.connect(self._save_live_recipe)
-        
+
         self.action_layout.addWidget(self.btn_load_recipe)
         self.action_layout.addWidget(self.btn_save_recipe)
         self.action_layout.addWidget(self.btn_export_gcode)
@@ -155,28 +164,30 @@ class LiveEditorWindow(QMainWindow):
         self.viewer.on_step_changed = self.build_ui_for_current_step
         self.viewer.on_close_requested = self.close
         self.viewer.on_stats_updated = self.update_stats_ui
-        
+
         # Debounce Timer Setup
         self.debounce_timer = QTimer()
         self.debounce_timer.setSingleShot(True)
-        self.debounce_timer.setInterval(300) 
+        self.debounce_timer.setInterval(300)
         self.debounce_timer.timeout.connect(self._execute_recalculation)
         self._pending_op_index = None
 
         self.build_ui_for_current_step()
-        self.viewer.update_view()  # Force initial stats update now that callbacks are bound
+        self.viewer.update_view(
+        )  # Force initial stats update now that callbacks are bound
 
     def _on_view_mode_toggled(self, checked):
         """Swaps the viewer mode and forces a visual update."""
         self.viewer.show_final_view = checked
         self.viewer.update_view()
 
-    def update_stats_ui(self, step, total_ops, op_name, lines, vertices, final_view):
+    def update_stats_ui(self, step, total_ops, op_name, lines, vertices,
+                        final_view):
         """Updates the discrete PyQt labels for pipeline statistics."""
         step_text = f"{step} / {total_ops}"
         if final_view:
             step_text += " (FINAL VIEW)"
-            
+
         self.step_label.setText(step_text)
         self.op_label.setText(str(op_name))
         self.lines_label.setText(str(lines))
@@ -188,21 +199,24 @@ class LiveEditorWindow(QMainWindow):
             if child.widget():
                 child.widget().deleteLater()
 
-        op_index = self.viewer.current_step - 1 
+        op_index = self.viewer.current_step - 1
         if op_index < 0 or op_index >= len(self.engine.runner.operations):
-            self.form_layout.addRow(QLabel("No configurable parameters for this state."))
+            self.form_layout.addRow(
+                QLabel("No configurable parameters for this state."))
             return
 
         operation = self.engine.runner.operations[op_index]
         if not operation.config:
-            self.form_layout.addRow(QLabel(f"{operation.__class__.__name__} has no config."))
+            self.form_layout.addRow(
+                QLabel(f"{operation.__class__.__name__} has no config."))
             return
 
-        self.form_layout.addRow(QLabel(f"<b>Editing: {operation.__class__.__name__}</b>"))
+        self.form_layout.addRow(
+            QLabel(f"<b>Editing: {operation.__class__.__name__}</b>"))
 
         for field_name, field_info in operation.config.model_fields.items():
             current_value = getattr(operation.config, field_name)
-            
+
             # --- Handle Root Float Parameters ---
             if field_info.annotation == float:
                 container = QWidget()
@@ -212,50 +226,61 @@ class LiveEditorWindow(QMainWindow):
                 slider = QSlider(Qt.Horizontal)
                 slider.setMinimum(0)
                 slider.setMaximum(1000)
-                slider.setValue(int(current_value * 10)) 
-                
+                slider.setValue(int(current_value * 10))
+
                 value_label = QLabel(f"{current_value:.1f}")
                 value_label.setMinimumWidth(35)
                 value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                
+
                 h_layout.addWidget(slider)
                 h_layout.addWidget(value_label)
-                
-                def update_wrapper(val, fname=field_name, idx=op_index, lbl=value_label):
+
+                def update_wrapper(val,
+                                   fname=field_name,
+                                   idx=op_index,
+                                   lbl=value_label):
                     real_val = val / 10.0
                     lbl.setText(f"{real_val:.1f}")
                     self.update_parameter(idx, fname, real_val)
-                    
+
                 slider.valueChanged.connect(update_wrapper)
                 self.form_layout.addRow(field_name, container)
 
             # --- Dynamic Poly-morphic Nested Settings Section ---
-            elif isinstance(current_value, dict) or field_info.annotation == dict or getattr(field_info.annotation, '__origin__', None) is dict:
+            elif isinstance(current_value,
+                            dict) or field_info.annotation == dict or getattr(
+                                field_info.annotation, '__origin__',
+                                None) is dict:
                 # Infer what the target sub-registry schema is by checking adjacent sibling attributes
                 # e.g., if we are looking at generator_settings, check if self.config.generator exists.
                 registry_key = None
-                
+
                 # Dynamic inference strategy: Look for a field named like the root prefix (e.g. "generator")
                 prefix = field_name.split('_')[0] if '_' in field_name else ""
                 if prefix and hasattr(operation.config, prefix):
                     registry_key = getattr(operation.config, prefix)
-                elif hasattr(operation.config, "generator"): # Fallback standard
+                elif hasattr(operation.config,
+                             "generator"):  # Fallback standard
                     registry_key = getattr(operation.config, "generator")
 
-                op_info = OPERATION_REGISTRY.get(registry_key) if registry_key else None
-                
+                op_info = OPERATION_REGISTRY.get(
+                    registry_key) if registry_key else None
+
                 if op_info and op_info["config"]:
                     sub_config_class = op_info["config"]
-                    self.form_layout.addRow(QLabel(f"<br><i>Nested Context: {registry_key} ({field_name})</i>"))
-                    
-                    for sub_field_name, sub_field_info in sub_config_class.model_fields.items():
+                    self.form_layout.addRow(
+                        QLabel(
+                            f"<br><i>Nested Context: {registry_key} ({field_name})</i>"
+                        ))
+
+                    for sub_field_name, sub_field_info in sub_config_class.model_fields.items(
+                    ):
                         if sub_field_info.annotation == float:
                             # Safely capture current map value or use the fallback default
                             sub_current_value = current_value.get(
-                                sub_field_name, 
-                                sub_field_info.default if sub_field_info.default is not None else 0.0
-                            )
-                            
+                                sub_field_name, sub_field_info.default
+                                if sub_field_info.default is not None else 0.0)
+
                             sub_container = QWidget()
                             sub_h_layout = QHBoxLayout(sub_container)
                             sub_h_layout.setContentsMargins(0, 0, 0, 0)
@@ -263,136 +288,149 @@ class LiveEditorWindow(QMainWindow):
                             sub_slider = QSlider(Qt.Horizontal)
                             sub_slider.setMinimum(0)
                             sub_slider.setMaximum(1000)
-                            sub_slider.setValue(int(sub_current_value * 10)) 
-                            
+                            sub_slider.setValue(int(sub_current_value * 10))
+
                             sub_value_label = QLabel(f"{sub_current_value:.1f}")
                             sub_value_label.setMinimumWidth(35)
-                            sub_value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                            
+                            sub_value_label.setAlignment(Qt.AlignRight |
+                                                         Qt.AlignVCenter)
+
                             sub_h_layout.addWidget(sub_slider)
                             sub_h_layout.addWidget(sub_value_label)
-                            
+
                             # Closure passes the targeted container dictionary name dynamically
-                            def sub_update_wrapper(val, parent_dict=field_name, fname=sub_field_name, idx=op_index, lbl=sub_value_label):
+                            def sub_update_wrapper(val,
+                                                   parent_dict=field_name,
+                                                   fname=sub_field_name,
+                                                   idx=op_index,
+                                                   lbl=sub_value_label):
                                 real_val = val / 10.0
                                 lbl.setText(f"{real_val:.1f}")
-                                self.update_nested_parameter(idx, parent_dict, fname, real_val)
-                                
+                                self.update_nested_parameter(
+                                    idx, parent_dict, fname, real_val)
+
                             sub_slider.valueChanged.connect(sub_update_wrapper)
-                            self.form_layout.addRow(f"↳ {sub_field_name}", sub_container)
+                            self.form_layout.addRow(f"↳ {sub_field_name}",
+                                                    sub_container)
 
     def update_parameter(self, op_index, field_name, new_value):
         operation = self.engine.runner.operations[op_index]
         setattr(operation.config, field_name, new_value)
-        
+
         self._pending_op_index = op_index
         self.debounce_timer.start()
 
-    def update_nested_parameter(self, op_index, parent_dict_name, sub_field_name, new_value):
+    def update_nested_parameter(self, op_index, parent_dict_name,
+                                sub_field_name, new_value):
         operation = self.engine.runner.operations[op_index]
-        
+
         if hasattr(operation.config, parent_dict_name):
             target_dict = getattr(operation.config, parent_dict_name)
             if isinstance(target_dict, dict):
                 target_dict[sub_field_name] = new_value
-                
+
                 self._pending_op_index = op_index
                 self.debounce_timer.start()
 
     def _execute_recalculation(self):
         if self._pending_op_index is not None:
             # Determine the calculation target based on view mode state
-            target = len(self.engine.runner.operations) if self.viewer.show_final_view else self.viewer.current_step
+            target = len(
+                self.engine.runner.operations
+            ) if self.viewer.show_final_view else self.viewer.current_step
             self.engine.runner.recompute_from(self._pending_op_index, target)
             self.viewer.update_view()
 
     def _load_live_recipe(self):
         """Prompts the user to select a YAML recipe, loads it, and refreshes the GUI."""
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "Load Recipe", "", "YAML Files (*.yaml *.yml);;All Files (*)"
-        )
-        
+            self, "Load Recipe", "", "YAML Files (*.yaml *.yml);;All Files (*)")
+
         if not file_path:
             return
 
         try:
             with open(file_path, 'r') as f:
                 new_recipe = yaml.safe_load(f)
-                
+
             # Basic validation to ensure it matches the current expected schema
             if not isinstance(new_recipe, list):
-                logger.error("Invalid recipe format: must be a list of operations.")
+                logger.error(
+                    "Invalid recipe format: must be a list of operations.")
                 return
 
             # 1. Inject the new recipe into the engine
             success = self.engine.load_recipe(new_recipe)
-            
+
             if success:
                 # 2. Reset the viewer state to the end of the new pipeline
                 self.viewer.current_step = len(self.engine.runner.operations)
-                
+
                 # 3. Rebuild the dynamic sliders for the current step
                 self.build_ui_for_current_step()
-                
+
                 # 4. Force Vispy to recalculate and redraw the canvas
                 self.viewer.update_view()
-                
+
         except Exception as e:
             logger.error(f"Error loading recipe from {file_path}: {e}")
 
     def _export_live_gcode(self):
         """Prompts the user for a save location and exports the current final paths."""
         file_path, _ = QFileDialog.getSaveFileName(
-            self, "Export G-Code", "output.nc", "G-Code Files (*.nc *.gcode);;All Files (*)"
-        )
-        
+            self, "Export G-Code", "output.nc",
+            "G-Code Files (*.nc *.gcode);;All Files (*)")
+
         if file_path:
             # Ensure the pipeline is fully computed to the end
-            self.engine.runner.recompute_from(0, len(self.engine.runner.operations))
+            self.engine.runner.recompute_from(
+                0, len(self.engine.runner.operations))
             final_lines = self.engine.runner.get_final_lines()
             self.engine.export_gcode(lines=final_lines, output_path=file_path)
 
     def _save_live_recipe(self):
         """Serializes the current pipeline state back into a YAML recipe."""
         file_path, _ = QFileDialog.getSaveFileName(
-            self, "Save Recipe", "preset.yaml", "YAML Files (*.yaml *.yml);;All Files (*)"
-        )
-        
+            self, "Save Recipe", "preset.yaml",
+            "YAML Files (*.yaml *.yml);;All Files (*)")
+
         if not file_path:
             return
 
         current_recipe = []
-        
+
         # Iterate through the live operations to reconstruct the recipe
         for op in self.engine.runner.operations:
             # Reverse-lookup the operation name from the registry
-            op_name = next(
-                (name for name, info in OPERATION_REGISTRY.items() if isinstance(op, info["class"])), 
-                None
-            )
-            
+            op_name = next((name for name, info in OPERATION_REGISTRY.items()
+                            if isinstance(op, info["class"])), None)
+
             if not op_name:
                 continue
-                
+
             # Build the step dictionary
             step = {"operation": op_name}
-            
+
             # Serialize the Pydantic config back to a standard dictionary
             if op.config:
                 step["settings"] = op.config.model_dump()
-                
+
             current_recipe.append(step)
 
         # Write the reconstructed recipe to disk
         try:
             with open(file_path, 'w') as f:
-                yaml.safe_dump(current_recipe, f, sort_keys=False, default_flow_style=False)
+                yaml.safe_dump(current_recipe,
+                               f,
+                               sort_keys=False,
+                               default_flow_style=False)
             logger.success(f"Recipe successfully saved to {file_path}")
         except Exception as e:
             logger.error(f"Failed to save recipe: {e}")
 
 
 class PipelineViewer(scene.SceneCanvas):
+
     def __init__(self, engine):
         super().__init__(keys='interactive',
                          size=(800, 800),
@@ -411,13 +449,15 @@ class PipelineViewer(scene.SceneCanvas):
         self.view.camera = 'panzoom'
         self.view.camera.aspect = 1.0
 
-        self.lines_visual = scene.visuals.Line(parent=self.view.scene, color='white')
-        self.boundary_visual = scene.visuals.Line(parent=self.view.scene, color='red')
+        self.lines_visual = scene.visuals.Line(parent=self.view.scene,
+                                               color='white')
+        self.boundary_visual = scene.visuals.Line(parent=self.view.scene,
+                                                  color='red')
         self.vertices_visual = scene.visuals.Markers(parent=self.view.scene)
 
         self.freeze()
         self.update_view()
-        
+
         history = self.engine.runner.history
         if history and history[0].boundary:
             minx, miny, maxx, maxy = history[0].boundary.bounds
@@ -456,7 +496,8 @@ class PipelineViewer(scene.SceneCanvas):
 
     def update_view(self):
         # 1. Determine how far we need to compute based on the view mode
-        target_step = len(self.engine.runner.operations) if self.show_final_view else self.current_step
+        target_step = len(self.engine.runner.operations
+                         ) if self.show_final_view else self.current_step
 
         # 2. Lazily compute history if we haven't reached the required target step yet
         current_history_max = len(self.engine.runner.history) - 1
@@ -464,7 +505,8 @@ class PipelineViewer(scene.SceneCanvas):
             self.engine.runner.recompute_from(current_history_max, target_step)
 
         # 3. Fetch the appropriate state to display
-        display_step = len(self.engine.runner.history) - 1 if self.show_final_view else self.current_step
+        display_step = len(self.engine.runner.history
+                          ) - 1 if self.show_final_view else self.current_step
         state = self.engine.runner.history[display_step]
 
         total_vertices = sum(len(line.coords) for line in state.lines)
@@ -472,14 +514,10 @@ class PipelineViewer(scene.SceneCanvas):
 
         # 4. Trigger HUD update callback
         if self.on_stats_updated:
-            self.on_stats_updated(
-                self.current_step, 
-                total_ops, 
-                state.operation_name, 
-                len(state.lines), 
-                total_vertices, 
-                self.show_final_view
-            )
+            self.on_stats_updated(self.current_step,
+                                  total_ops, state.operation_name,
+                                  len(state.lines), total_vertices,
+                                  self.show_final_view)
 
         # 5. Visual Rendering logic
         if state.boundary and not state.boundary.is_empty:
@@ -505,7 +543,8 @@ class PipelineViewer(scene.SceneCanvas):
 
             if b_pos:
                 stacked_b_pos = np.vstack(b_pos)
-                self.boundary_visual.set_data(pos=stacked_b_pos, connect=np.array(b_connect))
+                self.boundary_visual.set_data(pos=stacked_b_pos,
+                                              connect=np.array(b_connect))
                 self.boundary_visual.visible = True
             else:
                 self.boundary_visual.visible = False
@@ -523,13 +562,17 @@ class PipelineViewer(scene.SceneCanvas):
                 for i in range(n_pts - 1):
                     connect.append([idx + i, idx + i + 1])
                 idx += n_pts
-                
+
             stacked_pos = np.vstack(pos)
-            
-            self.lines_visual.set_data(pos=stacked_pos, connect=np.array(connect))
+
+            self.lines_visual.set_data(pos=stacked_pos,
+                                       connect=np.array(connect))
             self.lines_visual.visible = True
-            
-            self.vertices_visual.set_data(pos=stacked_pos, face_color='red', edge_color=None, size=10)
+
+            self.vertices_visual.set_data(pos=stacked_pos,
+                                          face_color='red',
+                                          edge_color=None,
+                                          size=10)
             self.vertices_visual.visible = True
         else:
             self.lines_visual.visible = False

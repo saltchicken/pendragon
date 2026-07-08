@@ -1,7 +1,10 @@
 import ezdxf
-from shapely.geometry import LineString, Polygon, MultiPolygon
-from shapely.ops import polygonize, unary_union
 from PIL import Image
+from shapely.geometry import LineString
+from shapely.geometry import MultiPolygon
+from shapely.geometry import Polygon
+from shapely.ops import polygonize
+from shapely.ops import unary_union
 
 
 class ImageSampler:
@@ -25,6 +28,7 @@ class ImageSampler:
                 int((1.0 - ((y - self.miny) / self.height)) *
                     (self.img.height - 1)), self.img.height - 1))
         return (255 - self.img.getpixel((px, py))) / 255.0
+
 
 def load_dxf_boundary(dxf_path: str) -> Polygon | MultiPolygon:
     """
@@ -54,7 +58,8 @@ def load_dxf_boundary(dxf_path: str) -> Polygon | MultiPolygon:
     polygons = list(polygonize(lines))
 
     if not polygons:
-        raise ValueError("Could not form any closed boundaries from the DXF lines.")
+        raise ValueError(
+            "Could not form any closed boundaries from the DXF lines.")
 
     # unary_union merges overlapping polygons and groups disjoint ones into a MultiPolygon
     return unary_union(polygons)

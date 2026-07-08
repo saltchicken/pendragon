@@ -1,8 +1,13 @@
 from typing import List
+
 from loguru import logger
-from pendragon.core import PipelineOperation, PipelineState
+
+from pendragon.core import PipelineOperation
+from pendragon.core import PipelineState
+
 
 class PipelineRunner:
+
     def __init__(self, initial_state: PipelineState):
         self.history: List[PipelineState] = [initial_state]
         self.operations: List[PipelineOperation] = []
@@ -22,7 +27,8 @@ class PipelineRunner:
         try:
             return self.history[step_index]
         except IndexError:
-            logger.error(f"Step {step_index} does not exist. Returning latest state.")
+            logger.error(
+                f"Step {step_index} does not exist. Returning latest state.")
             return self.history[-1]
 
     def recompute_from(self, step_index: int, target_step: int = None):
@@ -32,7 +38,7 @@ class PipelineRunner:
 
         if target_step is None:
             target_step = len(self.operations)
-        
+
         # Ensure we don't try to compute past the end of the pipeline
         target_step = min(target_step, len(self.operations))
 
@@ -44,7 +50,7 @@ class PipelineRunner:
             op = self.operations[i]
             current_state = self.history[-1]
             logger.info(f"Recomputing operation {i}: {op.__class__.__name__}")
-            
+
             new_state = op.process(current_state)
             self.history.append(new_state)
 

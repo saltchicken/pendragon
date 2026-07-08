@@ -15,9 +15,8 @@ from pendragon.core import register_operation
 
 class DeduplicateConfig(BaseModel):
     tolerance: float = Field(
-        default=1e-5, 
-        description="Tolerance for considering two geometries exactly equal."
-    )
+        default=1e-5,
+        description="Tolerance for considering two geometries exactly equal.")
 
 
 @register_operation("deduplicate", config_class=DeduplicateConfig)
@@ -28,7 +27,8 @@ class DeduplicateMod(PipelineOperation):
         current_lines = state.lines
 
         if not current_lines:
-            logger.warning("No lines provided to the deduplicate operation. Skipping.")
+            logger.warning(
+                "No lines provided to the deduplicate operation. Skipping.")
             return state
 
         logger.info(f"Deduplicating {len(current_lines)} lines...")
@@ -43,31 +43,29 @@ class DeduplicateMod(PipelineOperation):
             # If we've already flagged this line as a duplicate of an earlier one, skip it
             if i in duplicates_to_skip:
                 continue
-                
+
             unique_lines.append(line)
 
             # Query the R-Tree for lines with overlapping bounding boxes
             query_indices = tree.query(line)
 
             for j in query_indices:
-                if j <= i: 
+                if j <= i:
                     continue  # Skip checking against itself or already-processed lines
 
                 other_line = current_lines[j]
-                
-                # Use equals_exact to account for tiny floating point differences, 
+
+                # Use equals_exact to account for tiny floating point differences,
                 # checking both forward and reversed directions
-                if (line.equals_exact(other_line, active_config.tolerance) or 
-                    line.equals_exact(other_line.reverse(), active_config.tolerance)):
+                if (line.equals_exact(other_line, active_config.tolerance) or
+                        line.equals_exact(other_line.reverse(),
+                                          active_config.tolerance)):
                     duplicates_to_skip.add(j)
 
         logger.success(
             f"Deduplication complete. Removed {len(duplicates_to_skip)} duplicate lines. "
-            f"Retained {len(unique_lines)} paths."
-        )
+            f"Retained {len(unique_lines)} paths.")
 
-        return PipelineState(
-            boundary=state.boundary,
-            lines=unique_lines,
-            operation_name="deduplicate"
-        )
+        return PipelineState(boundary=state.boundary,
+                             lines=unique_lines,
+                             operation_name="deduplicate")

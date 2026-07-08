@@ -6,10 +6,10 @@ from pydantic import Field
 from shapely.geometry import LineString
 from shapely.geometry import MultiLineString
 
+from pendragon.core import BasePluginConfig
 from pendragon.core import PipelineOperation
 from pendragon.core import PipelineState
 from pendragon.core import register_operation
-from pendragon.core import BasePluginConfig
 
 
 class GridLinesConfig(BasePluginConfig):
@@ -26,11 +26,11 @@ class GridLinesGen(PipelineOperation):
 
     def process(self, state: PipelineState) -> PipelineState:
         active_config = self.config or GridLinesConfig()
-        
-        # 1. Distinguish between the original boundary (for phase locking) 
+
+        # 1. Distinguish between the original boundary (for phase locking)
         # and the effective boundary (for expansion/clipping)
         orig_minx, orig_miny, orig_maxx, orig_maxy = state.boundary.bounds
-        
+
         effective_boundary = self.get_effective_boundary(state)
         eff_minx, eff_miny, eff_maxx, eff_maxy = effective_boundary.bounds
 
@@ -45,13 +45,14 @@ class GridLinesGen(PipelineOperation):
             lines = []
             # Lock the grid phase to the original un-buffered boundary
             phase_y = orig_miny + active_config.spacing
-            
+
             # Step backwards to find the correct starting point that covers the overscan
             k_start = math.floor((eff_miny - phase_y) / active_config.spacing)
             current_y = phase_y + (k_start * active_config.spacing)
-            
+
             while current_y < eff_maxy:
-                line = LineString([(eff_minx, current_y), (eff_maxx, current_y)])
+                line = LineString([(eff_minx, current_y),
+                                   (eff_maxx, current_y)])
                 lines.append(line)
                 current_y += active_config.spacing
             return lines
@@ -61,13 +62,14 @@ class GridLinesGen(PipelineOperation):
             lines = []
             # Lock the grid phase to the original un-buffered boundary
             phase_x = orig_minx + active_config.spacing
-            
+
             # Step backwards to find the correct starting point that covers the overscan
             k_start = math.floor((eff_minx - phase_x) / active_config.spacing)
             current_x = phase_x + (k_start * active_config.spacing)
-            
+
             while current_x < eff_maxx:
-                line = LineString([(current_x, eff_miny), (current_x, eff_maxy)])
+                line = LineString([(current_x, eff_miny),
+                                   (current_x, eff_maxy)])
                 lines.append(line)
                 current_x += active_config.spacing
             return lines

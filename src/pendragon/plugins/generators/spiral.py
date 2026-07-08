@@ -3,19 +3,30 @@ from typing import List
 from loguru import logger
 import numpy as np
 from pydantic import Field
-from shapely.geometry import LineString, MultiLineString
+from shapely.geometry import LineString
+from shapely.geometry import MultiLineString
 
-from pendragon.core import PipelineOperation, PipelineState, register_operation
 from pendragon.core import BasePluginConfig
+from pendragon.core import PipelineOperation
+from pendragon.core import PipelineState
+from pendragon.core import register_operation
 
 
 class SpiralConfig(BasePluginConfig):
-    center_x: float = Field(default=100.0, description="X coordinate of the spiral center.")
-    center_y: float = Field(default=100.0, description="Y coordinate of the spiral center.")
-    start_radius: float = Field(default=0.0, description="Starting radius (can be > 0 for a hollow center).")
-    end_radius: float = Field(default=100.0, description="Outer radius where the spiral terminates.")
-    revolutions: float = Field(default=10.0, description="Total number of full rotations.")
-    steps: int = Field(default=1000, description="Total number of linear segments used to draw the curve.")
+    center_x: float = Field(default=100.0,
+                            description="X coordinate of the spiral center.")
+    center_y: float = Field(default=100.0,
+                            description="Y coordinate of the spiral center.")
+    start_radius: float = Field(
+        default=0.0,
+        description="Starting radius (can be > 0 for a hollow center).")
+    end_radius: float = Field(
+        default=100.0, description="Outer radius where the spiral terminates.")
+    revolutions: float = Field(default=10.0,
+                               description="Total number of full rotations.")
+    steps: int = Field(
+        default=1000,
+        description="Total number of linear segments used to draw the curve.")
 
 
 @register_operation("spiral", config_class=SpiralConfig)
@@ -25,10 +36,8 @@ class SpiralGen(PipelineOperation):
         cfg = self.config or SpiralConfig()
         boundary = self.get_effective_boundary(state)
 
-        logger.info(
-            f"Generating spiral at ({cfg.center_x}, {cfg.center_y}) "
-            f"with {cfg.revolutions} revolutions."
-        )
+        logger.info(f"Generating spiral at ({cfg.center_x}, {cfg.center_y}) "
+                    f"with {cfg.revolutions} revolutions.")
 
         # 1. Parameterize theta and radius
         theta = np.linspace(0, cfg.revolutions * 2 * np.pi, cfg.steps)
@@ -53,10 +62,10 @@ class SpiralGen(PipelineOperation):
                     if not sub_line.is_empty:
                         clipped_lines.append(sub_line)
 
-        logger.success(f"Generated spiral segments. Retained {len(clipped_lines)} continuous paths.")
-
-        return PipelineState(
-            boundary=state.boundary,
-            lines=clipped_lines,
-            operation_name="spiral"
+        logger.success(
+            f"Generated spiral segments. Retained {len(clipped_lines)} continuous paths."
         )
+
+        return PipelineState(boundary=state.boundary,
+                             lines=clipped_lines,
+                             operation_name="spiral")

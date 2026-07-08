@@ -1,33 +1,33 @@
-import numpy as np
-from loguru import logger
-from pydantic import Field
-from scipy.spatial import Delaunay, Voronoi
-from shapely.geometry import LineString, MultiLineString
 from typing import List
 
-from pendragon.core import PipelineOperation, PipelineState, register_operation
+from loguru import logger
+import numpy as np
+from pydantic import Field
+from scipy.spatial import Delaunay
+from scipy.spatial import Voronoi
+from shapely.geometry import LineString
+from shapely.geometry import MultiLineString
+
 from pendragon.core import BasePluginConfig
+from pendragon.core import PipelineOperation
+from pendragon.core import PipelineState
+from pendragon.core import register_operation
 
 
 class VoronoiDualConfig(BasePluginConfig):
     spacing: float = Field(
-        default=2.0, 
-        gt=0.0, 
-        description="Target spacing between points if num_points is 0."
-    )
+        default=2.0,
+        gt=0.0,
+        description="Target spacing between points if num_points is 0.")
     num_points: int = Field(
-        default=0, 
-        ge=0, 
-        description="Number of random seed points to generate."
-    )
-    seed: int = Field(
-        default=42, 
-        description="Random seed for repeatable generation."
-    )
+        default=0,
+        ge=0,
+        description="Number of random seed points to generate.")
+    seed: int = Field(default=42,
+                      description="Random seed for repeatable generation.")
     mode: str = Field(
-        default='dual', 
-        description="Mode of generation: 'voronoi', 'delaunay', or 'dual'."
-    )
+        default='dual',
+        description="Mode of generation: 'voronoi', 'delaunay', or 'dual'.")
 
 
 @register_operation("voronoi_dual", config_class=VoronoiDualConfig)
@@ -36,10 +36,10 @@ class VoronoiDualGen(PipelineOperation):
 
     def process(self, state: PipelineState) -> PipelineState:
         cfg = self.config or VoronoiDualConfig()
-        
+
         # Pull original lines to preserve them (matching the original plugin's behavior)
-        current_lines = state.lines 
-        
+        current_lines = state.lines
+
         # Get the boundary, buffered by the overscan config if applicable
         effective_boundary = self.get_effective_boundary(state)
         minx, miny, maxx, maxy = effective_boundary.bounds
@@ -47,7 +47,9 @@ class VoronoiDualGen(PipelineOperation):
         height = maxy - miny
 
         if width <= 0 or height <= 0:
-            logger.warning("Effective boundary has no area. Skipping voronoi_dual generation.")
+            logger.warning(
+                "Effective boundary has no area. Skipping voronoi_dual generation."
+            )
             return state
 
         logger.info(f"Generating {cfg.mode} diagram...")
@@ -72,7 +74,8 @@ class VoronoiDualGen(PipelineOperation):
 
         # Both diagrams require a minimum of 4 distinct points
         if len(points) < 4:
-            logger.warning("Not enough points generated to form a valid diagram.")
+            logger.warning(
+                "Not enough points generated to form a valid diagram.")
             return state
 
         raw_lines: List[LineString] = []
@@ -117,11 +120,10 @@ class VoronoiDualGen(PipelineOperation):
                         if not sub_line.is_empty:
                             clipped_lines.append(sub_line)
 
-        logger.success(f"Generated {len(clipped_lines)} bounded {cfg.mode} paths.")
+        logger.success(
+            f"Generated {len(clipped_lines)} bounded {cfg.mode} paths.")
 
         # Pass the original boundary forward alongside the merged lines
-        return PipelineState(
-            boundary=state.boundary,
-            lines=current_lines + clipped_lines,
-            operation_name="voronoi_dual"
-        )
+        return PipelineState(boundary=state.boundary,
+                             lines=current_lines + clipped_lines,
+                             operation_name="voronoi_dual")

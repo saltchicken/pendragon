@@ -1,12 +1,14 @@
 from typing import List, Optional
 
 from loguru import logger
-from shapely.geometry import LineString, Polygon
+from shapely.geometry import LineString
+from shapely.geometry import Polygon
 
 from pendragon.core.models import PipelineState
 from pendragon.core.registry import OPERATION_REGISTRY
 
-from .pen import PenConfig, PenTool
+from .pen import PenConfig
+from .pen import PenTool
 from .runner import PipelineRunner
 
 
@@ -29,24 +31,22 @@ class PendragonEngine:
         Resets the engine's runner and loads a new recipe dynamically.
         """
         self.recipe = new_recipe
-        
+
         # 1. Re-initialize the base state
-        initial_state = PipelineState(
-            boundary=self.boundary,
-            operation_name="base_geometry"
-        )
-        
+        initial_state = PipelineState(boundary=self.boundary,
+                                      operation_name="base_geometry")
+
         # 2. Create a brand new runner to clear the old history and operations
         self.runner = PipelineRunner(initial_state)
-        
+
         # 3. Rebuild the pipeline with the new recipe
         success = self.build_pipeline()
-        
+
         if success:
             logger.info("Successfully loaded and built new pipeline recipe.")
         else:
             logger.error("Failed to build pipeline from new recipe.")
-            
+
         return success
 
     def build_pipeline(self) -> bool:
@@ -57,7 +57,9 @@ class PendragonEngine:
         for step in self.recipe:
             op_name = step.get("operation")
             if not op_name:
-                logger.error(f"Invalid step configuration, missing 'operation' key: {step}")
+                logger.error(
+                    f"Invalid step configuration, missing 'operation' key: {step}"
+                )
                 return False
 
             op_info = OPERATION_REGISTRY.get(op_name)
@@ -72,7 +74,8 @@ class PendragonEngine:
             if ConfigClass:
                 try:
                     validated_config = ConfigClass(**step.get("settings", {}))
-                    logger.success(f"Successfully validated config for {op_name}")
+                    logger.success(
+                        f"Successfully validated config for {op_name}")
                 except Exception as e:
                     logger.error(f"Configuration error for '{op_name}': {e}")
                     return False

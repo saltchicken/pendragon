@@ -1,7 +1,9 @@
-from abc import ABC, abstractmethod
+from abc import ABC
+from abc import abstractmethod
 from typing import Type
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+from pydantic import Field
 
 from pendragon.core.models import PipelineState
 
@@ -12,11 +14,13 @@ class BasePluginConfig(BaseModel):
     """Base configuration for all pipeline operations."""
     overscan: float = Field(
         default=0.0,
-        description="Distance to expand (positive) or shrink (negative) the operation's clipping boundary."
+        description=
+        "Distance to expand (positive) or shrink (negative) the operation's clipping boundary."
     )
 
 
 def register_operation(name: str, config_class: Type[BaseModel] | None = None):
+
     def decorator(cls: Type['PipelineOperation']):
         if not issubclass(cls, PipelineOperation):
             raise TypeError(
