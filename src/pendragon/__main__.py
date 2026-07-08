@@ -11,6 +11,17 @@ from pendragon.core import load_plugins
 from .engine import PendragonEngine
 
 
+logger.remove()
+logger.add(
+    sys.stderr,
+    format=(
+        "<green>{module: <20}</green>."
+        "<green>{function: <20}</green> | "
+        "<level>{level: <8}</level> | "
+        "{message}"
+    )
+)
+
 def main():
     parser = argparse.ArgumentParser(
         description="Pendragon CNC G-code generator.")
