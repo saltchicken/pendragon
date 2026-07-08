@@ -1,142 +1,94 @@
 from typing import List
 import numpy as np
+import yaml
 from shapely.geometry import Polygon, MultiPolygon
 from vispy import scene
 
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QSlider, QLabel, 
-    QFormLayout, QApplication, QCheckBox, QGroupBox, QPushButton
+    QFormLayout, QApplication, QCheckBox, QGroupBox, QPushButton,
+    QFileDialog
 )
 from PyQt5.QtCore import Qt, QTimer
 
 from pendragon.core.models import PipelineState
-
+from pendragon.core.registry import OPERATION_REGISTRY
 
 DARK_THEME_STYLESHEET = """
-QWidget {
-    background-color: #1e1e1e;
-    color: #cccccc;
-    font-size: 13px;
-}
-QLabel {
-    color: #cccccc;
-}
-QGroupBox {
-    font-weight: bold;
-    border: 1px solid #333333;
-    border-radius: 5px;
-    margin-top: 1ex;
-    padding-top: 10px;
-}
-QGroupBox::title {
-    subcontrol-origin: margin;
-    subcontrol-position: top left;
-    padding: 0 3px;
-}
-QSlider::groove:horizontal {
-    border: 1px solid #333333;
-    height: 6px;
-    background: #333333;
-    margin: 2px 0;
-    border-radius: 3px;
-}
-QSlider::handle:horizontal {
-    background: #007acc;
-    border: 1px solid #005c99;
-    width: 14px;
-    margin: -4px 0;
-    border-radius: 7px;
-}
-QSlider::handle:horizontal:hover {
-    background: #0098ff;
-}
-QSlider::sub-page:horizontal {
-    background: #007acc;
-    border-radius: 3px;
-}
-QPushButton {
-    background-color: #333333;
-    border: 1px solid #555555;
-    border-radius: 4px;
-    padding: 6px;
-    color: #cccccc;
-}
-QPushButton:hover {
-    background-color: #444444;
-}
-QPushButton:pressed {
-    background-color: #222222;
-}
+QWidget { background-color: #1e1e1e; color: #cccccc; font-size: 13px; }
+QLabel { color: #cccccc; }
+QGroupBox { font-weight: bold; border: 1px solid #333333; border-radius: 5px; margin-top: 1ex; padding-top: 10px; }
+QSlider::groove:horizontal { border: 1px solid #333333; height: 6px; background: #333333; margin: 2px 0; border-radius: 3px; }
+QSlider::handle:horizontal { background: #007acc; border: 1px solid #005c99; width: 14px; margin: -4px 0; border-radius: 7px; }
+QPushButton { background-color: #333333; border: 1px solid #555555; border-radius: 4px; padding: 6px; color: #cccccc; }
+QPushButton:hover { background-color: #444444; }
 """
-
 
 class LiveEditorWindow(QMainWindow):
     def __init__(self, engine):
         super().__init__()
         self.setWindowTitle("Pendragon")
         self.engine = engine
-
         self.setStyleSheet(DARK_THEME_STYLESHEET)
         
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QHBoxLayout(central_widget)
 
-        # 1. The Vispy Canvas (Left Side)
         self.viewer = PipelineViewer(self.engine)
         main_layout.addWidget(self.viewer.native, stretch=3)
 
-        # 2. Parameter Control Panel (Right Side)
         self.control_panel = QWidget()
         self.control_layout = QVBoxLayout(self.control_panel)
         self.control_layout.setAlignment(Qt.AlignTop)
         main_layout.addWidget(self.control_panel, stretch=1)
 
-        # --- Pipeline Statistics HUD ---
         self.stats_group = QGroupBox("Pipeline Statistics")
         self.stats_layout = QFormLayout(self.stats_group)
-
         self.step_label = QLabel("-")
         self.op_label = QLabel("-")
         self.lines_label = QLabel("-")
         self.vertices_label = QLabel("-")
-
         self.stats_layout.addRow("Step:", self.step_label)
         self.stats_layout.addRow("Operation:", self.op_label)
         self.stats_layout.addRow("Lines:", self.lines_label)
         self.stats_layout.addRow("Vertices:", self.vertices_label)
-
         self.control_layout.addWidget(self.stats_group)
-        # -------------------------------
 
-        # View Mode Toggle
         self.final_view_checkbox = QCheckBox("Show Final View")
-        self.final_view_checkbox.setChecked(False)
         self.final_view_checkbox.toggled.connect(self._on_view_mode_toggled)
         self.control_layout.addWidget(self.final_view_checkbox)
 
         self.nav_layout = QHBoxLayout()
         self.btn_prev = QPushButton("Previous Step")
         self.btn_next = QPushButton("Next Step")
-        
         self.btn_prev.clicked.connect(self.viewer.step_backward)
         self.btn_next.clicked.connect(self.viewer.step_forward)
-        
         self.nav_layout.addWidget(self.btn_prev)
         self.nav_layout.addWidget(self.btn_next)
         self.control_layout.addLayout(self.nav_layout)
 
-        # Dynamic form area for sliders
+        # File Operations
+        self.action_layout = QHBoxLayout()
+        self.btn_load = QPushButton("Load Recipe")
+        self.btn_save = QPushButton("Save Recipe")
+        self.btn_export = QPushButton("Export G-Code")
+        self.btn_load.clicked.connect(self._load_live_recipe)
+        self.btn_save.clicked.connect(self._save_live_recipe)
+        self.btn_export.clicked.connect(self._export_live_gcode)
+        self.action_layout.addWidget(self.btn_load)
+        self.action_layout.addWidget(self.btn_save)
+        self.action_layout.addWidget(self.btn_export)
+        self.control_layout.addLayout(self.action_layout)
+
         self.dynamic_form_widget = QWidget()
         self.form_layout = QFormLayout(self.dynamic_form_widget)
         self.control_layout.addWidget(self.dynamic_form_widget)
 
-        # Hook up viewer callbacks
         self.viewer.on_step_changed = self.build_ui_for_current_step
         self.viewer.on_close_requested = self.close
         self.viewer.on_stats_updated = self.update_stats_ui
         
-        # Debounce Timer Setup
         self.debounce_timer = QTimer()
         self.debounce_timer.setSingleShot(True)
         self.debounce_timer.setInterval(300) 
@@ -144,86 +96,81 @@ class LiveEditorWindow(QMainWindow):
         self._pending_op_index = None
 
         self.build_ui_for_current_step()
-        self.viewer.update_view()  # Force initial stats update now that callbacks are bound
+        self.viewer.update_view()
 
     def _on_view_mode_toggled(self, checked):
-        """Swaps the viewer mode and forces a visual update."""
         self.viewer.show_final_view = checked
         self.viewer.update_view()
 
     def update_stats_ui(self, step, total_ops, op_name, lines, vertices, final_view):
-        """Updates the discrete PyQt labels for pipeline statistics."""
         step_text = f"{step} / {total_ops}"
-        if final_view:
-            step_text += " (FINAL VIEW)"
-            
+        if final_view: step_text += " (FINAL VIEW)"
         self.step_label.setText(step_text)
         self.op_label.setText(str(op_name))
         self.lines_label.setText(str(lines))
         self.vertices_label.setText(str(vertices))
 
+    def _export_live_gcode(self):
+        file_path, _ = QFileDialog.getSaveFileName(self, "Export G-Code", "output.nc", "G-Code (*.nc)")
+        if file_path:
+            self.engine.export_gcode(self.engine.runner.get_final_lines(), file_path)
+
+    def _save_live_recipe(self):
+        file_path, _ = QFileDialog.getSaveFileName(self, "Save Recipe", "recipe.yaml", "YAML (*.yaml)")
+        if file_path:
+            recipe = []
+            for op in self.engine.runner.operations:
+                op_name = next((name for name, info in OPERATION_REGISTRY.items() if isinstance(op, info["class"])), None)
+                step = {"operation": op_name}
+                if op.config: step["settings"] = op.config.model_dump()
+                recipe.append(step)
+            with open(file_path, 'w') as f: yaml.safe_dump(recipe, f, sort_keys=False)
+
+    def _load_live_recipe(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Load Recipe", "", "YAML (*.yaml)")
+        if file_path:
+            with open(file_path, 'r') as f:
+                new_recipe = yaml.safe_load(f)
+            if self.engine.load_recipe(new_recipe):
+                self.viewer.current_step = len(self.engine.runner.operations)
+                self.build_ui_for_current_step()
+                self.viewer.update_view()
+
     def build_ui_for_current_step(self):
         while self.form_layout.count():
             child = self.form_layout.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
-
+            if child.widget(): child.widget().deleteLater()
         op_index = self.viewer.current_step - 1 
         if op_index < 0 or op_index >= len(self.engine.runner.operations):
-            self.form_layout.addRow(QLabel("No configurable parameters for this state."))
+            self.form_layout.addRow(QLabel("No configuration."))
             return
-
         operation = self.engine.runner.operations[op_index]
-        if not operation.config:
-            self.form_layout.addRow(QLabel(f"{operation.__class__.__name__} has no config."))
-            return
-
+        if not operation.config: return
         self.form_layout.addRow(QLabel(f"<b>Editing: {operation.__class__.__name__}</b>"))
-
         for field_name, field_info in operation.config.model_fields.items():
             current_value = getattr(operation.config, field_name)
-            
             if field_info.annotation == float:
-                # 1. Create a container widget and horizontal layout
                 container = QWidget()
                 h_layout = QHBoxLayout(container)
-                h_layout.setContentsMargins(0, 0, 0, 0)
-
                 slider = QSlider(Qt.Horizontal)
-                slider.setMinimum(0)
-                slider.setMaximum(1000)
-                slider.setValue(int(current_value * 10)) 
-                
-                # 2. Create the label to display the numerical value
+                slider.setMinimum(0); slider.setMaximum(1000); slider.setValue(int(current_value * 10))
                 value_label = QLabel(f"{current_value:.1f}")
-                value_label.setMinimumWidth(35)
-                value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                
-                # 3. Add both widgets to the row's layout
-                h_layout.addWidget(slider)
-                h_layout.addWidget(value_label)
-                
-                # 4. Use a closure to update both the engine state and the UI label
+                h_layout.addWidget(slider); h_layout.addWidget(value_label)
                 def update_wrapper(val, fname=field_name, idx=op_index, lbl=value_label):
                     real_val = val / 10.0
                     lbl.setText(f"{real_val:.1f}")
                     self.update_parameter(idx, fname, real_val)
-                    
                 slider.valueChanged.connect(update_wrapper)
-                
-                # 5. Add the combined container to the form layout instead of just the slider
                 self.form_layout.addRow(field_name, container)
 
     def update_parameter(self, op_index, field_name, new_value):
         operation = self.engine.runner.operations[op_index]
         setattr(operation.config, field_name, new_value)
-        
         self._pending_op_index = op_index
         self.debounce_timer.start()
 
     def _execute_recalculation(self):
         if self._pending_op_index is not None:
-            # Determine the calculation target based on view mode state
             target = len(self.engine.runner.operations) if self.viewer.show_final_view else self.viewer.current_step
             self.engine.runner.recompute_from(self._pending_op_index, target)
             self.viewer.update_view()

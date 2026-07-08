@@ -1,5 +1,3 @@
-# src/pendragon/engine.py
-
 from typing import List, Optional
 
 from loguru import logger
@@ -25,6 +23,24 @@ class PendragonEngine:
         initial_state = PipelineState(boundary=self.boundary,
                                       operation_name="base_geometry")
         self.runner = PipelineRunner(initial_state)
+
+    def load_recipe(self, new_recipe: list) -> bool:
+        """
+        Resets the engine's runner and loads a new recipe dynamically.
+        """
+        self.recipe = new_recipe
+        
+        # Reset to base state
+        initial_state = PipelineState(
+            boundary=self.boundary,
+            operation_name="base_geometry"
+        )
+        
+        # Create a brand new runner to clear old history and operations
+        self.runner = PipelineRunner(initial_state)
+        
+        # Rebuild the pipeline
+        return self.build_pipeline()
 
     def build_pipeline(self) -> bool:
         """
