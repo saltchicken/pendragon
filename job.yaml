@@ -16,8 +16,8 @@
       kill_distance: 3.0
       attract_distance: 25.0
       segment_length: 1.5
-      root_x: 100.0
-      root_y: 10.0
+      root_x: 200.0
+      root_y: 100.0
       seed: 123
 
 # Critical: Stitches the thousands of tiny growth segments into smooth continuous paths
