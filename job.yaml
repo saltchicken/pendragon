@@ -1,17 +1,22 @@
-# yaml-language-server: $schema=./recipe-schema.json
-
-# 1. Create the scaffolding (e.g., a 50x50 crosshatch grid)
-- operation: voronoi_dual
+- operation: venation
   settings:
-    spacing: 20.0
+    num_leaves: 800
+    kill_distance: 3.0
+    attract_distance: 25.0
+    segment_length: 1.5
+    root_x: 100.0
+    root_y: 10.0
+    seed: 123
 
+# Critical: Stitches the thousands of tiny growth segments into smooth continuous paths
 - operation: connect_continuous
   settings:
     snap_distance: 0.1
 
+# Critical: Removes collinear vertices created by the step-by-step growth
 - operation: simplify
   settings:
-    tolerance: 0.1
+    tolerance: 0.2
 
 - operation: optimize
   settings:
