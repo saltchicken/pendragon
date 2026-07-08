@@ -4,7 +4,8 @@ from shapely.geometry import Polygon, MultiPolygon
 from vispy import scene
 
 from PyQt5.QtWidgets import (
-    QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QSlider, QLabel, QFormLayout, QApplication, QCheckBox
+    QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QSlider, QLabel, 
+    QFormLayout, QApplication, QCheckBox, QGroupBox
 )
 from PyQt5.QtCore import Qt, QTimer
 
@@ -19,6 +20,18 @@ QWidget {
 }
 QLabel {
     color: #cccccc;
+}
+QGroupBox {
+    font-weight: bold;
+    border: 1px solid #333333;
+    border-radius: 5px;
+    margin-top: 1ex;
+    padding-top: 10px;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    padding: 0 3px;
 }
 QSlider::groove:horizontal {
     border: 1px solid #333333;
@@ -56,14 +69,32 @@ class LiveEditorWindow(QMainWindow):
         self.setCentralWidget(central_widget)
         main_layout = QHBoxLayout(central_widget)
 
-        # 1. The Vispy Canvas (Left Side) - Now accepts the engine instead of just history
+        # 1. The Vispy Canvas (Left Side)
         self.viewer = PipelineViewer(self.engine)
         main_layout.addWidget(self.viewer.native, stretch=3)
 
         # 2. Parameter Control Panel (Right Side)
         self.control_panel = QWidget()
         self.control_layout = QVBoxLayout(self.control_panel)
+        self.control_layout.setAlignment(Qt.AlignTop)
         main_layout.addWidget(self.control_panel, stretch=1)
+
+        # --- Pipeline Statistics HUD ---
+        self.stats_group = QGroupBox("Pipeline Statistics")
+        self.stats_layout = QFormLayout(self.stats_group)
+
+        self.step_label = QLabel("-")
+        self.op_label = QLabel("-")
+        self.lines_label = QLabel("-")
+        self.vertices_label = QLabel("-")
+
+        self.stats_layout.addRow("Step:", self.step_label)
+        self.stats_layout.addRow("Operation:", self.op_label)
+        self.stats_layout.addRow("Lines:", self.lines_label)
+        self.stats_layout.addRow("Vertices:", self.vertices_label)
+
+        self.control_layout.addWidget(self.stats_group)
+        # -------------------------------
 
         # View Mode Toggle
         self.final_view_checkbox = QCheckBox("Show Final View")
@@ -76,8 +107,10 @@ class LiveEditorWindow(QMainWindow):
         self.form_layout = QFormLayout(self.dynamic_form_widget)
         self.control_layout.addWidget(self.dynamic_form_widget)
 
+        # Hook up viewer callbacks
         self.viewer.on_step_changed = self.build_ui_for_current_step
         self.viewer.on_close_requested = self.close
+        self.viewer.on_stats_updated = self.update_stats_ui
         
         # Debounce Timer Setup
         self.debounce_timer = QTimer()
@@ -87,11 +120,23 @@ class LiveEditorWindow(QMainWindow):
         self._pending_op_index = None
 
         self.build_ui_for_current_step()
+        self.viewer.update_view()  # Force initial stats update now that callbacks are bound
 
     def _on_view_mode_toggled(self, checked):
         """Swaps the viewer mode and forces a visual update."""
         self.viewer.show_final_view = checked
         self.viewer.update_view()
+
+    def update_stats_ui(self, step, total_ops, op_name, lines, vertices, final_view):
+        """Updates the discrete PyQt labels for pipeline statistics."""
+        step_text = f"{step} / {total_ops}"
+        if final_view:
+            step_text += " (FINAL VIEW)"
+            
+        self.step_label.setText(step_text)
+        self.op_label.setText(str(op_name))
+        self.lines_label.setText(str(lines))
+        self.vertices_label.setText(str(vertices))
 
     def build_ui_for_current_step(self):
         while self.form_layout.count():
@@ -115,15 +160,35 @@ class LiveEditorWindow(QMainWindow):
             current_value = getattr(operation.config, field_name)
             
             if field_info.annotation == float:
+                # 1. Create a container widget and horizontal layout
+                container = QWidget()
+                h_layout = QHBoxLayout(container)
+                h_layout.setContentsMargins(0, 0, 0, 0)
+
                 slider = QSlider(Qt.Horizontal)
                 slider.setMinimum(0)
                 slider.setMaximum(1000)
                 slider.setValue(int(current_value * 10)) 
                 
-                slider.valueChanged.connect(
-                    lambda val, fname=field_name, idx=op_index: self.update_parameter(idx, fname, val / 10.0)
-                )
-                self.form_layout.addRow(field_name, slider)
+                # 2. Create the label to display the numerical value
+                value_label = QLabel(f"{current_value:.1f}")
+                value_label.setMinimumWidth(35)
+                value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                
+                # 3. Add both widgets to the row's layout
+                h_layout.addWidget(slider)
+                h_layout.addWidget(value_label)
+                
+                # 4. Use a closure to update both the engine state and the UI label
+                def update_wrapper(val, fname=field_name, idx=op_index, lbl=value_label):
+                    real_val = val / 10.0
+                    lbl.setText(f"{real_val:.1f}")
+                    self.update_parameter(idx, fname, real_val)
+                    
+                slider.valueChanged.connect(update_wrapper)
+                
+                # 5. Add the combined container to the form layout instead of just the slider
+                self.form_layout.addRow(field_name, container)
 
     def update_parameter(self, op_index, field_name, new_value):
         operation = self.engine.runner.operations[op_index]
@@ -153,6 +218,7 @@ class PipelineViewer(scene.SceneCanvas):
 
         self.on_step_changed = None
         self.on_close_requested = None
+        self.on_stats_updated = None
 
         self.view = self.central_widget.add_view()
         self.view.camera = 'panzoom'
@@ -161,16 +227,6 @@ class PipelineViewer(scene.SceneCanvas):
         self.lines_visual = scene.visuals.Line(parent=self.view.scene, color='white')
         self.boundary_visual = scene.visuals.Line(parent=self.view.scene, color='red')
         self.vertices_visual = scene.visuals.Markers(parent=self.view.scene)
-
-        self.hud_text = scene.visuals.Text(
-            text="",
-            parent=self.central_widget,
-            color='yellow',
-            font_size=11,
-            anchor_x='left',
-            anchor_y='top',
-            pos=(15, 15) 
-        )
 
         self.freeze()
         self.update_view()
@@ -224,18 +280,18 @@ class PipelineViewer(scene.SceneCanvas):
         total_vertices = sum(len(line.coords) for line in state.lines)
         total_ops = len(self.engine.runner.operations)
 
-        # 4. Update HUD to clarify what is currently being rendered
-        hud_string = (f"Step: {self.current_step}/{total_ops} | "
-                      f"Operation: {state.operation_name} | "
-                      f"Lines: {len(state.lines)} | "
-                      f"Vertices: {total_vertices}")
-        
-        if self.show_final_view:
-            hud_string += " (FINAL VIEW)"
-            
-        self.hud_text.text = hud_string
+        # 4. Trigger HUD update callback
+        if self.on_stats_updated:
+            self.on_stats_updated(
+                self.current_step, 
+                total_ops, 
+                state.operation_name, 
+                len(state.lines), 
+                total_vertices, 
+                self.show_final_view
+            )
 
-        # 5. Visual Rendering logic (unchanged)
+        # 5. Visual Rendering logic
         if state.boundary and not state.boundary.is_empty:
             polygons = []
             if isinstance(state.boundary, Polygon):
