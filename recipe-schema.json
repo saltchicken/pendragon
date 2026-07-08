@@ -1,0 +1,623 @@
+{
+  "$defs": {
+    "ClipConfig": {
+      "properties": {},
+      "title": "ClipConfig",
+      "type": "object"
+    },
+    "ConnectContinuousConfig": {
+      "properties": {
+        "snap_distance": {
+          "default": 0.05,
+          "description": "Max distance between consecutive segment endpoints to weld them.",
+          "title": "Snap Distance",
+          "type": "number"
+        }
+      },
+      "title": "ConnectContinuousConfig",
+      "type": "object"
+    },
+    "DeduplicateConfig": {
+      "properties": {
+        "tolerance": {
+          "default": 1e-05,
+          "description": "Tolerance for considering two geometries exactly equal.",
+          "title": "Tolerance",
+          "type": "number"
+        }
+      },
+      "title": "DeduplicateConfig",
+      "type": "object"
+    },
+    "GenerateInCellsConfig": {
+      "properties": {
+        "overscan": {
+          "default": 0.0,
+          "description": "Distance to expand (positive) or shrink (negative) the operation's clipping boundary.",
+          "title": "Overscan",
+          "type": "number"
+        },
+        "generator": {
+          "description": "The registry name of the generator to run in each cell.",
+          "title": "Generator",
+          "type": "string"
+        },
+        "generator_settings": {
+          "additionalProperties": true,
+          "description": "Settings to pass to the sub-generator.",
+          "title": "Generator Settings",
+          "type": "object"
+        },
+        "auto_center": {
+          "default": true,
+          "description": "Automatically inject center_x and center_y for the sub-generator based on cell centroid.",
+          "title": "Auto Center",
+          "type": "boolean"
+        },
+        "keep_scaffolding": {
+          "default": false,
+          "description": "If true, includes the original incoming lines (the grid) in the final output.",
+          "title": "Keep Scaffolding",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "generator"
+      ],
+      "title": "GenerateInCellsConfig",
+      "type": "object"
+    },
+    "GridLinesConfig": {
+      "properties": {
+        "overscan": {
+          "default": 0.0,
+          "description": "Distance to expand (positive) or shrink (negative) the operation's clipping boundary.",
+          "title": "Overscan",
+          "type": "number"
+        },
+        "spacing": {
+          "default": 0.5,
+          "description": "Distance between consecutive lines.",
+          "title": "Spacing",
+          "type": "number"
+        },
+        "orientation": {
+          "default": "horizontal",
+          "description": "Orientation of lines: 'horizontal', 'vertical', or 'crosshatch'.",
+          "title": "Orientation",
+          "type": "string"
+        }
+      },
+      "title": "GridLinesConfig",
+      "type": "object"
+    },
+    "GuillocheConfig": {
+      "properties": {
+        "overscan": {
+          "default": 0.0,
+          "description": "Distance to expand (positive) or shrink (negative) the operation's clipping boundary.",
+          "title": "Overscan",
+          "type": "number"
+        },
+        "center_x": {
+          "default": 100.0,
+          "description": "X coordinate of the pattern center.",
+          "title": "Center X",
+          "type": "number"
+        },
+        "center_y": {
+          "default": 100.0,
+          "description": "Y coordinate of the pattern center.",
+          "title": "Center Y",
+          "type": "number"
+        },
+        "R": {
+          "default": 50.0,
+          "description": "Radius of the fixed outer circle.",
+          "title": "R",
+          "type": "number"
+        },
+        "r": {
+          "default": 35.0,
+          "description": "Radius of the rolling inner circle.",
+          "title": "R",
+          "type": "number"
+        },
+        "p": {
+          "default": 25.0,
+          "description": "Distance from the pen to the center of the rolling circle.",
+          "title": "P",
+          "type": "number"
+        },
+        "steps": {
+          "default": 1000,
+          "description": "Total number of linear steps/points sampled along the curve.",
+          "title": "Steps",
+          "type": "integer"
+        },
+        "revolutions": {
+          "default": 10.0,
+          "description": "Number of full outer loops ($2\\pi$ rotations) to complete.",
+          "title": "Revolutions",
+          "type": "number"
+        },
+        "amplitude_mod": {
+          "default": 0.0,
+          "description": "Amplitude of secondary wave modulation.",
+          "title": "Amplitude Mod",
+          "type": "number"
+        },
+        "frequency_mod": {
+          "default": 0.0,
+          "description": "Frequency multiplier of secondary wave modulation.",
+          "title": "Frequency Mod",
+          "type": "number"
+        }
+      },
+      "title": "GuillocheConfig",
+      "type": "object"
+    },
+    "ImageMaskConfig": {
+      "properties": {
+        "mask_image": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mask Image"
+        },
+        "threshold": {
+          "default": 0.5,
+          "description": "Darkness threshold (0.0 to 1.0) to keep lines.",
+          "title": "Threshold",
+          "type": "number"
+        },
+        "sample_step": {
+          "default": 0.5,
+          "description": "Resolution step size for sampling along lines.",
+          "title": "Sample Step",
+          "type": "number"
+        }
+      },
+      "title": "ImageMaskConfig",
+      "type": "object"
+    },
+    "MergeConfig": {
+      "properties": {
+        "precision": {
+          "default": 0.0,
+          "description": "Grid precision for unioning (0.0 for default).",
+          "title": "Precision",
+          "type": "number"
+        }
+      },
+      "title": "MergeConfig",
+      "type": "object"
+    },
+    "OptimizeConfig": {
+      "properties": {
+        "start_x": {
+          "default": 0.0,
+          "description": "X coordinate to start optimizing from.",
+          "title": "Start X",
+          "type": "number"
+        },
+        "start_y": {
+          "default": 0.0,
+          "description": "Y coordinate to start optimizing from.",
+          "title": "Start Y",
+          "type": "number"
+        }
+      },
+      "title": "OptimizeConfig",
+      "type": "object"
+    },
+    "PolygonizeConfig": {
+      "properties": {},
+      "title": "PolygonizeConfig",
+      "type": "object"
+    },
+    "SimplifyConfig": {
+      "properties": {
+        "tolerance": {
+          "default": 0.1,
+          "description": "Maximum allowed perpendicular distance between original and simplified line.",
+          "minimum": 0.0,
+          "title": "Tolerance",
+          "type": "number"
+        },
+        "preserve_topology": {
+          "default": false,
+          "description": "If True, prevents invalid geometries or self-intersections during simplification.",
+          "title": "Preserve Topology",
+          "type": "boolean"
+        }
+      },
+      "title": "SimplifyConfig",
+      "type": "object"
+    },
+    "SpiralConfig": {
+      "properties": {
+        "overscan": {
+          "default": 0.0,
+          "description": "Distance to expand (positive) or shrink (negative) the operation's clipping boundary.",
+          "title": "Overscan",
+          "type": "number"
+        },
+        "center_x": {
+          "default": 100.0,
+          "description": "X coordinate of the spiral center.",
+          "title": "Center X",
+          "type": "number"
+        },
+        "center_y": {
+          "default": 100.0,
+          "description": "Y coordinate of the spiral center.",
+          "title": "Center Y",
+          "type": "number"
+        },
+        "start_radius": {
+          "default": 0.0,
+          "description": "Starting radius (can be > 0 for a hollow center).",
+          "title": "Start Radius",
+          "type": "number"
+        },
+        "end_radius": {
+          "default": 100.0,
+          "description": "Outer radius where the spiral terminates.",
+          "title": "End Radius",
+          "type": "number"
+        },
+        "revolutions": {
+          "default": 10.0,
+          "description": "Total number of full rotations.",
+          "title": "Revolutions",
+          "type": "number"
+        },
+        "steps": {
+          "default": 1000,
+          "description": "Total number of linear segments used to draw the curve.",
+          "title": "Steps",
+          "type": "integer"
+        }
+      },
+      "title": "SpiralConfig",
+      "type": "object"
+    },
+    "Step_clip": {
+      "properties": {
+        "operation": {
+          "const": "clip",
+          "description": "Execute the 'clip' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/ClipConfig",
+          "description": "Settings for 'clip'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_clip",
+      "type": "object"
+    },
+    "Step_connect_continuous": {
+      "properties": {
+        "operation": {
+          "const": "connect_continuous",
+          "description": "Execute the 'connect_continuous' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/ConnectContinuousConfig",
+          "description": "Settings for 'connect_continuous'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_connect_continuous",
+      "type": "object"
+    },
+    "Step_deduplicate": {
+      "properties": {
+        "operation": {
+          "const": "deduplicate",
+          "description": "Execute the 'deduplicate' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/DeduplicateConfig",
+          "description": "Settings for 'deduplicate'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_deduplicate",
+      "type": "object"
+    },
+    "Step_generate_in_cells": {
+      "properties": {
+        "operation": {
+          "const": "generate_in_cells",
+          "description": "Execute the 'generate_in_cells' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/GenerateInCellsConfig",
+          "description": "Settings for 'generate_in_cells'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_generate_in_cells",
+      "type": "object"
+    },
+    "Step_grid_lines": {
+      "properties": {
+        "operation": {
+          "const": "grid_lines",
+          "description": "Execute the 'grid_lines' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/GridLinesConfig",
+          "description": "Settings for 'grid_lines'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_grid_lines",
+      "type": "object"
+    },
+    "Step_guilloche": {
+      "properties": {
+        "operation": {
+          "const": "guilloche",
+          "description": "Execute the 'guilloche' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/GuillocheConfig",
+          "description": "Settings for 'guilloche'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_guilloche",
+      "type": "object"
+    },
+    "Step_image_mask": {
+      "properties": {
+        "operation": {
+          "const": "image_mask",
+          "description": "Execute the 'image_mask' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/ImageMaskConfig",
+          "description": "Settings for 'image_mask'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_image_mask",
+      "type": "object"
+    },
+    "Step_merge": {
+      "properties": {
+        "operation": {
+          "const": "merge",
+          "description": "Execute the 'merge' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/MergeConfig",
+          "description": "Settings for 'merge'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_merge",
+      "type": "object"
+    },
+    "Step_optimize": {
+      "properties": {
+        "operation": {
+          "const": "optimize",
+          "description": "Execute the 'optimize' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/OptimizeConfig",
+          "description": "Settings for 'optimize'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_optimize",
+      "type": "object"
+    },
+    "Step_polygonize": {
+      "properties": {
+        "operation": {
+          "const": "polygonize",
+          "description": "Execute the 'polygonize' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/PolygonizeConfig",
+          "description": "Settings for 'polygonize'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_polygonize",
+      "type": "object"
+    },
+    "Step_simplify": {
+      "properties": {
+        "operation": {
+          "const": "simplify",
+          "description": "Execute the 'simplify' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/SimplifyConfig",
+          "description": "Settings for 'simplify'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_simplify",
+      "type": "object"
+    },
+    "Step_spiral": {
+      "properties": {
+        "operation": {
+          "const": "spiral",
+          "description": "Execute the 'spiral' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/SpiralConfig",
+          "description": "Settings for 'spiral'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_spiral",
+      "type": "object"
+    },
+    "Step_voronoi_dual": {
+      "properties": {
+        "operation": {
+          "const": "voronoi-dual",
+          "description": "Execute the 'voronoi-dual' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/VoronoiDualConfig",
+          "description": "Settings for 'voronoi-dual'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_voronoi_dual",
+      "type": "object"
+    },
+    "VoronoiDualConfig": {
+      "properties": {
+        "overscan": {
+          "default": 0.0,
+          "description": "Distance to expand (positive) or shrink (negative) the operation's clipping boundary.",
+          "title": "Overscan",
+          "type": "number"
+        },
+        "spacing": {
+          "default": 2.0,
+          "description": "Target spacing between points if num_points is 0.",
+          "exclusiveMinimum": 0.0,
+          "title": "Spacing",
+          "type": "number"
+        },
+        "num_points": {
+          "default": 0,
+          "description": "Number of random seed points to generate.",
+          "minimum": 0,
+          "title": "Num Points",
+          "type": "integer"
+        },
+        "seed": {
+          "default": 42,
+          "description": "Random seed for repeatable generation.",
+          "title": "Seed",
+          "type": "integer"
+        },
+        "mode": {
+          "default": "dual",
+          "description": "Mode of generation: 'voronoi', 'delaunay', or 'dual'.",
+          "title": "Mode",
+          "type": "string"
+        }
+      },
+      "title": "VoronoiDualConfig",
+      "type": "object"
+    }
+  },
+  "items": {
+    "anyOf": [
+      {
+        "$ref": "#/$defs/Step_image_mask"
+      },
+      {
+        "$ref": "#/$defs/Step_optimize"
+      },
+      {
+        "$ref": "#/$defs/Step_simplify"
+      },
+      {
+        "$ref": "#/$defs/Step_merge"
+      },
+      {
+        "$ref": "#/$defs/Step_deduplicate"
+      },
+      {
+        "$ref": "#/$defs/Step_connect_continuous"
+      },
+      {
+        "$ref": "#/$defs/Step_polygonize"
+      },
+      {
+        "$ref": "#/$defs/Step_generate_in_cells"
+      },
+      {
+        "$ref": "#/$defs/Step_clip"
+      },
+      {
+        "$ref": "#/$defs/Step_guilloche"
+      },
+      {
+        "$ref": "#/$defs/Step_spiral"
+      },
+      {
+        "$ref": "#/$defs/Step_grid_lines"
+      },
+      {
+        "$ref": "#/$defs/Step_voronoi_dual"
+      }
+    ]
+  },
+  "title": "RootModel[List[Union[Step_image_mask, Step_optimize, Step_simplify, Step_merge, Step_deduplicate, Step_connect_continuous, Step_polygonize, Step_generate_in_cells, Step_clip, Step_guilloche, Step_spiral, Step_grid_lines, Step_voronoi_dual]]]",
+  "type": "array"
+}
