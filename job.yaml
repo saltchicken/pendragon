@@ -3,7 +3,7 @@
   settings:
     spacing: 50.0
     orientation: crosshatch
-    overscan: 20
+    overscan: 100
 
 # 2. Run a generator inside every closed box formed by the scaffolding
 - operation: generate_in_cells
