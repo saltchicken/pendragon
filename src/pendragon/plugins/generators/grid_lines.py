@@ -98,5 +98,5 @@ class GridLinesGen(PipelineOperation):
 
         # 5. Pass the ORIGINAL boundary forward, along with the lines
         return PipelineState(boundary=state.boundary,
-                             lines=clipped_lines,
+                             lines=state.lines + clipped_lines,
                              operation_name="grid_lines")
