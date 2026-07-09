@@ -1,10 +1,10 @@
-# src/pendragon/plugins/modifications/polygonize.py
-
 from typing import List
 
 from loguru import logger
 from pydantic import BaseModel
 from pydantic import Field
+from shapely.geometry import LineString
+
 from shapely.geometry import MultiPolygon
 from shapely.geometry import Polygon
 from shapely.ops import polygonize
@@ -45,21 +45,16 @@ class PolygonizeMod(PipelineOperation):
             return state
 
         # 2. Combine all found loops into a single unified boundary shape
-        new_boundary = unary_union(polygons)
+        new_boundary_lines: List[LineString] = []
+        for poly in polygons:
+            new_boundary_lines.append(LineString(poly.exterior.coords))
+            for interior in poly.interiors:
+                new_boundary_lines.append(LineString(interior.coords))
 
-        # Enforce that it's a structural Polygon or MultiPolygon
-        if not isinstance(new_boundary, (Polygon, MultiPolygon)):
-            logger.error(
-                f"Unexpected geometric shape derived from polygonize: {type(new_boundary)}"
-            )
-            return state
-
-        logger.success(
-            "Successfully generated new generation boundary from prior lines.")
-
+        logger.success(f"Converted closed cells into {len(new_boundary_lines)} boundary lines.")
         # 3. Return a fresh state where the 'boundary' is updated,
         # and 'lines' is cleared out so the next step builds from scratch.
         return PipelineState(
-            boundary=new_boundary,
-            lines=[],  # Clear previous geometry lines
+            boundary=state.boundary,
+            lines=new_boundary_lines,  # Clear previous geometry lines
             operation_name="polygonize")
