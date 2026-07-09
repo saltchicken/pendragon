@@ -3,11 +3,9 @@ from typing import Any, Dict
 from loguru import logger
 from pydantic import BaseModel
 from pydantic import Field
-from shapely import set_precision
+from shapely import set_precision  # <-- New import to handle topological snapping
 from shapely.ops import polygonize
 from shapely.ops import unary_union
-
-from shapely.geometry import Polygon, MultiPolygon
 
 from pendragon.core import BasePluginConfig
 from pendragon.core import PipelineOperation
@@ -41,10 +39,6 @@ class GenerateInCellsConfig(BasePluginConfig):
         description=
         "Grid size for snapping vertices to resolve floating-point gaps. Set to 0 to disable."
     )
-    fill_rule: str = Field(
-        default="all",
-        description="Rule for filtering overlapping cells: 'all' or 'even_odd'."
-    )
 
 
 @register_operation("generate_in_cells", config_class=GenerateInCellsConfig)
@@ -72,22 +66,7 @@ class GenerateInCellsOp(PipelineOperation):
 
         # 3. Now polygonize can successfully detect the closed loops
         polygons = list(polygonize(noded_lines))
-        
-        # --- NEW XOR LOGIC ---
-        if cfg.fill_rule == "even_odd" and polygons:
-            logger.debug("Applying even-odd XOR fill rule to generated cells...")
-            combined = Polygon()
-            for p in polygons:
-                combined = combined.symmetric_difference(p)
-            
-            # Unpack the resulting compound geometry back into discrete cells
-            if isinstance(combined, MultiPolygon):
-                polygons = list(combined.geoms)
-            elif isinstance(combined, Polygon) and not combined.is_empty:
-                polygons = [combined]
-            else:
-                polygons = []
-        # ---------------------
+        # --------------------------------------------
 
         if not polygons:
             logger.warning(
