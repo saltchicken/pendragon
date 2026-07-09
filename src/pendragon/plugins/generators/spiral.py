@@ -39,10 +39,8 @@ class SpiralGen(PipelineOperation):
 
         clipped_lines: List[LineString] = []
 
-        logger.info(
-            f"Generating spiral with {cfg.revolutions} revolutions "
-            f"across {len(polygons)} boundary region(s)."
-        )
+        logger.info(f"Generating spiral with {cfg.revolutions} revolutions "
+                    f"across {len(polygons)} boundary region(s).")
 
         for poly in polygons:
             # Fallback to centroid if coordinates are not strictly defined

@@ -260,6 +260,24 @@
       "title": "PolygonizeConfig",
       "type": "object"
     },
+    "ScaleConfig": {
+      "properties": {
+        "factor": {
+          "default": 1.0,
+          "description": "Uniform scaling multiplier (e.g., 2.0 doubles the size).",
+          "title": "Factor",
+          "type": "number"
+        },
+        "origin": {
+          "default": "center",
+          "description": "Origin point for scaling: 'center', 'centroid', or an exact coordinate.",
+          "title": "Origin",
+          "type": "string"
+        }
+      },
+      "title": "ScaleConfig",
+      "type": "object"
+    },
     "SimplifyConfig": {
       "properties": {
         "tolerance": {
@@ -556,6 +574,25 @@
       "title": "Step_polygonize",
       "type": "object"
     },
+    "Step_scale": {
+      "properties": {
+        "operation": {
+          "const": "scale",
+          "description": "Execute the 'scale' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/ScaleConfig",
+          "description": "Settings for 'scale'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_scale",
+      "type": "object"
+    },
     "Step_simplify": {
       "properties": {
         "operation": {
@@ -630,6 +667,25 @@
         "operation"
       ],
       "title": "Step_voronoi_dual",
+      "type": "object"
+    },
+    "Step_zoom": {
+      "properties": {
+        "operation": {
+          "const": "zoom",
+          "description": "Execute the 'zoom' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/ZoomConfig",
+          "description": "Settings for 'zoom'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_zoom",
       "type": "object"
     },
     "VenationConfig": {
@@ -761,6 +817,24 @@
       },
       "title": "VoronoiDualConfig",
       "type": "object"
+    },
+    "ZoomConfig": {
+      "properties": {
+        "factor": {
+          "default": 1.0,
+          "description": "Zoom multiplier (e.g., 2.0 zooms in 2x, 0.5 zooms out).",
+          "title": "Factor",
+          "type": "number"
+        },
+        "origin": {
+          "default": "center",
+          "description": "Origin point for zoom: 'center', 'centroid', or an exact coordinate.",
+          "title": "Origin",
+          "type": "string"
+        }
+      },
+      "title": "ZoomConfig",
+      "type": "object"
     }
   },
   "items": {
@@ -793,6 +867,12 @@
         "$ref": "#/$defs/Step_generate_in_cells"
       },
       {
+        "$ref": "#/$defs/Step_zoom"
+      },
+      {
+        "$ref": "#/$defs/Step_scale"
+      },
+      {
         "$ref": "#/$defs/Step_guilloche"
       },
       {
@@ -802,16 +882,16 @@
         "$ref": "#/$defs/Step_voronoi_dual"
       },
       {
-        "$ref": "#/$defs/Step_venation"
-      },
-      {
         "$ref": "#/$defs/Step_grid_lines"
       },
       {
         "$ref": "#/$defs/Step_add_boundary"
+      },
+      {
+        "$ref": "#/$defs/Step_venation"
       }
     ]
   },
-  "title": "RootModel[List[Union[Step_clip, Step_deduplicate, Step_image_mask, Step_optimize, Step_simplify, Step_connect_continuous, Step_merge, Step_polygonize, Step_generate_in_cells, Step_guilloche, Step_spiral, Step_voronoi_dual, Step_venation, Step_grid_lines, Step_add_boundary]]]",
+  "title": "RootModel[List[Union[Step_clip, Step_deduplicate, Step_image_mask, Step_optimize, Step_simplify, Step_connect_continuous, Step_merge, Step_polygonize, Step_generate_in_cells, Step_zoom, Step_scale, Step_guilloche, Step_spiral, Step_voronoi_dual, Step_grid_lines, Step_add_boundary, Step_venation]]]",
   "type": "array"
 }

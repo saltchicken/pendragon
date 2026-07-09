@@ -44,42 +44,46 @@ class GridLinesGen(PipelineOperation):
         def make_horizontal():
             lines = []
             phase_y = orig_miny
-            
+
             # Find the starting and ending multipliers based on the effective boundary
             start_k = math.ceil((eff_miny - phase_y) / active_config.spacing)
             end_k = math.floor((eff_maxy - phase_y) / active_config.spacing)
-            
+
             for k in range(start_k, end_k + 1):
                 current_y = phase_y + k * active_config.spacing
-                
+
                 # Skip the line if it falls exactly on the bottom or top boundary
-                if abs(current_y - eff_miny) < 1e-7 or abs(current_y - eff_maxy) < 1e-7:
+                if abs(current_y - eff_miny) < 1e-7 or abs(current_y -
+                                                           eff_maxy) < 1e-7:
                     continue
-                    
-                line = LineString([(eff_minx, current_y), (eff_maxx, current_y)])
+
+                line = LineString([(eff_minx, current_y),
+                                   (eff_maxx, current_y)])
                 lines.append(line)
-                
+
             return lines
 
         # 3. Helper to generate vertical lines
         def make_vertical():
             lines = []
             phase_x = orig_minx
-            
+
             # Find the starting and ending multipliers based on the effective boundary
             start_k = math.ceil((eff_minx - phase_x) / active_config.spacing)
             end_k = math.floor((eff_maxx - phase_x) / active_config.spacing)
-            
+
             for k in range(start_k, end_k + 1):
                 current_x = phase_x + k * active_config.spacing
-                
+
                 # Skip the line if it falls exactly on the left or right boundary
-                if abs(current_x - eff_minx) < 1e-7 or abs(current_x - eff_maxx) < 1e-7:
+                if abs(current_x - eff_minx) < 1e-7 or abs(current_x -
+                                                           eff_maxx) < 1e-7:
                     continue
-                    
-                line = LineString([(current_x, eff_miny), (current_x, eff_maxy)])
+
+                line = LineString([(current_x, eff_miny),
+                                   (current_x, eff_maxy)])
                 lines.append(line)
-                
+
             return lines
 
         # Populate baseline geometric patterns

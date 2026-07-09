@@ -53,7 +53,7 @@ class GenerateInCellsOp(PipelineOperation):
             return state
 
         # 1. Slice the incoming lines at their intersection points
-        # We no longer inject the global boundary here. We ONLY use the lines 
+        # We no longer inject the global boundary here. We ONLY use the lines
         # passed in from previous operations.
         noded_lines = unary_union(current_lines)
 

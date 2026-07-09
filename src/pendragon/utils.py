@@ -6,7 +6,6 @@ from shapely.geometry import MultiPolygon
 from shapely.geometry import Polygon
 from shapely.ops import polygonize
 from shapely.ops import unary_union
-from shapely.geometry import MultiPolygon, Polygon
 
 
 class ImageSampler:
@@ -51,17 +50,17 @@ def load_dxf_boundary(dxf_path: str) -> Polygon | MultiPolygon:
             try:
                 # Convert the DXF entity into an ezdxf Path object
                 path = ezdxf.path.make_path(e)
-                
-                # Flatten the path into discrete vertices. 
+
+                # Flatten the path into discrete vertices.
                 # 'distance' is the maximum approximation error (sagitta) allowed.
                 # 0.05 units ensures very smooth curves without overwhelming Shapely.
                 pts = [(v.x, v.y) for v in path.flattening(distance=0.05)]
-                
+
                 if len(pts) >= 2:
                     # Explicitly enforce topological closure if the path is marked closed
                     if path.is_closed and pts[0] != pts[-1]:
                         pts.append(pts[0])
-                        
+
                     lines.append(LineString(pts))
             except Exception:
                 # Silently ignore broken or completely unsupported geometry
@@ -80,7 +79,10 @@ def load_dxf_boundary(dxf_path: str) -> Polygon | MultiPolygon:
     # unary_union merges overlapping polygons and groups disjoint ones into a MultiPolygon
     return unary_union(polygons)
 
-def extract_target_polygons(boundary: Polygon | MultiPolygon, group_boundaries: bool = False) -> list[Polygon | MultiPolygon]:
+
+def extract_target_polygons(
+        boundary: Polygon | MultiPolygon,
+        group_boundaries: bool = False) -> list[Polygon | MultiPolygon]:
     """
     Extracts a list of target geometries from a boundary.
     If group_boundaries is True, returns the unified geometry as a single item.

@@ -56,8 +56,7 @@ class GuillocheGen(PipelineOperation):
 
         logger.info(
             f"Generating guilloche pattern over {cfg.revolutions} revolutions "
-            f"across {len(polygons)} boundary region(s)."
-        )
+            f"across {len(polygons)} boundary region(s).")
 
         for poly in polygons:
             # Fallback to centroid if coordinates are not strictly defined
@@ -75,8 +74,10 @@ class GuillocheGen(PipelineOperation):
                 cfg.frequency_mod * theta)
             effective_p = cfg.p * mod_envelope
 
-            x = cx + r_diff * np.cos(theta) + effective_p * np.cos(ratio * theta)
-            y = cy + r_diff * np.sin(theta) - effective_p * np.sin(ratio * theta)
+            x = cx + r_diff * np.cos(theta) + effective_p * np.cos(
+                ratio * theta)
+            y = cy + r_diff * np.sin(theta) - effective_p * np.sin(
+                ratio * theta)
 
             coords = np.column_stack((x, y))
             raw_pattern_line = LineString(coords)

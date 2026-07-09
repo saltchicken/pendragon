@@ -76,7 +76,6 @@ class VenationGen(PipelineOperation):
             return state
 
         # 2. Initialize the network with a single root node
-        
 
         nodes = np.array([[root_x, root_y]])
         raw_lines = []

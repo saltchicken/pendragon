@@ -47,14 +47,16 @@ class AddBoundaryGen(PipelineOperation):
             for poly in effective_boundary.geoms:
                 new_lines.extend(extract_rings(poly))
         else:
-            logger.error(f"Unsupported boundary geometry type: {type(effective_boundary)}")
+            logger.error(
+                f"Unsupported boundary geometry type: {type(effective_boundary)}"
+            )
             return state
 
         logger.success(f"Successfully added {len(new_lines)} boundary paths.")
 
         # Append the new boundary paths to the existing lines
         return PipelineState(
-            boundary=state.boundary,  # Always pass the original, un-overscanned boundary forward
+            boundary=state.
+            boundary,  # Always pass the original, un-overscanned boundary forward
             lines=state.lines + new_lines,
-            operation_name="add_boundary"
-        )
+            operation_name="add_boundary")
