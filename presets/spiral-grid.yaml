@@ -5,6 +5,8 @@
     orientation: crosshatch
     overscan: 0
 
+- operation: add_boundary
+
 # 2. Run a generator inside every closed box formed by the scaffolding
 - operation: generate_in_cells
   settings:

@@ -52,24 +52,19 @@ class GenerateInCellsOp(PipelineOperation):
             logger.warning("No lines available to form cells. Skipping.")
             return state
 
-        # 1. Grab the outer perimeter of the current boundary
-        effective_boundary = self.get_effective_boundary(state)
-        boundary_ring = effective_boundary.boundary
+        # 1. Slice the incoming lines at their intersection points
+        # We no longer inject the global boundary here. We ONLY use the lines 
+        # passed in from previous operations.
+        noded_lines = unary_union(current_lines)
 
-        # 2. Combine our grid lines with the outer perimeter
-        all_lines = current_lines + [boundary_ring]
-
-        # 3. Slice all lines at their intersection points
-        noded_lines = unary_union(all_lines)
-
-        # 4. Resolve floating-point inaccuracies
+        # 2. Resolve floating-point inaccuracies
         if cfg.tolerance > 0:
             logger.debug(
                 f"Applying precision snapping with tolerance {cfg.tolerance}")
             # set_precision aligns vertices to a grid, closing microscopic gaps
             noded_lines = set_precision(noded_lines, grid_size=cfg.tolerance)
 
-        # 5. Now polygonize can successfully detect the closed loops
+        # 3. Now polygonize can successfully detect the closed loops
         polygons = list(polygonize(noded_lines))
         # --------------------------------------------
 
@@ -82,7 +77,7 @@ class GenerateInCellsOp(PipelineOperation):
             f"Formed {len(polygons)} cells. Running '{cfg.generator}' inside each..."
         )
 
-        # 6. Look up the requested sub-generator in the registry
+        # 4. Look up the requested sub-generator in the registry
         op_info = OPERATION_REGISTRY.get(cfg.generator)
         if not op_info:
             logger.error(
@@ -94,7 +89,7 @@ class GenerateInCellsOp(PipelineOperation):
 
         all_new_lines = []
 
-        # 7. Iterate over every isolated cell
+        # 5. Iterate over every isolated cell
         for poly in polygons:
             cell_settings = cfg.generator_settings.copy()
 
@@ -135,7 +130,7 @@ class GenerateInCellsOp(PipelineOperation):
             logger.info("Keeping original scaffolding lines in the output.")
             final_lines = current_lines + all_new_lines
 
-        # 8. Return the unified lines, but PRESERVE the original global boundary
+        # 6. Return the unified lines, but PRESERVE the original global boundary
         return PipelineState(boundary=state.boundary,
                              lines=final_lines,
                              operation_name="generate_in_cells")
