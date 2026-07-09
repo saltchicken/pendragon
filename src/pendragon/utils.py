@@ -1,4 +1,5 @@
 import ezdxf
+import ezdxf.path
 from PIL import Image
 from shapely.geometry import LineString
 from shapely.geometry import MultiPolygon
@@ -34,22 +35,36 @@ def load_dxf_boundary(dxf_path: str) -> Polygon | MultiPolygon:
     """
     Parses a DXF file and constructs a Shapely Polygon or MultiPolygon.
     Handles multiple disjoint, overlapping, or holed polygons.
+    Supports LINE, LWPOLYLINE, POLYLINE, CIRCLE, ARC, ELLIPSE, and SPLINE.
     """
     doc = ezdxf.readfile(dxf_path)
     msp = doc.modelspace()
     lines = []
 
+    supported_types = {
+        'LINE', 'LWPOLYLINE', 'POLYLINE', 'CIRCLE', 'ARC', 'ELLIPSE', 'SPLINE'
+    }
+
     for e in msp:
-        if e.dxftype() == 'LWPOLYLINE':
-            pts = [vertex[:2] for vertex in e.vertices()]
-            if len(pts) >= 2:
-                # If the polyline is flagged as closed, ensure the coordinate loop is closed
-                if e.closed and pts[0] != pts[-1]:
-                    pts.append(pts[0])
-                lines.append(LineString(pts))
-        elif e.dxftype() == 'LINE':
-            lines.append(LineString([e.dxf.start[:2], e.dxf.end[:2]]))
-        # Note: You can add handling for SPLINE or ARC here later if needed
+        if e.dxftype() in supported_types:
+            try:
+                # Convert the DXF entity into an ezdxf Path object
+                path = ezdxf.path.make_path(e)
+                
+                # Flatten the path into discrete vertices. 
+                # 'distance' is the maximum approximation error (sagitta) allowed.
+                # 0.05 units ensures very smooth curves without overwhelming Shapely.
+                pts = [(v.x, v.y) for v in path.flattening(distance=0.05)]
+                
+                if len(pts) >= 2:
+                    # Explicitly enforce topological closure if the path is marked closed
+                    if path.is_closed and pts[0] != pts[-1]:
+                        pts.append(pts[0])
+                        
+                    lines.append(LineString(pts))
+            except Exception:
+                # Silently ignore broken or completely unsupported geometry
+                pass
 
     if not lines:
         raise ValueError("No valid line geometries found in DXF modelspace.")
