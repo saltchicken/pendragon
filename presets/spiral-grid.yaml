@@ -2,7 +2,7 @@
 - operation: grid_lines
   settings:
     spacing: 50.0
-    orientation: horizontal
+    orientation: crosshatch
     overscan: 0
 
 # 2. Run a generator inside every closed box formed by the scaffolding
@@ -20,7 +20,7 @@
       steps: 2000
       overscan: 20
 
-# 3. Standard path modifications 
+# 3. Standard path modifications
 - operation: clip
 
 - operation: connect_continuous

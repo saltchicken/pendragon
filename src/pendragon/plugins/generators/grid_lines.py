@@ -43,35 +43,43 @@ class GridLinesGen(PipelineOperation):
         # 2. Helper to generate horizontal lines
         def make_horizontal():
             lines = []
-            # Lock the grid phase to the original un-buffered boundary
-            phase_y = orig_miny + active_config.spacing
-
-            # Step backwards to find the correct starting point that covers the overscan
-            k_start = math.floor((eff_miny - phase_y) / active_config.spacing)
-            current_y = phase_y + (k_start * active_config.spacing)
-
-            while current_y < eff_maxy:
-                line = LineString([(eff_minx, current_y),
-                                   (eff_maxx, current_y)])
+            phase_y = orig_miny
+            
+            # Find the starting and ending multipliers based on the effective boundary
+            start_k = math.ceil((eff_miny - phase_y) / active_config.spacing)
+            end_k = math.floor((eff_maxy - phase_y) / active_config.spacing)
+            
+            for k in range(start_k, end_k + 1):
+                current_y = phase_y + k * active_config.spacing
+                
+                # Skip the line if it falls exactly on the bottom or top boundary
+                if abs(current_y - eff_miny) < 1e-7 or abs(current_y - eff_maxy) < 1e-7:
+                    continue
+                    
+                line = LineString([(eff_minx, current_y), (eff_maxx, current_y)])
                 lines.append(line)
-                current_y += active_config.spacing
+                
             return lines
 
         # 3. Helper to generate vertical lines
         def make_vertical():
             lines = []
-            # Lock the grid phase to the original un-buffered boundary
-            phase_x = orig_minx + active_config.spacing
-
-            # Step backwards to find the correct starting point that covers the overscan
-            k_start = math.floor((eff_minx - phase_x) / active_config.spacing)
-            current_x = phase_x + (k_start * active_config.spacing)
-
-            while current_x < eff_maxx:
-                line = LineString([(current_x, eff_miny),
-                                   (current_x, eff_maxy)])
+            phase_x = orig_minx
+            
+            # Find the starting and ending multipliers based on the effective boundary
+            start_k = math.ceil((eff_minx - phase_x) / active_config.spacing)
+            end_k = math.floor((eff_maxx - phase_x) / active_config.spacing)
+            
+            for k in range(start_k, end_k + 1):
+                current_x = phase_x + k * active_config.spacing
+                
+                # Skip the line if it falls exactly on the left or right boundary
+                if abs(current_x - eff_minx) < 1e-7 or abs(current_x - eff_maxx) < 1e-7:
+                    continue
+                    
+                line = LineString([(current_x, eff_miny), (current_x, eff_maxy)])
                 lines.append(line)
-                current_x += active_config.spacing
+                
             return lines
 
         # Populate baseline geometric patterns
