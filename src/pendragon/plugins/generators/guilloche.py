@@ -16,6 +16,7 @@ from pendragon.core import CenteredPluginConfig
 from pendragon.core import PipelineOperation
 from pendragon.core import PipelineState
 from pendragon.core import register_operation
+from pendragon.utils import extract_target_polygons
 
 
 class GuillocheConfig(CenteredPluginConfig):
@@ -49,16 +50,7 @@ class GuillocheGen(PipelineOperation):
         cfg = self.config or GuillocheConfig()
         boundary = self.get_effective_boundary(state)
 
-        # Handle distinct multiple boundaries gracefully
-        if cfg.group_boundaries:
-            polygons = [boundary]  # Treats the whole MultiPolygon as one geometry
-        else:
-            if isinstance(boundary, MultiPolygon):
-                polygons = list(boundary.geoms)
-            elif isinstance(boundary, Polygon):
-                polygons = [boundary]
-            else:
-                polygons = []
+        polygons = extract_target_polygons(boundary, cfg.group_boundaries)
 
         clipped_lines: List[LineString] = []
 

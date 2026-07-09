@@ -6,6 +6,7 @@ from shapely.geometry import MultiPolygon
 from shapely.geometry import Polygon
 from shapely.ops import polygonize
 from shapely.ops import unary_union
+from shapely.geometry import MultiPolygon, Polygon
 
 
 class ImageSampler:
@@ -78,3 +79,17 @@ def load_dxf_boundary(dxf_path: str) -> Polygon | MultiPolygon:
 
     # unary_union merges overlapping polygons and groups disjoint ones into a MultiPolygon
     return unary_union(polygons)
+
+def extract_target_polygons(boundary: Polygon | MultiPolygon, group_boundaries: bool = False) -> list[Polygon | MultiPolygon]:
+    """
+    Extracts a list of target geometries from a boundary.
+    If group_boundaries is True, returns the unified geometry as a single item.
+    Otherwise, unpacks MultiPolygons into their distinct geometric components.
+    """
+    if group_boundaries:
+        return [boundary]
+    if isinstance(boundary, MultiPolygon):
+        return list(boundary.geoms)
+    if isinstance(boundary, Polygon):
+        return [boundary]
+    return []

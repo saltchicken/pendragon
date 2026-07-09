@@ -2,7 +2,7 @@
 
 - operation: spiral
   settings:
-    group_boundaries: true
+    group_boundaries: false
     spacing: 4
 
 # - operation: grid_lines
