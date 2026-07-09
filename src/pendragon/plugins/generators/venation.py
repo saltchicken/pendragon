@@ -165,5 +165,5 @@ class VenationGen(PipelineOperation):
             f"Venation complete. Yielded {len(clipped_lines)} final toolpaths.")
 
         return PipelineState(boundary=state.boundary,
-                             lines=state.liens + clipped_lines,
+                             lines=state.lines + clipped_lines,
                              operation_name="venation")
