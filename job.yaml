@@ -1,9 +1,9 @@
 # yaml-language-server: $schema=./recipe-schema.json
 
-- operation: spiral
+- operation: guilloche
   settings:
-    group_boundaries: false
-    spacing: 4
+    group_boundaries: true
+    steps: 1000
 
 # - operation: grid_lines
 #   settings:
