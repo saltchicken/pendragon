@@ -1,5 +1,17 @@
 {
   "$defs": {
+    "AddBoundaryConfig": {
+      "properties": {
+        "overscan": {
+          "default": 0.0,
+          "description": "Distance to expand (positive) or shrink (negative) the operation's clipping boundary.",
+          "title": "Overscan",
+          "type": "number"
+        }
+      },
+      "title": "AddBoundaryConfig",
+      "type": "object"
+    },
     "ClipConfig": {
       "properties": {},
       "title": "ClipConfig",
@@ -106,16 +118,36 @@
           "type": "number"
         },
         "center_x": {
-          "default": 100.0,
-          "description": "X coordinate of the pattern center.",
-          "title": "Center X",
-          "type": "number"
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "X coordinate of the pattern center. Defaults to centroid.",
+          "title": "Center X"
         },
         "center_y": {
-          "default": 100.0,
-          "description": "Y coordinate of the pattern center.",
-          "title": "Center Y",
-          "type": "number"
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Y coordinate of the pattern center. Defaults to centroid.",
+          "title": "Center Y"
+        },
+        "group_boundaries": {
+          "default": false,
+          "description": "If true, generates a single pattern globally centered across all boundaries.",
+          "title": "Group Boundaries",
+          "type": "boolean"
         },
         "R": {
           "default": 50.0,
@@ -256,16 +288,36 @@
           "type": "number"
         },
         "center_x": {
-          "default": 100.0,
-          "description": "X coordinate of the spiral center.",
-          "title": "Center X",
-          "type": "number"
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "X coordinate of the pattern center. Defaults to centroid.",
+          "title": "Center X"
         },
         "center_y": {
-          "default": 100.0,
-          "description": "Y coordinate of the spiral center.",
-          "title": "Center Y",
-          "type": "number"
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Y coordinate of the pattern center. Defaults to centroid.",
+          "title": "Center Y"
+        },
+        "group_boundaries": {
+          "default": false,
+          "description": "If true, generates a single pattern globally centered across all boundaries.",
+          "title": "Group Boundaries",
+          "type": "boolean"
         },
         "start_radius": {
           "default": 0.0,
@@ -293,6 +345,25 @@
         }
       },
       "title": "SpiralConfig",
+      "type": "object"
+    },
+    "Step_add_boundary": {
+      "properties": {
+        "operation": {
+          "const": "add_boundary",
+          "description": "Execute the 'add_boundary' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/AddBoundaryConfig",
+          "description": "Settings for 'add_boundary'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_add_boundary",
       "type": "object"
     },
     "Step_clip": {
@@ -569,6 +640,38 @@
           "title": "Overscan",
           "type": "number"
         },
+        "center_x": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "X coordinate of the pattern center. Defaults to centroid.",
+          "title": "Center X"
+        },
+        "center_y": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Y coordinate of the pattern center. Defaults to centroid.",
+          "title": "Center Y"
+        },
+        "group_boundaries": {
+          "default": false,
+          "description": "If true, generates a single pattern globally centered across all boundaries.",
+          "title": "Group Boundaries",
+          "type": "boolean"
+        },
         "num_leaves": {
           "default": 500,
           "description": "Number of attractor points (leaves) to drive the growth.",
@@ -681,16 +784,13 @@
         "$ref": "#/$defs/Step_connect_continuous"
       },
       {
-        "$ref": "#/$defs/Step_generate_in_cells"
-      },
-      {
         "$ref": "#/$defs/Step_merge"
       },
       {
         "$ref": "#/$defs/Step_polygonize"
       },
       {
-        "$ref": "#/$defs/Step_grid_lines"
+        "$ref": "#/$defs/Step_generate_in_cells"
       },
       {
         "$ref": "#/$defs/Step_guilloche"
@@ -699,13 +799,19 @@
         "$ref": "#/$defs/Step_spiral"
       },
       {
+        "$ref": "#/$defs/Step_voronoi_dual"
+      },
+      {
         "$ref": "#/$defs/Step_venation"
       },
       {
-        "$ref": "#/$defs/Step_voronoi_dual"
+        "$ref": "#/$defs/Step_grid_lines"
+      },
+      {
+        "$ref": "#/$defs/Step_add_boundary"
       }
     ]
   },
-  "title": "RootModel[List[Union[Step_clip, Step_deduplicate, Step_image_mask, Step_optimize, Step_simplify, Step_connect_continuous, Step_generate_in_cells, Step_merge, Step_polygonize, Step_grid_lines, Step_guilloche, Step_spiral, Step_venation, Step_voronoi_dual]]]",
+  "title": "RootModel[List[Union[Step_clip, Step_deduplicate, Step_image_mask, Step_optimize, Step_simplify, Step_connect_continuous, Step_merge, Step_polygonize, Step_generate_in_cells, Step_guilloche, Step_spiral, Step_voronoi_dual, Step_venation, Step_grid_lines, Step_add_boundary]]]",
   "type": "array"
 }

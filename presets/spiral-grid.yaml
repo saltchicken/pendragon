@@ -1,3 +1,5 @@
+# yaml-language-server: $schema=../recipe-schema.json
+
 # 1. Create the scaffolding (e.g., a 50x50 crosshatch grid)
 - operation: grid_lines
   settings:
