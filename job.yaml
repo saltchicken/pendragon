@@ -1,15 +1,12 @@
 # yaml-language-server: $schema=./recipe-schema.json
 
-- operation: guilloche
+- operation: venation
   settings:
-    group_boundaries: true
-    steps: 1000
+    num_leaves: 500
+    root_x: 0.0 # Move the root to match your DXF coordinates
+    root_y: 0.0
+    attract_distance: 50.0 # Increase to ensure it sees the leaves
 
-# - operation: grid_lines
-#   settings:
-#     spacing: 5
-
-# Critical: Stitches the thousands of tiny growth segments into smooth continuous paths
 - operation: connect_continuous
   settings:
     snap_distance: 0.1

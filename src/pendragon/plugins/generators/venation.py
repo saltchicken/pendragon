@@ -9,15 +9,13 @@ from shapely.geometry import MultiLineString
 from shapely.geometry import Point
 from shapely.ops import linemerge
 
-from pendragon.core import BasePluginConfig
+from pendragon.core import CenteredPluginConfig
 from pendragon.core import PipelineOperation
 from pendragon.core import PipelineState
 from pendragon.core import register_operation
 
 
-class VenationConfig(BasePluginConfig):
-    center_x: float = Field(default=None)
-    center_y: float = Field(default=None)
+class VenationConfig(CenteredPluginConfig):
     num_leaves: int = Field(
         default=500,
         description="Number of attractor points (leaves) to drive the growth.")
@@ -167,5 +165,5 @@ class VenationGen(PipelineOperation):
             f"Venation complete. Yielded {len(clipped_lines)} final toolpaths.")
 
         return PipelineState(boundary=state.boundary,
-                             lines=clipped_lines,
+                             lines=state.liens + clipped_lines,
                              operation_name="venation")

@@ -96,5 +96,5 @@ class GuillocheGen(PipelineOperation):
         )
 
         return PipelineState(boundary=state.boundary,
-                             lines=clipped_lines,
+                             lines=state.lines + clipped_lines,
                              operation_name="guilloche")

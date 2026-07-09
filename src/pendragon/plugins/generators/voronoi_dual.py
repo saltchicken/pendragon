@@ -37,9 +37,6 @@ class VoronoiDualGen(PipelineOperation):
     def process(self, state: PipelineState) -> PipelineState:
         cfg = self.config or VoronoiDualConfig()
 
-        # Pull original lines to preserve them (matching the original plugin's behavior)
-        current_lines = state.lines
-
         # Get the boundary, buffered by the overscan config if applicable
         effective_boundary = self.get_effective_boundary(state)
         minx, miny, maxx, maxy = effective_boundary.bounds
@@ -125,5 +122,5 @@ class VoronoiDualGen(PipelineOperation):
 
         # Pass the original boundary forward alongside the merged lines
         return PipelineState(boundary=state.boundary,
-                             lines=current_lines + clipped_lines,
+                             lines=state.lines + clipped_lines,
                              operation_name="voronoi_dual")
