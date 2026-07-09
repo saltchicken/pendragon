@@ -9,18 +9,16 @@ from pydantic import BaseModel
 from pydantic import Field
 from shapely.geometry import LineString
 from shapely.geometry import MultiLineString
+from shapely.geometry import MultiPolygon
+from shapely.geometry import Polygon
 
-from pendragon.core import BasePluginConfig
+from pendragon.core import CenteredPluginConfig
 from pendragon.core import PipelineOperation
 from pendragon.core import PipelineState
 from pendragon.core import register_operation
 
 
-class GuillocheConfig(BasePluginConfig):
-    center_x: float = Field(default=100.0,
-                            description="X coordinate of the pattern center.")
-    center_y: float = Field(default=100.0,
-                            description="Y coordinate of the pattern center.")
+class GuillocheConfig(CenteredPluginConfig):
     R: float = Field(default=50.0,
                      description="Radius of the fixed outer circle.")
     r: float = Field(default=35.0,
@@ -51,42 +49,55 @@ class GuillocheGen(PipelineOperation):
         cfg = self.config or GuillocheConfig()
         boundary = self.get_effective_boundary(state)
 
-        logger.info(
-            f"Generating guilloche geometric pattern at ({cfg.center_x}, {cfg.center_y}) "
-            f"over {cfg.revolutions} revolutions.")
+        # Handle distinct multiple boundaries gracefully
+        if cfg.group_boundaries:
+            polygons = [boundary]  # Treats the whole MultiPolygon as one geometry
+        else:
+            if isinstance(boundary, MultiPolygon):
+                polygons = list(boundary.geoms)
+            elif isinstance(boundary, Polygon):
+                polygons = [boundary]
+            else:
+                polygons = []
 
-        # 1. Parameterize and calculate points using classic hypotrochoid mathematics
-        # with secondary wave modulation for an authentic security-pattern look.
-        theta = np.linspace(0, cfg.revolutions * 2 * np.pi, cfg.steps)
-
-        # Hypotrochoid base math
-        r_diff = cfg.R - cfg.r
-        ratio = r_diff / cfg.r
-
-        # Apply optional harmonic modulation envelope
-        mod_envelope = 1.0 + cfg.amplitude_mod * np.sin(
-            cfg.frequency_mod * theta)
-        effective_p = cfg.p * mod_envelope
-
-        x = cfg.center_x + r_diff * np.cos(theta) + effective_p * np.cos(
-            ratio * theta)
-        y = cfg.center_y + r_diff * np.sin(theta) - effective_p * np.sin(
-            ratio * theta)
-
-        coords = np.column_stack((x, y))
-        raw_pattern_line = LineString(coords)
-
-        # 2. Clip the generated curve against the current pipeline boundary
         clipped_lines: List[LineString] = []
-        if raw_pattern_line.intersects(boundary):
-            clipped = raw_pattern_line.intersection(boundary)
 
-            if isinstance(clipped, LineString) and not clipped.is_empty:
-                clipped_lines.append(clipped)
-            elif isinstance(clipped, MultiLineString):
-                for sub_line in clipped.geoms:
-                    if not sub_line.is_empty:
-                        clipped_lines.append(sub_line)
+        logger.info(
+            f"Generating guilloche pattern over {cfg.revolutions} revolutions "
+            f"across {len(polygons)} boundary region(s)."
+        )
+
+        for poly in polygons:
+            # Fallback to centroid if coordinates are not strictly defined
+            cx = cfg.center_x if cfg.center_x is not None else poly.centroid.x
+            cy = cfg.center_y if cfg.center_y is not None else poly.centroid.y
+
+            theta = np.linspace(0, cfg.revolutions * 2 * np.pi, cfg.steps)
+
+            # Hypotrochoid base math
+            r_diff = cfg.R - cfg.r
+            ratio = r_diff / cfg.r
+
+            # Apply optional harmonic modulation envelope
+            mod_envelope = 1.0 + cfg.amplitude_mod * np.sin(
+                cfg.frequency_mod * theta)
+            effective_p = cfg.p * mod_envelope
+
+            x = cx + r_diff * np.cos(theta) + effective_p * np.cos(ratio * theta)
+            y = cy + r_diff * np.sin(theta) - effective_p * np.sin(ratio * theta)
+
+            coords = np.column_stack((x, y))
+            raw_pattern_line = LineString(coords)
+
+            if raw_pattern_line.intersects(poly):
+                clipped = raw_pattern_line.intersection(poly)
+
+                if isinstance(clipped, LineString) and not clipped.is_empty:
+                    clipped_lines.append(clipped)
+                elif isinstance(clipped, MultiLineString):
+                    for sub_line in clipped.geoms:
+                        if not sub_line.is_empty:
+                            clipped_lines.append(sub_line)
 
         logger.success(
             f"Generated guilloche pattern segments. Retained {len(clipped_lines)} continuous paths."
