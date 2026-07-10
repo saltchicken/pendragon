@@ -38,40 +38,41 @@ class ImageModulatorConfig(BaseModel):
 
 class GenerateInCellsConfig(BasePluginConfig):
     generator: str = Field(
-        ...,
+        default="grid_lines",  # <-- Changed from ... to a safe default
         description="The registry name of the generator to run in each cell.")
+    
     generator_settings: Dict[str, Any] = Field(
         default_factory=dict,
         description="Settings to pass to the sub-generator.")
+    
     auto_center: bool = Field(
         default=True,
-        description=
-        "Automatically inject center_x and center_y for the sub-generator based on cell centroid."
+        description="Automatically inject center_x and center_y for the sub-generator based on cell centroid."
     )
+    
     auto_rotate: bool = Field(
         default=False,
-        description=
-        "Automatically calculate the minimum rotated rectangle of the cell and inject its angle."
+        description="Automatically calculate the minimum rotated rectangle of the cell and inject its angle."
     )
+    
     rotation_setting: str = Field(
         default="rotation",
-        description=
-        "The parameter name in the sub-generator to inject the calculated angle into (e.g., 'rotation')."
+        description="The parameter name in the sub-generator to inject the calculated angle into (e.g., 'rotation')."
     )
+    
     keep_scaffolding: bool = Field(
         default=False,
-        description=
-        "If true, includes the original incoming lines (the grid) in the final output."
+        description="If true, includes the original incoming lines (the grid) in the final output."
     )
+    
     tolerance: float = Field(
         default=1e-5,
-        description=
-        "Grid size for snapping vertices to resolve floating-point gaps. Set to 0 to disable."
+        description="Grid size for snapping vertices to resolve floating-point gaps. Set to 0 to disable."
     )
+    
     image_modulator: Optional[ImageModulatorConfig] = Field(
         default=None,
-        description=
-        "Optional configuration to dynamically modulate a setting based on an image."
+        description="Optional configuration to dynamically modulate a setting based on an image."
     )
 
 
