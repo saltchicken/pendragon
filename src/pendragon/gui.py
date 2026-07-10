@@ -159,6 +159,26 @@ class LiveEditorWindow(QMainWindow):
         self.control_layout.addLayout(self.action_layout)
         # ----------------------
 
+        # --- Pipeline Editing Tools ---
+        self.edit_layout = QHBoxLayout()
+        
+        self.op_selector = QComboBox()
+        # Populate dropdown directly from the registry keys
+        self.op_selector.addItems(sorted(OPERATION_REGISTRY.keys()))
+        
+        self.btn_add_op = QPushButton("Add Step")
+        self.btn_remove_op = QPushButton("Remove Step")
+        
+        self.btn_add_op.clicked.connect(self._add_operation)
+        self.btn_remove_op.clicked.connect(self._remove_operation)
+        
+        self.edit_layout.addWidget(self.op_selector, stretch=2)
+        self.edit_layout.addWidget(self.btn_add_op, stretch=1)
+        self.edit_layout.addWidget(self.btn_remove_op, stretch=1)
+        
+        self.control_layout.addLayout(self.edit_layout)
+        # -----------------------------------
+
         # Dynamic form area for sliders
         self.dynamic_form_widget = QWidget()
         self.form_layout = QFormLayout(self.dynamic_form_widget)
@@ -177,8 +197,7 @@ class LiveEditorWindow(QMainWindow):
         self._pending_op_index = None
 
         self.build_ui_for_current_step()
-        self.viewer.update_view(
-        )  # Force initial stats update now that callbacks are bound
+        self.viewer.update_view()  # Force initial stats update now that callbacks are bound
 
     def _on_view_mode_toggled(self, checked):
         """Swaps the viewer mode and forces a visual update."""
@@ -403,6 +422,58 @@ class LiveEditorWindow(QMainWindow):
             self.engine.runner.recompute_from(self._pending_op_index, target)
             self.viewer.update_view()
 
+    def _get_current_recipe(self) -> list:
+        """Extracts the live operation list back into a dictionary recipe."""
+        current_recipe = []
+        for op in self.engine.runner.operations:
+            op_name = next((name for name, info in OPERATION_REGISTRY.items()
+                            if isinstance(op, info["class"])), None)
+            if not op_name:
+                continue
+            
+            step = {"operation": op_name}
+            if op.config:
+                step["settings"] = op.config.model_dump()
+            current_recipe.append(step)
+            
+        return current_recipe
+
+    def _reload_pipeline(self, new_recipe: list, target_step: int):
+        """Loads a new recipe and securely transitions the UI/viewer state."""
+        success = self.engine.load_recipe(new_recipe)
+        if success:
+            # Clamp the target step to ensure we don't go out of bounds
+            max_step = len(self.engine.runner.operations)
+            self.viewer.current_step = max(0, min(target_step, max_step))
+            
+            self.build_ui_for_current_step()
+            self.viewer.update_view()
+
+    def _add_operation(self):
+        """Inserts a new default operation after the current step."""
+        op_name = self.op_selector.currentText()
+        if not op_name:
+            return
+            
+        recipe = self._get_current_recipe()
+        insert_idx = self.viewer.current_step
+        
+        # Insert a fresh operation with default settings
+        recipe.insert(insert_idx, {"operation": op_name, "settings": {}})
+        
+        # Reload and step forward into the new operation
+        self._reload_pipeline(recipe, target_step=insert_idx + 1)
+
+    def _remove_operation(self):
+        """Removes the currently viewed operation from the pipeline."""
+        recipe = self._get_current_recipe()
+        remove_idx = self.viewer.current_step - 1
+        
+        if 0 <= remove_idx < len(recipe):
+            recipe.pop(remove_idx)
+            # Reload and step back to the previous operation
+            self._reload_pipeline(recipe, target_step=max(0, remove_idx))
+
     def _load_live_recipe(self):
         """Prompts the user to select a YAML recipe, loads it, and refreshes the GUI."""
         file_path, _ = QFileDialog.getOpenFileName(
@@ -459,25 +530,7 @@ class LiveEditorWindow(QMainWindow):
         if not file_path:
             return
 
-        current_recipe = []
-
-        # Iterate through the live operations to reconstruct the recipe
-        for op in self.engine.runner.operations:
-            # Reverse-lookup the operation name from the registry
-            op_name = next((name for name, info in OPERATION_REGISTRY.items()
-                            if isinstance(op, info["class"])), None)
-
-            if not op_name:
-                continue
-
-            # Build the step dictionary
-            step = {"operation": op_name}
-
-            # Serialize the Pydantic config back to a standard dictionary
-            if op.config:
-                step["settings"] = op.config.model_dump()
-
-            current_recipe.append(step)
+        current_recipe = self._get_current_recipe()
 
         # Write the reconstructed recipe to disk
         try:
@@ -559,7 +612,7 @@ class PipelineViewer(scene.SceneCanvas):
     def update_view(self):
         # 1. Determine how far we need to compute based on the view mode
         target_step = len(self.engine.runner.operations
-                         ) if self.show_final_view else self.current_step
+                          ) if self.show_final_view else self.current_step
 
         # 2. Lazily compute history if we haven't reached the required target step yet
         current_history_max = len(self.engine.runner.history) - 1
@@ -568,7 +621,7 @@ class PipelineViewer(scene.SceneCanvas):
 
         # 3. Fetch the appropriate state to display
         display_step = len(self.engine.runner.history
-                          ) - 1 if self.show_final_view else self.current_step
+                           ) - 1 if self.show_final_view else self.current_step
         state = self.engine.runner.history[display_step]
 
         total_vertices = sum(len(line.coords) for line in state.lines)
