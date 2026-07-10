@@ -72,20 +72,20 @@
         },
         "sign": {
           "default": -1.0,
-          "description": "Sign of the wave interference (+1.0 or -1.0).",
+          "description": "Sign of the wave interference.",
           "title": "Sign",
           "type": "number"
         },
         "res": {
           "default": 0.5,
-          "description": "Grid sampling resolution. Lower is more detailed.",
+          "description": "Grid sampling resolution.",
           "exclusiveMinimum": 0.0,
           "title": "Res",
           "type": "number"
         },
         "simplify": {
           "default": 0.0,
-          "description": "Tolerance for path simplification to reduce vertex count.",
+          "description": "Tolerance for path simplification.",
           "minimum": 0.0,
           "title": "Simplify",
           "type": "number"
@@ -100,7 +100,7 @@
             }
           ],
           "default": null,
-          "description": "Optional file path to an image for modulating the nodes.",
+          "description": "Optional image modulator.",
           "title": "Image Path"
         }
       },
@@ -191,7 +191,7 @@
       "properties": {
         "snap_distance": {
           "default": 0.05,
-          "description": "Max distance between consecutive segment endpoints to weld them.",
+          "description": "Max distance to weld segments.",
           "title": "Snap Distance",
           "type": "number"
         }
@@ -203,7 +203,7 @@
       "properties": {
         "tolerance": {
           "default": 1e-05,
-          "description": "Tolerance for considering two geometries exactly equal.",
+          "description": "Tolerance for exactly equal geometries.",
           "title": "Tolerance",
           "type": "number"
         }
@@ -228,27 +228,27 @@
         },
         "step_length": {
           "default": 1.0,
-          "description": "Distance the path travels in a single calculation step.",
+          "description": "Distance path travels in single step.",
           "exclusiveMinimum": 0.0,
           "title": "Step Length",
           "type": "number"
         },
         "max_steps": {
           "default": 50,
-          "description": "Maximum number of steps each flow line can take.",
+          "description": "Maximum number of steps.",
           "exclusiveMinimum": 0,
           "title": "Max Steps",
           "type": "integer"
         },
         "scale": {
           "default": 0.1,
-          "description": "Scaling factor for the vector field math. Smaller = broader curves.",
+          "description": "Scaling factor for vector field math.",
           "title": "Scale",
           "type": "number"
         },
         "seed": {
           "default": 42,
-          "description": "Random seed for reproducible jitter and flow generation.",
+          "description": "Random seed.",
           "title": "Seed",
           "type": "integer"
         }
@@ -281,6 +281,18 @@
           "title": "Auto Center",
           "type": "boolean"
         },
+        "auto_rotate": {
+          "default": false,
+          "description": "Automatically calculate the minimum rotated rectangle of the cell and inject its angle.",
+          "title": "Auto Rotate",
+          "type": "boolean"
+        },
+        "rotation_setting": {
+          "default": "rotation",
+          "description": "The parameter name in the sub-generator to inject the calculated angle into (e.g., 'rotation').",
+          "title": "Rotation Setting",
+          "type": "string"
+        },
         "keep_scaffolding": {
           "default": false,
           "description": "If true, includes the original incoming lines (the grid) in the final output.",
@@ -292,6 +304,18 @@
           "description": "Grid size for snapping vertices to resolve floating-point gaps. Set to 0 to disable.",
           "title": "Tolerance",
           "type": "number"
+        },
+        "image_modulator": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ImageModulatorConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional configuration to dynamically modulate a setting based on an image."
         }
       },
       "required": [
@@ -420,7 +444,7 @@
         },
         "radius": {
           "default": 3.0,
-          "description": "The outer radius of a single hexagon cell.",
+          "description": "Outer radius of a single hexagon cell.",
           "exclusiveMinimum": 0.0,
           "title": "Radius",
           "type": "number"
@@ -439,7 +463,7 @@
         },
         "spacing": {
           "default": 2.0,
-          "description": "Target distance between parallel segments. Determines the resolution (order) of the fractal.",
+          "description": "Target distance between segments.",
           "exclusiveMinimum": 0.0,
           "title": "Spacing",
           "type": "number"
@@ -470,12 +494,44 @@
         },
         "sample_step": {
           "default": 0.5,
-          "description": "Resolution step size for sampling along lines.",
+          "description": "Resolution step size for sampling.",
           "title": "Sample Step",
           "type": "number"
         }
       },
       "title": "ImageMaskConfig",
+      "type": "object"
+    },
+    "ImageModulatorConfig": {
+      "properties": {
+        "image_path": {
+          "description": "File path to the source image to sample.",
+          "title": "Image Path",
+          "type": "string"
+        },
+        "target_setting": {
+          "description": "The parameter name in the sub-generator to modulate (e.g., 'revolutions', 'spacing').",
+          "title": "Target Setting",
+          "type": "string"
+        },
+        "min_val": {
+          "description": "The setting value when the image is pure white (0% darkness).",
+          "title": "Min Val",
+          "type": "number"
+        },
+        "max_val": {
+          "description": "The setting value when the image is pure black (100% darkness).",
+          "title": "Max Val",
+          "type": "number"
+        }
+      },
+      "required": [
+        "image_path",
+        "target_setting",
+        "min_val",
+        "max_val"
+      ],
+      "title": "ImageModulatorConfig",
       "type": "object"
     },
     "ImageOutlineConfig": {
@@ -501,21 +557,21 @@
         },
         "resolution": {
           "default": 0.5,
-          "description": "Sampling grid resolution. Lower = higher detail.",
+          "description": "Sampling grid resolution.",
           "exclusiveMinimum": 0.0,
           "title": "Resolution",
           "type": "number"
         },
         "sigma": {
           "default": 1.0,
-          "description": "Blur factor to smooth out noise. Increase if you get too many tiny stray lines.",
+          "description": "Blur factor to smooth out noise.",
           "minimum": 0.0,
           "title": "Sigma",
           "type": "number"
         },
         "min_length": {
           "default": 2.0,
-          "description": "Minimum physical length of a line to keep.",
+          "description": "Minimum physical length to keep.",
           "minimum": 0.0,
           "title": "Min Length",
           "type": "number"
@@ -610,14 +666,14 @@
         },
         "spacing": {
           "default": 2.0,
-          "description": "Distance between concentric offset rings.",
+          "description": "Distance between offset rings.",
           "exclusiveMinimum": 0.0,
           "title": "Spacing",
           "type": "number"
         },
         "ring_simplify": {
           "default": 0.2,
-          "description": "Simplification tolerance for the generated rings.",
+          "description": "Simplification tolerance.",
           "minimum": 0.0,
           "title": "Ring Simplify",
           "type": "number"
@@ -654,7 +710,7 @@
         },
         "spacing": {
           "default": 2.0,
-          "description": "Target spacing between the parallel lines of the curve.",
+          "description": "Target spacing between lines.",
           "exclusiveMinimum": 0.0,
           "title": "Spacing",
           "type": "number"
@@ -724,27 +780,27 @@
         },
         "spacing": {
           "default": 2.0,
-          "description": "Physical distance between concentric contour lines.",
+          "description": "Distance between contour lines.",
           "exclusiveMinimum": 0.0,
           "title": "Spacing",
           "type": "number"
         },
         "threshold": {
           "default": 0.5,
-          "description": "Darkness threshold (0.0-1.0) to define the boundaries of the fill area.",
+          "description": "Darkness threshold (0.0-1.0).",
           "title": "Threshold",
           "type": "number"
         },
         "resolution": {
           "default": 0.25,
-          "description": "Sampling grid resolution. Lower values yield higher detail but run slower.",
+          "description": "Sampling grid resolution.",
           "exclusiveMinimum": 0.0,
           "title": "Resolution",
           "type": "number"
         },
         "min_length": {
           "default": 2.0,
-          "description": "Minimum physical length of a contour line to keep (filters out noise).",
+          "description": "Minimum length to keep.",
           "minimum": 0.0,
           "title": "Min Length",
           "type": "number"
@@ -759,7 +815,7 @@
             }
           ],
           "default": null,
-          "description": "File path to the source image to sample.",
+          "description": "File path to the source image.",
           "title": "Image Path"
         }
       },
@@ -776,21 +832,21 @@
         },
         "levels": {
           "default": 15,
-          "description": "Number of contour levels to generate between light and dark.",
+          "description": "Number of contour levels to generate.",
           "exclusiveMinimum": 0,
           "title": "Levels",
           "type": "integer"
         },
         "resolution": {
           "default": 0.5,
-          "description": "Sampling grid resolution (smaller is higher detail but slower).",
+          "description": "Sampling grid resolution.",
           "exclusiveMinimum": 0.0,
           "title": "Resolution",
           "type": "number"
         },
         "min_length": {
           "default": 2.0,
-          "description": "Minimum physical length of a contour line to keep.",
+          "description": "Minimum physical length to keep.",
           "minimum": 0.0,
           "title": "Min Length",
           "type": "number"
@@ -805,7 +861,7 @@
             }
           ],
           "default": null,
-          "description": "File path to the source image to sample.",
+          "description": "File path to the source image.",
           "title": "Image Path"
         }
       },
@@ -837,19 +893,19 @@
             }
           ],
           "default": null,
-          "description": "File path to the source image to sample.",
+          "description": "Source image.",
           "title": "Image Path"
         },
         "dot_size": {
           "default": 0.1,
-          "description": "Length of the microscopic line used to draw a single dot.",
+          "description": "Length of microscopic line.",
           "exclusiveMinimum": 0.0,
           "title": "Dot Size",
           "type": "number"
         },
         "seed": {
           "default": 42,
-          "description": "Random seed for repeatable point placement.",
+          "description": "Random seed.",
           "title": "Seed",
           "type": "integer"
         }
@@ -867,7 +923,7 @@
         },
         "nodes": {
           "default": 2000,
-          "description": "Number of stipple points to generate and connect.",
+          "description": "Number of points to connect.",
           "exclusiveMinimum": 1,
           "title": "Nodes",
           "type": "integer"
@@ -882,12 +938,12 @@
             }
           ],
           "default": null,
-          "description": "File path to the source image to sample.",
+          "description": "File path to the source image.",
           "title": "Image Path"
         },
         "seed": {
           "default": 42,
-          "description": "Random seed for repeatable point placement.",
+          "description": "Random seed.",
           "title": "Seed",
           "type": "integer"
         }
@@ -905,14 +961,14 @@
         },
         "lines": {
           "default": 80,
-          "description": "Number of horizontal wave lines to generate.",
+          "description": "Number of horizontal wave lines.",
           "exclusiveMinimum": 0,
           "title": "Lines",
           "type": "integer"
         },
         "amp": {
           "default": 2.0,
-          "description": "Amplitude multiplier for the generated waves.",
+          "description": "Amplitude multiplier.",
           "title": "Amp",
           "type": "number"
         },
@@ -926,7 +982,7 @@
             }
           ],
           "default": null,
-          "description": "File path to the source image to sample.",
+          "description": "File path to the source image.",
           "title": "Image Path"
         }
       },
@@ -942,13 +998,13 @@
       "properties": {
         "factor": {
           "default": 1.0,
-          "description": "Uniform scaling multiplier (e.g., 2.0 doubles the size).",
+          "description": "Uniform scaling multiplier.",
           "title": "Factor",
           "type": "number"
         },
         "origin": {
           "default": "center",
-          "description": "Origin point for scaling: 'center', 'centroid', or an exact coordinate.",
+          "description": "Origin point for scaling ('center', 'centroid', etc).",
           "title": "Origin",
           "type": "string"
         }
@@ -960,14 +1016,14 @@
       "properties": {
         "tolerance": {
           "default": 0.1,
-          "description": "Maximum allowed perpendicular distance between original and simplified line.",
+          "description": "Max allowed distance between original and simplified line.",
           "minimum": 0.0,
           "title": "Tolerance",
           "type": "number"
         },
         "preserve_topology": {
           "default": false,
-          "description": "If True, prevents invalid geometries or self-intersections during simplification.",
+          "description": "Prevents invalid geometries.",
           "title": "Preserve Topology",
           "type": "boolean"
         }
@@ -1699,7 +1755,7 @@
         },
         "cell_size": {
           "default": 5.0,
-          "description": "Side length of the equilateral triangles forming the grid.",
+          "description": "Side length of equilateral triangles.",
           "exclusiveMinimum": 0.0,
           "title": "Cell Size",
           "type": "number"
@@ -1810,27 +1866,27 @@
         },
         "spacing": {
           "default": 2.0,
-          "description": "Target spacing between points if num_points is 0.",
+          "description": "Target spacing between points.",
           "exclusiveMinimum": 0.0,
           "title": "Spacing",
           "type": "number"
         },
         "num_points": {
           "default": 0,
-          "description": "Number of random seed points to generate.",
+          "description": "Number of random seed points.",
           "minimum": 0,
           "title": "Num Points",
           "type": "integer"
         },
         "seed": {
           "default": 42,
-          "description": "Random seed for repeatable generation.",
+          "description": "Random seed.",
           "title": "Seed",
           "type": "integer"
         },
         "mode": {
           "default": "dual",
-          "description": "Mode of generation: 'voronoi', 'delaunay', or 'dual'.",
+          "description": "Mode: 'voronoi', 'delaunay', or 'dual'.",
           "title": "Mode",
           "type": "string"
         }
@@ -1842,13 +1898,13 @@
       "properties": {
         "factor": {
           "default": 1.0,
-          "description": "Zoom multiplier (e.g., 2.0 zooms in 2x, 0.5 zooms out).",
+          "description": "Zoom multiplier.",
           "title": "Factor",
           "type": "number"
         },
         "origin": {
           "default": "center",
-          "description": "Origin point for zoom: 'center', 'centroid', or an exact coordinate.",
+          "description": "Origin point for zoom.",
           "title": "Origin",
           "type": "string"
         }
@@ -1860,88 +1916,16 @@
   "items": {
     "anyOf": [
       {
-        "$ref": "#/$defs/Step_clip"
-      },
-      {
-        "$ref": "#/$defs/Step_deduplicate"
-      },
-      {
-        "$ref": "#/$defs/Step_image_mask"
-      },
-      {
-        "$ref": "#/$defs/Step_optimize"
-      },
-      {
-        "$ref": "#/$defs/Step_simplify"
-      },
-      {
-        "$ref": "#/$defs/Step_connect_continuous"
-      },
-      {
-        "$ref": "#/$defs/Step_merge"
-      },
-      {
-        "$ref": "#/$defs/Step_scale"
-      },
-      {
-        "$ref": "#/$defs/Step_zoom"
-      },
-      {
-        "$ref": "#/$defs/Step_generate_in_cells"
-      },
-      {
-        "$ref": "#/$defs/Step_polygonize"
-      },
-      {
-        "$ref": "#/$defs/Step_guilloche"
-      },
-      {
-        "$ref": "#/$defs/Step_spiral"
-      },
-      {
-        "$ref": "#/$defs/Step_voronoi_dual"
-      },
-      {
-        "$ref": "#/$defs/Step_grid_lines"
-      },
-      {
-        "$ref": "#/$defs/Step_add_boundary"
-      },
-      {
-        "$ref": "#/$defs/Step_venation"
-      },
-      {
-        "$ref": "#/$defs/Step_concentric"
-      },
-      {
-        "$ref": "#/$defs/Step_offset_fill"
-      },
-      {
-        "$ref": "#/$defs/Step_photo_contour"
-      },
-      {
-        "$ref": "#/$defs/Step_image_outline"
-      },
-      {
-        "$ref": "#/$defs/Step_photo_wave"
-      },
-      {
-        "$ref": "#/$defs/Step_photo_tsp"
-      },
-      {
-        "$ref": "#/$defs/Step_photo_stipple"
-      },
-      {
-        "$ref": "#/$defs/Step_photo_concentric"
-      },
-      {
-        "$ref": "#/$defs/Step_lichtenberg"
-      },
-      {
         "$ref": "#/$defs/Step_chaotic"
       },
       {
+        "$ref": "#/$defs/Step_hexagon"
+      },
+      {
         "$ref": "#/$defs/Step_hilbert"
+      },
+      {
+        "$ref": "#/$defs/Step_lichtenberg"
       },
       {
         "$ref": "#/$defs/Step_peano"
@@ -1950,19 +1934,91 @@
         "$ref": "#/$defs/Step_penrose"
       },
       {
-        "$ref": "#/$defs/Step_hexagon"
+        "$ref": "#/$defs/Step_photo_concentric"
+      },
+      {
+        "$ref": "#/$defs/Step_photo_stipple"
+      },
+      {
+        "$ref": "#/$defs/Step_photo_tsp"
       },
       {
         "$ref": "#/$defs/Step_triangle"
+      },
+      {
+        "$ref": "#/$defs/Step_add_boundary"
+      },
+      {
+        "$ref": "#/$defs/Step_grid_lines"
+      },
+      {
+        "$ref": "#/$defs/Step_image_outline"
+      },
+      {
+        "$ref": "#/$defs/Step_photo_contour"
+      },
+      {
+        "$ref": "#/$defs/Step_photo_wave"
+      },
+      {
+        "$ref": "#/$defs/Step_concentric"
+      },
+      {
+        "$ref": "#/$defs/Step_spiral"
       },
       {
         "$ref": "#/$defs/Step_chladni"
       },
       {
         "$ref": "#/$defs/Step_flow_field"
+      },
+      {
+        "$ref": "#/$defs/Step_guilloche"
+      },
+      {
+        "$ref": "#/$defs/Step_offset_fill"
+      },
+      {
+        "$ref": "#/$defs/Step_venation"
+      },
+      {
+        "$ref": "#/$defs/Step_voronoi_dual"
+      },
+      {
+        "$ref": "#/$defs/Step_clip"
+      },
+      {
+        "$ref": "#/$defs/Step_deduplicate"
+      },
+      {
+        "$ref": "#/$defs/Step_merge"
+      },
+      {
+        "$ref": "#/$defs/Step_polygonize"
+      },
+      {
+        "$ref": "#/$defs/Step_zoom"
+      },
+      {
+        "$ref": "#/$defs/Step_connect_continuous"
+      },
+      {
+        "$ref": "#/$defs/Step_optimize"
+      },
+      {
+        "$ref": "#/$defs/Step_scale"
+      },
+      {
+        "$ref": "#/$defs/Step_simplify"
+      },
+      {
+        "$ref": "#/$defs/Step_generate_in_cells"
+      },
+      {
+        "$ref": "#/$defs/Step_image_mask"
       }
     ]
   },
-  "title": "RootModel[List[Union[Step_clip, Step_deduplicate, Step_image_mask, Step_optimize, Step_simplify, Step_connect_continuous, Step_merge, Step_scale, Step_zoom, Step_generate_in_cells, Step_polygonize, Step_guilloche, Step_spiral, Step_voronoi_dual, Step_grid_lines, Step_add_boundary, Step_venation, Step_concentric, Step_offset_fill, Step_photo_contour, Step_image_outline, Step_photo_wave, Step_photo_tsp, Step_photo_stipple, Step_photo_concentric, Step_lichtenberg, Step_chaotic, Step_hilbert, Step_peano, Step_penrose, Step_hexagon, Step_triangle, Step_chladni, Step_flow_field]]]",
+  "title": "RootModel[List[Union[Step_chaotic, Step_hexagon, Step_hilbert, Step_lichtenberg, Step_peano, Step_penrose, Step_photo_concentric, Step_photo_stipple, Step_photo_tsp, Step_triangle, Step_add_boundary, Step_grid_lines, Step_image_outline, Step_photo_contour, Step_photo_wave, Step_concentric, Step_spiral, Step_chladni, Step_flow_field, Step_guilloche, Step_offset_fill, Step_venation, Step_voronoi_dual, Step_clip, Step_deduplicate, Step_merge, Step_polygonize, Step_zoom, Step_connect_continuous, Step_optimize, Step_scale, Step_simplify, Step_generate_in_cells, Step_image_mask]]]",
   "type": "array"
 }
