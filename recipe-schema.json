@@ -12,6 +12,101 @@
       "title": "AddBoundaryConfig",
       "type": "object"
     },
+    "ChaoticConfig": {
+      "properties": {
+        "overscan": {
+          "default": 0.0,
+          "description": "Distance to expand (positive) or shrink (negative) the operation's clipping boundary.",
+          "title": "Overscan",
+          "type": "number"
+        },
+        "spacing": {
+          "default": 2.0,
+          "description": "Spacing between the coarse baseline segments.",
+          "exclusiveMinimum": 0.0,
+          "title": "Spacing",
+          "type": "number"
+        },
+        "depth": {
+          "default": 4,
+          "description": "Recursion depth for the fractal generation.",
+          "minimum": 0,
+          "title": "Depth",
+          "type": "integer"
+        },
+        "chaos_freq": {
+          "default": 0.15,
+          "description": "Spatial frequency of the chaotic distortion.",
+          "title": "Chaos Freq",
+          "type": "number"
+        },
+        "chaos_amp": {
+          "default": 0.8,
+          "description": "Amplitude of the chaotic distortion.",
+          "title": "Chaos Amp",
+          "type": "number"
+        }
+      },
+      "title": "ChaoticConfig",
+      "type": "object"
+    },
+    "ChladniConfig": {
+      "properties": {
+        "overscan": {
+          "default": 0.0,
+          "description": "Distance to expand (positive) or shrink (negative) the operation's clipping boundary.",
+          "title": "Overscan",
+          "type": "number"
+        },
+        "n": {
+          "default": 3.0,
+          "description": "Horizontal resonant mode.",
+          "title": "N",
+          "type": "number"
+        },
+        "m": {
+          "default": 5.0,
+          "description": "Vertical resonant mode.",
+          "title": "M",
+          "type": "number"
+        },
+        "sign": {
+          "default": -1.0,
+          "description": "Sign of the wave interference (+1.0 or -1.0).",
+          "title": "Sign",
+          "type": "number"
+        },
+        "res": {
+          "default": 0.5,
+          "description": "Grid sampling resolution. Lower is more detailed.",
+          "exclusiveMinimum": 0.0,
+          "title": "Res",
+          "type": "number"
+        },
+        "simplify": {
+          "default": 0.0,
+          "description": "Tolerance for path simplification to reduce vertex count.",
+          "minimum": 0.0,
+          "title": "Simplify",
+          "type": "number"
+        },
+        "image_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional file path to an image for modulating the nodes.",
+          "title": "Image Path"
+        }
+      },
+      "title": "ChladniConfig",
+      "type": "object"
+    },
     "ClipConfig": {
       "properties": {},
       "title": "ClipConfig",
@@ -114,6 +209,51 @@
         }
       },
       "title": "DeduplicateConfig",
+      "type": "object"
+    },
+    "FlowFieldConfig": {
+      "properties": {
+        "overscan": {
+          "default": 0.0,
+          "description": "Distance to expand (positive) or shrink (negative) the operation's clipping boundary.",
+          "title": "Overscan",
+          "type": "number"
+        },
+        "spacing": {
+          "default": 3.0,
+          "description": "Distance between initial seed points.",
+          "exclusiveMinimum": 0.0,
+          "title": "Spacing",
+          "type": "number"
+        },
+        "step_length": {
+          "default": 1.0,
+          "description": "Distance the path travels in a single calculation step.",
+          "exclusiveMinimum": 0.0,
+          "title": "Step Length",
+          "type": "number"
+        },
+        "max_steps": {
+          "default": 50,
+          "description": "Maximum number of steps each flow line can take.",
+          "exclusiveMinimum": 0,
+          "title": "Max Steps",
+          "type": "integer"
+        },
+        "scale": {
+          "default": 0.1,
+          "description": "Scaling factor for the vector field math. Smaller = broader curves.",
+          "title": "Scale",
+          "type": "number"
+        },
+        "seed": {
+          "default": 42,
+          "description": "Random seed for reproducible jitter and flow generation.",
+          "title": "Seed",
+          "type": "integer"
+        }
+      },
+      "title": "FlowFieldConfig",
       "type": "object"
     },
     "GenerateInCellsConfig": {
@@ -270,6 +410,44 @@
       "title": "GuillocheConfig",
       "type": "object"
     },
+    "HexagonConfig": {
+      "properties": {
+        "overscan": {
+          "default": 0.0,
+          "description": "Distance to expand (positive) or shrink (negative) the operation's clipping boundary.",
+          "title": "Overscan",
+          "type": "number"
+        },
+        "radius": {
+          "default": 3.0,
+          "description": "The outer radius of a single hexagon cell.",
+          "exclusiveMinimum": 0.0,
+          "title": "Radius",
+          "type": "number"
+        }
+      },
+      "title": "HexagonConfig",
+      "type": "object"
+    },
+    "HilbertConfig": {
+      "properties": {
+        "overscan": {
+          "default": 0.0,
+          "description": "Distance to expand (positive) or shrink (negative) the operation's clipping boundary.",
+          "title": "Overscan",
+          "type": "number"
+        },
+        "spacing": {
+          "default": 2.0,
+          "description": "Target distance between parallel segments. Determines the resolution (order) of the fractal.",
+          "exclusiveMinimum": 0.0,
+          "title": "Spacing",
+          "type": "number"
+        }
+      },
+      "title": "HilbertConfig",
+      "type": "object"
+    },
     "ImageMaskConfig": {
       "properties": {
         "mask_image": {
@@ -346,6 +524,70 @@
       "title": "ImageOutlineConfig",
       "type": "object"
     },
+    "LichtenbergConfig": {
+      "properties": {
+        "overscan": {
+          "default": 0.0,
+          "description": "Distance to expand (positive) or shrink (negative) the operation's clipping boundary.",
+          "title": "Overscan",
+          "type": "number"
+        },
+        "center_x": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "X coordinate of the pattern center. Defaults to centroid.",
+          "title": "Center X"
+        },
+        "center_y": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Y coordinate of the pattern center. Defaults to centroid.",
+          "title": "Center Y"
+        },
+        "group_boundaries": {
+          "default": false,
+          "description": "If true, generates a single pattern globally centered across all boundaries.",
+          "title": "Group Boundaries",
+          "type": "boolean"
+        },
+        "nodes": {
+          "default": 1500,
+          "description": "Target number of branches/nodes to generate per region.",
+          "exclusiveMinimum": 0,
+          "title": "Nodes",
+          "type": "integer"
+        },
+        "spacing": {
+          "default": 2.0,
+          "description": "Length of each branching segment.",
+          "exclusiveMinimum": 0.0,
+          "title": "Spacing",
+          "type": "number"
+        },
+        "seed": {
+          "default": 42,
+          "description": "Random seed for reproducible fractal generation.",
+          "title": "Seed",
+          "type": "integer"
+        }
+      },
+      "title": "LichtenbergConfig",
+      "type": "object"
+    },
     "MergeConfig": {
       "properties": {
         "precision": {
@@ -402,6 +644,128 @@
       "title": "OptimizeConfig",
       "type": "object"
     },
+    "PeanoConfig": {
+      "properties": {
+        "overscan": {
+          "default": 0.0,
+          "description": "Distance to expand (positive) or shrink (negative) the operation's clipping boundary.",
+          "title": "Overscan",
+          "type": "number"
+        },
+        "spacing": {
+          "default": 2.0,
+          "description": "Target spacing between the parallel lines of the curve.",
+          "exclusiveMinimum": 0.0,
+          "title": "Spacing",
+          "type": "number"
+        }
+      },
+      "title": "PeanoConfig",
+      "type": "object"
+    },
+    "PenroseConfig": {
+      "properties": {
+        "overscan": {
+          "default": 0.0,
+          "description": "Distance to expand (positive) or shrink (negative) the operation's clipping boundary.",
+          "title": "Overscan",
+          "type": "number"
+        },
+        "center_x": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "X coordinate of the pattern center. Defaults to centroid.",
+          "title": "Center X"
+        },
+        "center_y": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Y coordinate of the pattern center. Defaults to centroid.",
+          "title": "Center Y"
+        },
+        "group_boundaries": {
+          "default": false,
+          "description": "If true, generates a single pattern globally centered across all boundaries.",
+          "title": "Group Boundaries",
+          "type": "boolean"
+        },
+        "depth": {
+          "default": 5,
+          "description": "Number of recursive deflation iterations. High values exponentially increase detail.",
+          "minimum": 1,
+          "title": "Depth",
+          "type": "integer"
+        }
+      },
+      "title": "PenroseConfig",
+      "type": "object"
+    },
+    "PhotoConcentricConfig": {
+      "properties": {
+        "overscan": {
+          "default": 0.0,
+          "description": "Distance to expand (positive) or shrink (negative) the operation's clipping boundary.",
+          "title": "Overscan",
+          "type": "number"
+        },
+        "spacing": {
+          "default": 2.0,
+          "description": "Physical distance between concentric contour lines.",
+          "exclusiveMinimum": 0.0,
+          "title": "Spacing",
+          "type": "number"
+        },
+        "threshold": {
+          "default": 0.5,
+          "description": "Darkness threshold (0.0-1.0) to define the boundaries of the fill area.",
+          "title": "Threshold",
+          "type": "number"
+        },
+        "resolution": {
+          "default": 0.25,
+          "description": "Sampling grid resolution. Lower values yield higher detail but run slower.",
+          "exclusiveMinimum": 0.0,
+          "title": "Resolution",
+          "type": "number"
+        },
+        "min_length": {
+          "default": 2.0,
+          "description": "Minimum physical length of a contour line to keep (filters out noise).",
+          "minimum": 0.0,
+          "title": "Min Length",
+          "type": "number"
+        },
+        "image_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "File path to the source image to sample.",
+          "title": "Image Path"
+        }
+      },
+      "title": "PhotoConcentricConfig",
+      "type": "object"
+    },
     "PhotoContourConfig": {
       "properties": {
         "overscan": {
@@ -446,6 +810,89 @@
         }
       },
       "title": "PhotoContourConfig",
+      "type": "object"
+    },
+    "PhotoStippleConfig": {
+      "properties": {
+        "overscan": {
+          "default": 0.0,
+          "description": "Distance to expand (positive) or shrink (negative) the operation's clipping boundary.",
+          "title": "Overscan",
+          "type": "number"
+        },
+        "dots": {
+          "default": 5000,
+          "description": "Target number of stipple dots to generate.",
+          "exclusiveMinimum": 0,
+          "title": "Dots",
+          "type": "integer"
+        },
+        "image_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "File path to the source image to sample.",
+          "title": "Image Path"
+        },
+        "dot_size": {
+          "default": 0.1,
+          "description": "Length of the microscopic line used to draw a single dot.",
+          "exclusiveMinimum": 0.0,
+          "title": "Dot Size",
+          "type": "number"
+        },
+        "seed": {
+          "default": 42,
+          "description": "Random seed for repeatable point placement.",
+          "title": "Seed",
+          "type": "integer"
+        }
+      },
+      "title": "PhotoStippleConfig",
+      "type": "object"
+    },
+    "PhotoTSPConfig": {
+      "properties": {
+        "overscan": {
+          "default": 0.0,
+          "description": "Distance to expand (positive) or shrink (negative) the operation's clipping boundary.",
+          "title": "Overscan",
+          "type": "number"
+        },
+        "nodes": {
+          "default": 2000,
+          "description": "Number of stipple points to generate and connect.",
+          "exclusiveMinimum": 1,
+          "title": "Nodes",
+          "type": "integer"
+        },
+        "image_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "File path to the source image to sample.",
+          "title": "Image Path"
+        },
+        "seed": {
+          "default": 42,
+          "description": "Random seed for repeatable point placement.",
+          "title": "Seed",
+          "type": "integer"
+        }
+      },
+      "title": "PhotoTSPConfig",
       "type": "object"
     },
     "PhotoWaveConfig": {
@@ -615,6 +1062,44 @@
       "title": "Step_add_boundary",
       "type": "object"
     },
+    "Step_chaotic": {
+      "properties": {
+        "operation": {
+          "const": "chaotic",
+          "description": "Execute the 'chaotic' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/ChaoticConfig",
+          "description": "Settings for 'chaotic'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_chaotic",
+      "type": "object"
+    },
+    "Step_chladni": {
+      "properties": {
+        "operation": {
+          "const": "chladni",
+          "description": "Execute the 'chladni' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/ChladniConfig",
+          "description": "Settings for 'chladni'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_chladni",
+      "type": "object"
+    },
     "Step_clip": {
       "properties": {
         "operation": {
@@ -691,6 +1176,25 @@
       "title": "Step_deduplicate",
       "type": "object"
     },
+    "Step_flow_field": {
+      "properties": {
+        "operation": {
+          "const": "flow_field",
+          "description": "Execute the 'flow_field' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/FlowFieldConfig",
+          "description": "Settings for 'flow_field'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_flow_field",
+      "type": "object"
+    },
     "Step_generate_in_cells": {
       "properties": {
         "operation": {
@@ -748,6 +1252,44 @@
       "title": "Step_guilloche",
       "type": "object"
     },
+    "Step_hexagon": {
+      "properties": {
+        "operation": {
+          "const": "hexagon",
+          "description": "Execute the 'hexagon' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/HexagonConfig",
+          "description": "Settings for 'hexagon'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_hexagon",
+      "type": "object"
+    },
+    "Step_hilbert": {
+      "properties": {
+        "operation": {
+          "const": "hilbert",
+          "description": "Execute the 'hilbert' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/HilbertConfig",
+          "description": "Settings for 'hilbert'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_hilbert",
+      "type": "object"
+    },
     "Step_image_mask": {
       "properties": {
         "operation": {
@@ -784,6 +1326,25 @@
         "operation"
       ],
       "title": "Step_image_outline",
+      "type": "object"
+    },
+    "Step_lichtenberg": {
+      "properties": {
+        "operation": {
+          "const": "lichtenberg",
+          "description": "Execute the 'lichtenberg' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/LichtenbergConfig",
+          "description": "Settings for 'lichtenberg'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_lichtenberg",
       "type": "object"
     },
     "Step_merge": {
@@ -843,6 +1404,63 @@
       "title": "Step_optimize",
       "type": "object"
     },
+    "Step_peano": {
+      "properties": {
+        "operation": {
+          "const": "peano",
+          "description": "Execute the 'peano' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/PeanoConfig",
+          "description": "Settings for 'peano'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_peano",
+      "type": "object"
+    },
+    "Step_penrose": {
+      "properties": {
+        "operation": {
+          "const": "penrose",
+          "description": "Execute the 'penrose' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/PenroseConfig",
+          "description": "Settings for 'penrose'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_penrose",
+      "type": "object"
+    },
+    "Step_photo_concentric": {
+      "properties": {
+        "operation": {
+          "const": "photo_concentric",
+          "description": "Execute the 'photo_concentric' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/PhotoConcentricConfig",
+          "description": "Settings for 'photo_concentric'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_photo_concentric",
+      "type": "object"
+    },
     "Step_photo_contour": {
       "properties": {
         "operation": {
@@ -860,6 +1478,44 @@
         "operation"
       ],
       "title": "Step_photo_contour",
+      "type": "object"
+    },
+    "Step_photo_stipple": {
+      "properties": {
+        "operation": {
+          "const": "photo_stipple",
+          "description": "Execute the 'photo_stipple' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/PhotoStippleConfig",
+          "description": "Settings for 'photo_stipple'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_photo_stipple",
+      "type": "object"
+    },
+    "Step_photo_tsp": {
+      "properties": {
+        "operation": {
+          "const": "photo_tsp",
+          "description": "Execute the 'photo_tsp' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/PhotoTSPConfig",
+          "description": "Settings for 'photo_tsp'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_photo_tsp",
       "type": "object"
     },
     "Step_photo_wave": {
@@ -957,6 +1613,25 @@
       "title": "Step_spiral",
       "type": "object"
     },
+    "Step_triangle": {
+      "properties": {
+        "operation": {
+          "const": "triangle",
+          "description": "Execute the 'triangle' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/TriangleConfig",
+          "description": "Settings for 'triangle'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_triangle",
+      "type": "object"
+    },
     "Step_venation": {
       "properties": {
         "operation": {
@@ -1012,6 +1687,25 @@
         "operation"
       ],
       "title": "Step_zoom",
+      "type": "object"
+    },
+    "TriangleConfig": {
+      "properties": {
+        "overscan": {
+          "default": 0.0,
+          "description": "Distance to expand (positive) or shrink (negative) the operation's clipping boundary.",
+          "title": "Overscan",
+          "type": "number"
+        },
+        "cell_size": {
+          "default": 5.0,
+          "description": "Side length of the equilateral triangles forming the grid.",
+          "exclusiveMinimum": 0.0,
+          "title": "Cell Size",
+          "type": "number"
+        }
+      },
+      "title": "TriangleConfig",
       "type": "object"
     },
     "VenationConfig": {
@@ -1230,9 +1924,45 @@
       },
       {
         "$ref": "#/$defs/Step_photo_wave"
+      },
+      {
+        "$ref": "#/$defs/Step_photo_tsp"
+      },
+      {
+        "$ref": "#/$defs/Step_photo_stipple"
+      },
+      {
+        "$ref": "#/$defs/Step_photo_concentric"
+      },
+      {
+        "$ref": "#/$defs/Step_lichtenberg"
+      },
+      {
+        "$ref": "#/$defs/Step_chaotic"
+      },
+      {
+        "$ref": "#/$defs/Step_hilbert"
+      },
+      {
+        "$ref": "#/$defs/Step_peano"
+      },
+      {
+        "$ref": "#/$defs/Step_penrose"
+      },
+      {
+        "$ref": "#/$defs/Step_hexagon"
+      },
+      {
+        "$ref": "#/$defs/Step_triangle"
+      },
+      {
+        "$ref": "#/$defs/Step_chladni"
+      },
+      {
+        "$ref": "#/$defs/Step_flow_field"
       }
     ]
   },
-  "title": "RootModel[List[Union[Step_clip, Step_deduplicate, Step_image_mask, Step_optimize, Step_simplify, Step_connect_continuous, Step_merge, Step_scale, Step_zoom, Step_generate_in_cells, Step_polygonize, Step_guilloche, Step_spiral, Step_voronoi_dual, Step_grid_lines, Step_add_boundary, Step_venation, Step_concentric, Step_offset_fill, Step_photo_contour, Step_image_outline, Step_photo_wave]]]",
+  "title": "RootModel[List[Union[Step_clip, Step_deduplicate, Step_image_mask, Step_optimize, Step_simplify, Step_connect_continuous, Step_merge, Step_scale, Step_zoom, Step_generate_in_cells, Step_polygonize, Step_guilloche, Step_spiral, Step_voronoi_dual, Step_grid_lines, Step_add_boundary, Step_venation, Step_concentric, Step_offset_fill, Step_photo_contour, Step_image_outline, Step_photo_wave, Step_photo_tsp, Step_photo_stipple, Step_photo_concentric, Step_lichtenberg, Step_chaotic, Step_hilbert, Step_peano, Step_penrose, Step_hexagon, Step_triangle, Step_chladni, Step_flow_field]]]",
   "type": "array"
 }
