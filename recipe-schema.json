@@ -314,6 +314,7 @@
               "type": "null"
             }
           ],
+          "default": null,
           "description": "Optional configuration to dynamically modulate a setting based on an image."
         }
       },
@@ -332,7 +333,7 @@
           "type": "number"
         },
         "spacing": {
-          "default": 0.5,
+          "default": 5,
           "description": "Distance between consecutive lines.",
           "title": "Spacing",
           "type": "number"
@@ -340,6 +341,11 @@
         "orientation": {
           "default": "horizontal",
           "description": "Orientation of lines: 'horizontal', 'vertical', or 'crosshatch'.",
+          "enum": [
+            "horizontal",
+            "vertical",
+            "crosshatch"
+          ],
           "title": "Orientation",
           "type": "string"
         }
@@ -504,30 +510,32 @@
     "ImageModulatorConfig": {
       "properties": {
         "image_path": {
-          "default": "",
           "description": "File path to the source image to sample.",
           "title": "Image Path",
           "type": "string"
         },
         "target_setting": {
-          "default": "revolutions",
           "description": "The parameter name in the sub-generator to modulate (e.g., 'revolutions', 'spacing').",
           "title": "Target Setting",
           "type": "string"
         },
         "min_val": {
-          "default": 0.0,
           "description": "The setting value when the image is pure white (0% darkness).",
           "title": "Min Val",
           "type": "number"
         },
         "max_val": {
-          "default": 1.0,
           "description": "The setting value when the image is pure black (100% darkness).",
           "title": "Max Val",
           "type": "number"
         }
       },
+      "required": [
+        "image_path",
+        "target_setting",
+        "min_val",
+        "max_val"
+      ],
       "title": "ImageModulatorConfig",
       "type": "object"
     },

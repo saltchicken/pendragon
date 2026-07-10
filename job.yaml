@@ -1,9 +1,7 @@
 # yaml-language-server: $schema=./recipe-schema.json
 
-- operation: photo_stipple
+- operation: grid_lines
   settings:
     overscan: 0
-    dots: 5000
-    image_path: "images/loz.jpg"
-    dot_size: 0.1
-    seed: 42
+    spacing: 5
+    orientation: horizontal

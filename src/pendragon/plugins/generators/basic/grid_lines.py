@@ -1,6 +1,5 @@
-# src/pendragon/plugins/generators/basic/grid_lines.py
 import math
-from typing import List, Optional
+from typing import List, Optional, Literal
 
 from loguru import logger
 from pydantic import Field
@@ -15,9 +14,9 @@ from pendragon.core import register_operation
 
 
 class GridLinesConfig(BasePluginConfig):
-    spacing: float = Field(default=0.5,
+    spacing: float = Field(default=5,
                            description="Distance between consecutive lines.")
-    orientation: str = Field(
+    orientation: Literal["horizontal", "vertical", "crosshatch"] = Field(
         default="horizontal",
         description=
         "Orientation of lines: 'horizontal', 'vertical', or 'crosshatch'.")

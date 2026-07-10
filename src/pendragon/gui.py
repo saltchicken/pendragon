@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import get_args, get_origin, Any, Dict, List, Literal
 
 from loguru import logger
 import numpy as np
@@ -18,6 +18,7 @@ from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 from PyQt5.QtWidgets import QSpinBox
 from PyQt5.QtWidgets import QLineEdit
+from PyQt5.QtWidgets import QComboBox
 
 from shapely.geometry import MultiPolygon
 from shapely.geometry import Polygon
@@ -219,6 +220,7 @@ class LiveEditorWindow(QMainWindow):
 
         for field_name, field_info in operation.config.model_fields.items():
             current_value = getattr(operation.config, field_name)
+            origin = get_origin(field_info.annotation)
 
             # --- Handle Float Parameters (Existing Logic) ---
             if field_info.annotation == float:
@@ -263,6 +265,33 @@ class LiveEditorWindow(QMainWindow):
                 spin_box.valueChanged.connect(update_int_wrapper)
                 
                 h_layout.addWidget(spin_box)
+                self.form_layout.addRow(field_name, container)
+
+            elif origin is Literal:
+                container = QWidget()
+                h_layout = QHBoxLayout(container)
+                h_layout.setContentsMargins(0, 0, 0, 0)
+
+                combo_box = QComboBox()
+                
+                # get_args extracts the allowed values from the Literal
+                # e.g., ("horizontal", "vertical", "crosshatch")
+                allowed_options = get_args(field_info.annotation)
+                combo_box.addItems([str(opt) for opt in allowed_options])
+
+                # Set the current active text
+                if current_value in allowed_options:
+                    combo_box.setCurrentText(str(current_value))
+                elif allowed_options:
+                    combo_box.setCurrentText(str(allowed_options[0]))
+
+                def update_literal_wrapper(text, fname=field_name, idx=op_index):
+                    self.update_parameter(idx, fname, text)
+
+                # currentTextChanged fires whenever the user selects a new dropdown option
+                combo_box.currentTextChanged.connect(update_literal_wrapper)
+                
+                h_layout.addWidget(combo_box)
                 self.form_layout.addRow(field_name, container)
 
             # --- Handle String Parameters ---
