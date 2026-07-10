@@ -1,5 +1,5 @@
 import math
-from typing import List
+from typing import List, Optional
 
 from loguru import logger
 import numpy as np
@@ -11,7 +11,7 @@ from shapely.ops import linemerge
 
 from pendragon.core import CenteredPluginConfig
 from pendragon.core import PipelineOperation
-from pendragon.core import PipelineState
+from pendragon.core import PipelineState, PipelineContext
 from pendragon.core import register_operation
 from pendragon.utils import extract_target_polygons
 
@@ -40,18 +40,16 @@ class LichtenbergGen(PipelineOperation):
     (Rapidly-exploring Random Tree) algorithm confined to the boundary.
     """
 
-    def process(self, state: PipelineState) -> PipelineState:
+    def process(self, state: PipelineState, context: Optional[PipelineContext] = None) -> PipelineState:
         cfg = self.config or LichtenbergConfig()
-        
+        ctx = context or PipelineContext()
         effective_boundary = self.get_effective_boundary(state)
 
         if not effective_boundary or effective_boundary.is_empty:
             logger.warning("No boundary available. Skipping lichtenberg.")
             return state
 
-        # Handle distinct, non-contiguous boundaries safely
         polygons = extract_target_polygons(effective_boundary, cfg.group_boundaries)
-        
         logger.info(
             f"Generating Lichtenberg fractals ({cfg.nodes} nodes max) "
             f"across {len(polygons)} boundary region(s)..."
@@ -63,13 +61,11 @@ class LichtenbergGen(PipelineOperation):
         for poly in polygons:
             minx, miny, maxx, maxy = poly.bounds
             
-            # Determine the root of the fractal tree
-            cx = cfg.center_x if cfg.center_x is not None else poly.centroid.x
-            cy = cfg.center_y if cfg.center_y is not None else poly.centroid.y
+            # Fallback hierarchy: Context -> YAML Config -> Geometry Centroid
+            cx = ctx.local_center_x if ctx.local_center_x is not None else (cfg.center_x if cfg.center_x is not None else poly.centroid.x)
+            cy = ctx.local_center_y if ctx.local_center_y is not None else (cfg.center_y if cfg.center_y is not None else poly.centroid.y)
             root_pt = Point(cx, cy)
             
-            # If the calculated root is outside the polygon (e.g., a crescent shape),
-            # randomly hunt for a valid starting point inside the shape.
             if not poly.contains(root_pt):
                 for _ in range(100):
                     root_pt = Point(
@@ -79,27 +75,21 @@ class LichtenbergGen(PipelineOperation):
                     if poly.contains(root_pt):
                         break
 
-            # 1. Pre-allocate NumPy matrix for lightning-fast vectorized distance calculation
             nodes_arr = np.zeros((cfg.nodes, 2))
             nodes_arr[0] = [root_pt.x, root_pt.y]
             current_size = 1
-            
             raw_segments = []
 
-            # Pre-generate a massive batch of random target points to grow towards
             max_attempts = cfg.nodes * 10
             rand_xs = np.random.uniform(minx, maxx, max_attempts)
             rand_ys = np.random.uniform(miny, maxy, max_attempts)
 
-            # 2. Grow the Rapidly-exploring Random Tree (RRT)
             for i in range(max_attempts):
                 if current_size >= cfg.nodes:
                     break
                     
                 rx, ry = rand_xs[i], rand_ys[i]
                 
-                # Fast Vectorized Nearest-Neighbor: 
-                # Calculate distance from the new random point to ALL existing nodes instantly
                 valid_nodes = nodes_arr[:current_size]
                 diff = valid_nodes - np.array([rx, ry])
                 sq_dists = diff[:, 0]**2 + diff[:, 1]**2
@@ -111,20 +101,17 @@ class LichtenbergGen(PipelineOperation):
                 if dist == 0:
                     continue
                     
-                # Steer towards the random point by exactly `spacing`
                 step = min(cfg.spacing, dist)
                 new_x = nx + (rx - nx) * (step / dist)
                 new_y = ny + (ry - ny) * (step / dist)
                 
                 segment = LineString([(nx, ny), (new_x, new_y)])
                 
-                # Only add the branch if it stays strictly inside the geometry
                 if poly.contains(segment):
                     nodes_arr[current_size] = [new_x, new_y]
                     current_size += 1
                     raw_segments.append(segment)
 
-            # 3. Weld the fragmented segments into continuous paths
             if raw_segments:
                 merged_geometry = linemerge(raw_segments)
                 

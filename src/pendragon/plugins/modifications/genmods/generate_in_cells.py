@@ -1,5 +1,6 @@
+import inspect
 import math
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from loguru import logger
 from pydantic import BaseModel
@@ -10,7 +11,7 @@ from shapely.ops import unary_union
 
 from pendragon.core import BasePluginConfig
 from pendragon.core import PipelineOperation
-from pendragon.core import PipelineState
+from pendragon.core import PipelineState, PipelineContext
 from pendragon.core import register_operation
 from pendragon.core.registry import OPERATION_REGISTRY
 from pendragon.utils import ImageSampler
@@ -64,7 +65,7 @@ class GenerateInCellsConfig(BasePluginConfig):
         default=1e-5,
         description="Grid size for snapping vertices to resolve floating-point gaps. Set to 0 to disable."
     )
-    image_modulator: ImageModulatorConfig | None = Field(
+    image_modulator: Optional[ImageModulatorConfig] = Field(
         default=None,
         description="Optional configuration to dynamically modulate a setting based on an image."
     )
@@ -73,7 +74,7 @@ class GenerateInCellsConfig(BasePluginConfig):
 @register_operation("generate_in_cells", config_class=GenerateInCellsConfig)
 class GenerateInCellsOp(PipelineOperation):
 
-    def process(self, state: PipelineState) -> PipelineState:
+    def process(self, state: PipelineState, context: Optional[PipelineContext] = None) -> PipelineState:
         cfg = self.config or GenerateInCellsConfig()
         current_lines = state.lines
 
@@ -119,21 +120,22 @@ class GenerateInCellsOp(PipelineOperation):
 
         # 6. Iterate over every isolated cell
         for poly in polygons:
+            # We no longer modify the static sub_config. It stays exactly as the user wrote it.
             cell_settings = cfg.generator_settings.copy()
             centroid = poly.centroid
-
-            if cfg.auto_center:
-                cell_settings["center_x"] = centroid.x
-                cell_settings["center_y"] = centroid.y
+            
+            ctx_center_x = centroid.x if cfg.auto_center else None
+            ctx_center_y = centroid.y if cfg.auto_center else None
+            ctx_rotation = None
+            ctx_vars = {}
 
             # Apply Geometry-Aware Rotation logic
             if cfg.auto_rotate:
                 min_rect = poly.minimum_rotated_rectangle
+                best_angle = 0.0
                 if min_rect.geom_type == 'Polygon':
                     coords = list(min_rect.exterior.coords)
                     longest_length = -1
-                    best_angle = 0.0
-                    # Find the longest edge of the bounding rectangle
                     for i in range(len(coords) - 1):
                         p1, p2 = coords[i], coords[i+1]
                         dx, dy = p2[0] - p1[0], p2[1] - p1[1]
@@ -141,27 +143,29 @@ class GenerateInCellsOp(PipelineOperation):
                         if length > longest_length:
                             longest_length = length
                             best_angle = math.degrees(math.atan2(dy, dx))
-                    
-                    # Normalize angle to 0-180 for consistent geometric fills
-                    cell_settings[cfg.rotation_setting] = best_angle % 180.0
+                    ctx_rotation = best_angle % 180.0
                 elif min_rect.geom_type == 'LineString':
-                    # Edge case: degenerate cell that collapsed into a line
                     coords = list(min_rect.coords)
                     dx, dy = coords[-1][0] - coords[0][0], coords[-1][1] - coords[0][1]
-                    cell_settings[cfg.rotation_setting] = math.degrees(math.atan2(dy, dx)) % 180.0
+                    ctx_rotation = math.degrees(math.atan2(dy, dx)) % 180.0
+                
+                # Make the rotation available generally and strictly under the configured string
+                ctx_vars[cfg.rotation_setting] = ctx_rotation
 
             # Apply Image Modulation logic
             if sampler and cfg.image_modulator:
                 darkness = sampler.get_darkness(centroid.x, centroid.y)
-                
-                # Linear interpolation between min_val and max_val based on darkness (0.0 to 1.0)
                 val_range = cfg.image_modulator.max_val - cfg.image_modulator.min_val
                 modulated_value = cfg.image_modulator.min_val + (darkness * val_range)
-                
-                # Dynamically overwrite the target setting for this specific cell
-                cell_settings[cfg.image_modulator.target_setting] = modulated_value
+                ctx_vars[cfg.image_modulator.target_setting] = modulated_value
 
-            # Validate the dynamic sub-configuration
+            cell_context = PipelineContext(
+                local_center_x=ctx_center_x,
+                local_center_y=ctx_center_y,
+                local_rotation=ctx_rotation,
+                variables=ctx_vars
+            )
+
             sub_config = None
             if SubConfigClass:
                 try:
@@ -172,15 +176,19 @@ class GenerateInCellsOp(PipelineOperation):
 
             sub_gen = SubGenClass(config=sub_config)
 
-            # Create a temporary local state confined to this specific cell
             temp_state = PipelineState(
                 boundary=poly,
                 lines=[],
                 operation_name=f"cell_{cfg.generator}"
             )
 
-            # Execute the sub-generator and collect the output
-            result_state = sub_gen.process(temp_state)
+            # Safely Execute the sub-generator
+            sig = inspect.signature(sub_gen.process)
+            if 'context' in sig.parameters:
+                result_state = sub_gen.process(temp_state, context=cell_context)
+            else:
+                result_state = sub_gen.process(temp_state)
+                
             all_new_lines.extend(result_state.lines)
 
         logger.success(f"Generated {len(all_new_lines)} paths across {len(polygons)} cells.")
@@ -190,7 +198,6 @@ class GenerateInCellsOp(PipelineOperation):
             logger.info("Keeping original scaffolding lines in the output.")
             final_lines = current_lines + all_new_lines
 
-        # 7. Return the unified lines, preserving the original global boundary
         return PipelineState(
             boundary=state.boundary,
             lines=final_lines,

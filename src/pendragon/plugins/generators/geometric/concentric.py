@@ -1,5 +1,5 @@
 import math
-from typing import List
+from typing import List, Optional
 
 from loguru import logger
 import numpy as np
@@ -9,7 +9,7 @@ from shapely.geometry import MultiLineString
 
 from pendragon.core import CenteredPluginConfig
 from pendragon.core import PipelineOperation
-from pendragon.core import PipelineState
+from pendragon.core import PipelineState, PipelineContext
 from pendragon.core import register_operation
 from pendragon.utils import extract_target_polygons
 
@@ -42,12 +42,12 @@ class ConcentricConfig(CenteredPluginConfig):
 class ConcentricGen(PipelineOperation):
     """Generates concentric rings or polygons clipped to the boundary."""
 
-    def process(self, state: PipelineState) -> PipelineState:
+    def process(self, state: PipelineState, context: Optional[PipelineContext] = None) -> PipelineState:
         cfg = self.config or ConcentricConfig()
+        ctx = context or PipelineContext()
         boundary = self.get_effective_boundary(state)
 
         polygons = extract_target_polygons(boundary, cfg.group_boundaries)
-
         clipped_lines: List[LineString] = []
 
         logger.info(
@@ -55,27 +55,26 @@ class ConcentricGen(PipelineOperation):
             f"across {len(polygons)} boundary region(s)."
         )
 
-        if cfg.spacing <= 0:
+        spacing = ctx.variables.get("spacing", cfg.spacing)
+        if spacing <= 0:
             logger.error("Spacing must be greater than 0.")
             return state
 
-        # Generate the list of radiuses we need to draw
-        radiuses = np.arange(cfg.min_radius, cfg.max_radius + 1e-9, cfg.spacing)
+        radiuses = np.arange(cfg.min_radius, cfg.max_radius + 1e-9, spacing)
 
         for poly in polygons:
-            # Fallback to centroid if coordinates are not strictly defined
-            cx = cfg.center_x if cfg.center_x is not None else poly.centroid.x
-            cy = cfg.center_y if cfg.center_y is not None else poly.centroid.y
+            # Fallback hierarchy: Context -> YAML Config -> Geometry Centroid
+            cx = ctx.local_center_x if ctx.local_center_x is not None else (cfg.center_x if cfg.center_x is not None else poly.centroid.x)
+            cy = ctx.local_center_y if ctx.local_center_y is not None else (cfg.center_y if cfg.center_y is not None else poly.centroid.y)
+            rot = ctx.variables.get("rotation", ctx.local_rotation if ctx.local_rotation is not None else cfg.rotation)
 
-            # Calculate the angular steps once per polygon center
-            # Adding 1 to sides ensures the path closes back on itself (0 to 2π)
-            theta = np.linspace(0, 2 * math.pi, cfg.sides + 1) + math.radians(cfg.rotation)
+            theta = np.linspace(0, 2 * math.pi, cfg.sides + 1) + math.radians(rot)
             cos_theta = np.cos(theta)
             sin_theta = np.sin(theta)
 
             for r in radiuses:
                 if r <= 0:
-                    continue  # Can't draw a LineString with a radius of 0
+                    continue 
 
                 x = cx + r * cos_theta
                 y = cy + r * sin_theta
@@ -83,7 +82,6 @@ class ConcentricGen(PipelineOperation):
                 coords = np.column_stack((x, y))
                 raw_pattern_line = LineString(coords)
 
-                # Standard boundary intersection and clipping
                 if raw_pattern_line.intersects(poly):
                     clipped = raw_pattern_line.intersection(poly)
 

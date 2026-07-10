@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from loguru import logger
 import numpy as np
@@ -11,7 +11,7 @@ from shapely.ops import linemerge
 
 from pendragon.core import CenteredPluginConfig
 from pendragon.core import PipelineOperation
-from pendragon.core import PipelineState
+from pendragon.core import PipelineState, PipelineContext
 from pendragon.core import register_operation
 
 
@@ -44,15 +44,17 @@ class VenationConfig(CenteredPluginConfig):
 class VenationGen(PipelineOperation):
     """Generates organic branching structures using the Space Colonization Algorithm."""
 
-    def process(self, state: PipelineState) -> PipelineState:
+    def process(self, state: PipelineState, context: Optional[PipelineContext] = None) -> PipelineState:
         cfg = self.config or VenationConfig()
+        ctx = context or PipelineContext()
         boundary = self.get_effective_boundary(state)
         minx, miny, maxx, maxy = boundary.bounds
 
-        # Check if center_x and center_y were injected by generate_in_cells
-        # TODO: This is hacky, I want plugins to operate without needing to know anything about generate_in_cells
-        root_x = cfg.center_x if cfg.center_x is not None else cfg.root_x
-        root_y = cfg.center_y if cfg.center_y is not None else cfg.root_y
+        # Clean fallback hierarchy for the venation root 
+        root_x = ctx.local_center_x if ctx.local_center_x is not None else (cfg.center_x if cfg.center_x is not None else cfg.root_x)
+        root_y = ctx.local_center_y if ctx.local_center_y is not None else (cfg.center_y if cfg.center_y is not None else cfg.root_y)
+        
+        segment_length = ctx.variables.get("segment_length", cfg.segment_length)
 
         logger.info(
             f"Generating venation pattern from root ({root_x}, {root_y}) "
@@ -64,7 +66,6 @@ class VenationGen(PipelineOperation):
         xs = np.random.uniform(minx, maxx, cfg.num_leaves)
         ys = np.random.uniform(miny, maxy, cfg.num_leaves)
 
-        # Keep only the leaves that strictly fall inside the complex boundary
         valid_leaves = []
         for lx, ly in zip(xs, ys):
             if boundary.contains(Point(lx, ly)):
@@ -76,7 +77,6 @@ class VenationGen(PipelineOperation):
             return state
 
         # 2. Initialize the network with a single root node
-
         nodes = np.array([[root_x, root_y]])
         raw_lines = []
 
@@ -86,20 +86,17 @@ class VenationGen(PipelineOperation):
             if len(leaves) == 0:
                 break
 
-            # Build spatial index for fast nearest-neighbor lookups
             node_tree = cKDTree(nodes)
             distances, indices = node_tree.query(
                 leaves, distance_upper_bound=cfg.attract_distance)
 
-            active_nodes = {
-            }  # node_index -> list of normalized direction vectors
+            active_nodes = {}  
             leaves_to_remove = []
 
             for i, (dist, node_idx) in enumerate(zip(distances, indices)):
                 if dist < cfg.kill_distance:
                     leaves_to_remove.append(i)
                 elif dist < cfg.attract_distance and node_idx != len(nodes):
-                    # Calculate vector from node to leaf
                     leaf = leaves[i]
                     node = nodes[node_idx]
                     direction = leaf - node
@@ -110,30 +107,25 @@ class VenationGen(PipelineOperation):
                             active_nodes[node_idx] = []
                         active_nodes[node_idx].append(direction)
 
-            # Halt if the network has stalled
             if not active_nodes and not leaves_to_remove:
                 break
 
-            # Remove consumed leaves
             if leaves_to_remove:
                 leaves = np.delete(leaves, leaves_to_remove, axis=0)
 
-            # Grow active nodes toward the average direction of their attractors
             new_nodes = []
             for node_idx, vectors in active_nodes.items():
                 avg_dir = np.mean(vectors, axis=0)
                 norm = np.linalg.norm(avg_dir)
                 if norm > 0:
                     avg_dir = avg_dir / norm
-                    new_pos = nodes[node_idx] + avg_dir * cfg.segment_length
+                    new_pos = nodes[node_idx] + avg_dir * segment_length
                     new_nodes.append(new_pos)
                     raw_lines.append(LineString([nodes[node_idx], new_pos]))
 
             if new_nodes:
                 nodes = np.vstack((nodes, new_nodes))
 
-        # --- THE FIX: MERGE THE INTERLEAVED SEGMENTS ---
-        # linemerge joins contiguous segments into long paths, breaking only at branching junctions
         merged_geometry = linemerge(raw_lines)
 
         merged_lines = []
@@ -142,7 +134,7 @@ class VenationGen(PipelineOperation):
         elif isinstance(merged_geometry, MultiLineString):
             merged_lines = list(merged_geometry.geoms)
         else:
-            merged_lines = raw_lines  # Safe fallback if something bizarre happens
+            merged_lines = raw_lines  
 
         logger.info(
             f"Growth complete. Merged {len(raw_lines)} micro-segments into {len(merged_lines)} contiguous branches."

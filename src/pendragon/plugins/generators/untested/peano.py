@@ -1,112 +1,65 @@
 import math
-from typing import List
+from typing import List, Optional
 
 from loguru import logger
 from pydantic import Field
 from shapely.geometry import LineString, MultiLineString
 
-from pendragon.core import (
-    BasePluginConfig,
-    PipelineOperation,
-    PipelineState,
-    register_operation,
-)
+from pendragon.core import BasePluginConfig, PipelineOperation, PipelineState, PipelineContext, register_operation
 
 class PeanoConfig(BasePluginConfig):
-    spacing: float = Field(
-        default=2.0, 
-        gt=0.0,
-        description="Target spacing between the parallel lines of the curve."
-    )
-
+    spacing: float = Field(default=2.0, gt=0.0, description="Target spacing between lines.")
 
 @register_operation("peano", config_class=PeanoConfig)
 class PeanoGen(PipelineOperation):
-    """Generates a mathematically exact, continuous base-3 Peano space-filling curve."""
-
-    def process(self, state: PipelineState) -> PipelineState:
+    def process(self, state: PipelineState, context: Optional[PipelineContext] = None) -> PipelineState:
         cfg = self.config or PeanoConfig()
-        
-        # 1. Acquire the boundary geometry (factoring in overscan if configured)
+        ctx = context or PipelineContext()
         effective_boundary = self.get_effective_boundary(state)
 
-        if not effective_boundary or effective_boundary.is_empty:
-            logger.warning("No boundary available. Skipping peano.")
-            return state
+        if not effective_boundary or effective_boundary.is_empty: return state
+
+        spacing = ctx.variables.get("spacing", cfg.spacing)
+        safe_spacing = max(spacing, 0.1)
 
         minx, miny, maxx, maxy = effective_boundary.bounds
-        width = maxx - minx
-        height = maxy - miny
+        width, height = maxx - minx, maxy - miny
         size = max(width, height)
-        safe_spacing = max(cfg.spacing, 0.1)
-
-        logger.info(f"Generating Peano curve with target spacing {safe_spacing}...")
-
-        # Calculate required recursion depth based on bounding box size
-        if size > safe_spacing:
-            order = int(math.ceil(math.log(size / safe_spacing, 3)))
-        else:
-            order = 1
-
-        # Cap order at 5 (59,049 points) to prevent massive memory/CPU usage
+        order = int(math.ceil(math.log(size / safe_spacing, 3))) if size > safe_spacing else 1
         order = min(max(order, 1), 5)
+
+        logger.info(f"Generating Peano curve (order={order}) with spacing {safe_spacing}...")
+
         num_points = 9**order
         pts = []
-
-        cells_per_axis = 3**order
-        cell_size = size / cells_per_axis
+        cell_size = size / (3**order)
 
         for i in range(num_points):
-            # Extract base-3 digits (2 digits per order level)
-            temp = i
-            digits = []
+            temp, digits = i, []
             for _ in range(2 * order):
                 digits.append(temp % 3)
                 temp //= 3
             digits.reverse()
 
-            x_grid, y_grid = 0, 0
-            sum_t_even = 0
-            sum_t_odd = 0
-
-            # Compute exact grid coordinates using parity rules
+            x_grid, y_grid, sum_t_even, sum_t_odd = 0, 0, 0, 0
             for k in range(1, order + 1):
-                t_odd = digits[2 * k - 2]
-                t_even = digits[2 * k - 1]
-
-                # Compute x_k (inverts if sum of previous evens is odd)
-                if sum_t_even % 2 == 0:
-                    x_k = t_odd
-                else:
-                    x_k = 2 - t_odd
+                t_odd, t_even = digits[2 * k - 2], digits[2 * k - 1]
+                x_k = t_odd if sum_t_even % 2 == 0 else 2 - t_odd
                 sum_t_odd += t_odd
-
-                # Compute y_k (inverts if sum of previous odds is odd)
-                if sum_t_odd % 2 == 0:
-                    y_k = t_even
-                else:
-                    y_k = 2 - t_even
+                y_k = t_even if sum_t_odd % 2 == 0 else 2 - t_even
                 sum_t_even += t_even
 
-                # Accumulate the coordinate values
                 x_grid = x_grid * 3 + x_k
                 y_grid = y_grid * 3 + y_k
 
-            # Map to physical coordinates (centered in the cell)
-            px = minx + (x_grid + 0.5) * cell_size
-            py = miny + (y_grid + 0.5) * cell_size
-            pts.append((px, py))
+            pts.append((minx + (x_grid + 0.5) * cell_size, miny + (y_grid + 0.5) * cell_size))
 
-        if len(pts) < 2:
-            return state
+        if len(pts) < 2: return state
 
-        # 2. Clip the generated curve against the complex boundary
         raw_line = LineString(pts)
         clipped_lines: List[LineString] = []
-        
         if raw_line.intersects(effective_boundary):
             clipped = raw_line.intersection(effective_boundary)
-            
             if isinstance(clipped, LineString) and not clipped.is_empty:
                 clipped_lines.append(clipped)
             elif isinstance(clipped, MultiLineString):
@@ -115,10 +68,4 @@ class PeanoGen(PipelineOperation):
                         clipped_lines.append(sub_line)
 
         logger.success(f"Generated Peano curve. Retained {len(clipped_lines)} continuous paths.")
-
-        # 3. Return a new immutable state
-        return PipelineState(
-            boundary=state.boundary, 
-            lines=state.lines + clipped_lines,
-            operation_name="peano"
-        )
+        return PipelineState(boundary=state.boundary, lines=state.lines + clipped_lines, operation_name="peano")

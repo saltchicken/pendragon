@@ -8,7 +8,8 @@
     seed: 88 # Change this for different shard layouts
 
 # 2. Close the raw Voronoi lines into distinct geometric panes
-- operation: polygonize
+- operation: add_boundary
+# - operation: polygonize
 
 # 3. Fill every pane with an isolated, clipping-aware fractal
 - operation: generate_in_cells

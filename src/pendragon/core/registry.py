@@ -1,11 +1,10 @@
-from abc import ABC
-from abc import abstractmethod
-from typing import Type
+from abc import ABC, abstractmethod
+from typing import Type, Optional
 
 from pydantic import BaseModel
 from pydantic import Field
 
-from pendragon.core.models import PipelineState
+from pendragon.core.models import PipelineState, PipelineContext
 
 OPERATION_REGISTRY = {}
 
@@ -19,7 +18,7 @@ class BasePluginConfig(BaseModel):
     )
 
 
-def register_operation(name: str, config_class: Type[BaseModel] | None = None):
+def register_operation(name: str, config_class: Optional[Type[BaseModel]] = None):
 
     def decorator(cls: Type['PipelineOperation']):
         if not issubclass(cls, PipelineOperation):
@@ -34,7 +33,7 @@ def register_operation(name: str, config_class: Type[BaseModel] | None = None):
 
 class PipelineOperation(ABC):
 
-    def __init__(self, config: BaseModel | None = None) -> None:
+    def __init__(self, config: Optional[BaseModel] = None) -> None:
         """
         Base initialization for all pipeline operations.
         Automatically binds the Pydantic configuration model to the instance.
@@ -52,8 +51,8 @@ class PipelineOperation(ABC):
         return state.boundary
 
     @abstractmethod
-    def process(self, state: PipelineState) -> PipelineState:
+    def process(self, state: PipelineState, context: Optional[PipelineContext] = None) -> PipelineState:
         """
-        Takes the current state and returns a NEW PipelineState snapshot.
+        Takes the current state and context, and returns a NEW PipelineState snapshot.
         """
         pass

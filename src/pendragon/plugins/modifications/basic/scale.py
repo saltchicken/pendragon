@@ -1,60 +1,43 @@
-from typing import List
+from typing import List, Optional
 
 from loguru import logger
-from pydantic import BaseModel
-from pydantic import Field
+from pydantic import BaseModel, Field
 from shapely.affinity import scale
 from shapely.geometry import LineString
 
-from pendragon.core import PipelineOperation
-from pendragon.core import PipelineState
-from pendragon.core import register_operation
+from pendragon.core import PipelineOperation, PipelineState, PipelineContext, register_operation
 
 
 class ScaleConfig(BaseModel):
-    factor: float = Field(
-        default=1.0,
-        description="Uniform scaling multiplier (e.g., 2.0 doubles the size).")
-    origin: str = Field(
-        default="center",
-        description=
-        "Origin point for scaling: 'center', 'centroid', or an exact coordinate."
-    )
+    factor: float = Field(default=1.0, description="Uniform scaling multiplier.")
+    origin: str = Field(default="center", description="Origin point for scaling ('center', 'centroid', etc).")
 
 
 @register_operation("scale", config_class=ScaleConfig)
 class ScaleMod(PipelineOperation):
-    """Scales all current geometries uniformly."""
-
-    def process(self, state: PipelineState) -> PipelineState:
+    def process(self, state: PipelineState, context: Optional[PipelineContext] = None) -> PipelineState:
         cfg = self.config or ScaleConfig()
+        ctx = context or PipelineContext()
         current_lines = state.lines
 
-        if not current_lines:
-            logger.warning(
-                "No lines provided to the scale operation. Skipping.")
-            return state
+        if not current_lines: return state
 
-        logger.info(
-            f"Scaling {len(current_lines)} lines by a factor of {cfg.factor}..."
-        )
+        factor = ctx.variables.get("factor", cfg.factor)
+        origin = ctx.variables.get("origin", cfg.origin)
+
+        # Allow dynamic cells to scale perfectly from their local centers
+        if origin == "center" and ctx.local_center_x is not None and ctx.local_center_y is not None:
+            origin_coords = (ctx.local_center_x, ctx.local_center_y)
+        else:
+            origin_coords = origin
+
+        logger.info(f"Scaling {len(current_lines)} lines by a factor of {factor}...")
 
         scaled_lines: List[LineString] = []
-
         for line in current_lines:
-            if line.is_empty:
-                continue
-
-            # Shapely's scale handles the matrix math for us
-            scaled_geom = scale(line,
-                                xfact=cfg.factor,
-                                yfact=cfg.factor,
-                                origin=cfg.origin)
+            if line.is_empty: continue
+            scaled_geom = scale(line, xfact=factor, yfact=factor, origin=origin_coords)
             scaled_lines.append(scaled_geom)
 
         logger.success("Scaling complete.")
-
-        return PipelineState(
-            boundary=state.boundary,  # Keep the original boundary intact
-            lines=scaled_lines,
-            operation_name="scale")
+        return PipelineState(boundary=state.boundary, lines=scaled_lines, operation_name="scale")

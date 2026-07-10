@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from loguru import logger
 import numpy as np
@@ -10,7 +10,7 @@ from shapely.geometry import Polygon
 
 from pendragon.core import CenteredPluginConfig
 from pendragon.core import PipelineOperation
-from pendragon.core import PipelineState
+from pendragon.core import PipelineState, PipelineContext
 from pendragon.core import register_operation
 from pendragon.utils import extract_target_polygons
 
@@ -31,23 +31,25 @@ class SpiralConfig(CenteredPluginConfig):
 @register_operation("spiral", config_class=SpiralConfig)
 class SpiralGen(PipelineOperation):
 
-    def process(self, state: PipelineState) -> PipelineState:
+    def process(self, state: PipelineState, context: Optional[PipelineContext] = None) -> PipelineState:
         cfg = self.config or SpiralConfig()
+        ctx = context or PipelineContext()
         boundary = self.get_effective_boundary(state)
 
         polygons = extract_target_polygons(boundary, cfg.group_boundaries)
-
         clipped_lines: List[LineString] = []
+        
+        revolutions = ctx.variables.get("revolutions", cfg.revolutions)
 
-        logger.info(f"Generating spiral with {cfg.revolutions} revolutions "
+        logger.info(f"Generating spiral with {revolutions} revolutions "
                     f"across {len(polygons)} boundary region(s).")
 
         for poly in polygons:
-            # Fallback to centroid if coordinates are not strictly defined
-            cx = cfg.center_x if cfg.center_x is not None else poly.centroid.x
-            cy = cfg.center_y if cfg.center_y is not None else poly.centroid.y
+            # Fallback hierarchy: Context -> YAML Config -> Geometry Centroid
+            cx = ctx.local_center_x if ctx.local_center_x is not None else (cfg.center_x if cfg.center_x is not None else poly.centroid.x)
+            cy = ctx.local_center_y if ctx.local_center_y is not None else (cfg.center_y if cfg.center_y is not None else poly.centroid.y)
 
-            theta = np.linspace(0, cfg.revolutions * 2 * np.pi, cfg.steps)
+            theta = np.linspace(0, revolutions * 2 * np.pi, cfg.steps)
             r = np.linspace(cfg.start_radius, cfg.end_radius, cfg.steps)
 
             x = cx + r * np.cos(theta)

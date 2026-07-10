@@ -1,65 +1,49 @@
-from typing import List
+from typing import List, Optional
 
 from loguru import logger
-from pydantic import BaseModel
-from pydantic import Field
+from pydantic import BaseModel, Field
 from shapely.affinity import scale
-from shapely.geometry import LineString
-from shapely.geometry import MultiLineString
+from shapely.geometry import LineString, MultiLineString
 
-from pendragon.core import PipelineOperation
-from pendragon.core import PipelineState
-from pendragon.core import register_operation
+from pendragon.core import PipelineOperation, PipelineState, PipelineContext, register_operation
 
 
 class ZoomConfig(BaseModel):
-    factor: float = Field(
-        default=1.0,
-        description="Zoom multiplier (e.g., 2.0 zooms in 2x, 0.5 zooms out).")
-    origin: str = Field(
-        default="center",
-        description=
-        "Origin point for zoom: 'center', 'centroid', or an exact coordinate.")
+    factor: float = Field(default=1.0, description="Zoom multiplier.")
+    origin: str = Field(default="center", description="Origin point for zoom.")
 
 
 @register_operation("zoom", config_class=ZoomConfig)
 class ZoomMod(PipelineOperation):
-    """Magnifies geometries and clips them to the original bounding viewport."""
-
-    def process(self, state: PipelineState) -> PipelineState:
+    def process(self, state: PipelineState, context: Optional[PipelineContext] = None) -> PipelineState:
         cfg = self.config or ZoomConfig()
+        ctx = context or PipelineContext()
         current_lines = state.lines
         boundary = state.boundary
 
-        if not current_lines:
-            logger.warning("No lines provided to the zoom operation. Skipping.")
-            return state
+        if not current_lines: return state
+        
+        factor = ctx.variables.get("factor", cfg.factor)
+        origin = ctx.variables.get("origin", cfg.origin)
 
-        logger.info(
-            f"Zooming {len(current_lines)} lines by a factor of {cfg.factor}..."
-        )
+        if origin == "center" and ctx.local_center_x is not None and ctx.local_center_y is not None:
+            origin_coords = (ctx.local_center_x, ctx.local_center_y)
+        else:
+            origin_coords = origin
+
+        logger.info(f"Zooming {len(current_lines)} lines by a factor of {factor}...")
 
         scaled_lines: List[LineString] = []
-
-        # 1. Magnify the lines outward from the origin
         for line in current_lines:
-            if line.is_empty:
-                continue
-
-            scaled_geom = scale(line,
-                                xfact=cfg.factor,
-                                yfact=cfg.factor,
-                                origin=cfg.origin)
+            if line.is_empty: continue
+            scaled_geom = scale(line, xfact=factor, yfact=factor, origin=origin_coords)
             scaled_lines.append(scaled_geom)
 
-        # 2. Clip the magnified lines back to the original viewport
         clipped_lines: List[LineString] = []
-
         if boundary and not boundary.is_empty:
             for line in scaled_lines:
                 if line.intersects(boundary):
                     clipped = line.intersection(boundary)
-
                     if isinstance(clipped, LineString) and not clipped.is_empty:
                         clipped_lines.append(clipped)
                     elif isinstance(clipped, MultiLineString):
@@ -67,12 +51,7 @@ class ZoomMod(PipelineOperation):
                             if not sub_line.is_empty:
                                 clipped_lines.append(sub_line)
         else:
-            # Fallback if there is no boundary defined in the state
             clipped_lines = scaled_lines
 
-        logger.success(
-            f"Zoom complete. Yielded {len(clipped_lines)} bounded lines.")
-
-        return PipelineState(boundary=boundary,
-                             lines=clipped_lines,
-                             operation_name="zoom")
+        logger.success(f"Zoom complete. Yielded {len(clipped_lines)} bounded lines.")
+        return PipelineState(boundary=boundary, lines=clipped_lines, operation_name="zoom")
