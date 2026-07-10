@@ -14,7 +14,10 @@ from pendragon.utils import ImageSampler
 
 
 class ImageMaskConfig(BaseModel):
-    mask_image: str | None = None
+    mask_image: str = Field(
+        default="", 
+        description="Source image."
+    )
     threshold: float = Field(
         default=0.5,
         description="Darkness threshold (0.0 to 1.0) to keep lines.")
