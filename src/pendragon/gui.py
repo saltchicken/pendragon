@@ -16,6 +16,9 @@ from PyQt5.QtWidgets import QPushButton
 from PyQt5.QtWidgets import QSlider
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
+from PyQt5.QtWidgets import QSpinBox
+from PyQt5.QtWidgets import QLineEdit
+
 from shapely.geometry import MultiPolygon
 from shapely.geometry import Polygon
 from vispy import scene
@@ -217,7 +220,7 @@ class LiveEditorWindow(QMainWindow):
         for field_name, field_info in operation.config.model_fields.items():
             current_value = getattr(operation.config, field_name)
 
-            # --- Handle Root Float Parameters ---
+            # --- Handle Float Parameters (Existing Logic) ---
             if field_info.annotation == float:
                 container = QWidget()
                 h_layout = QHBoxLayout(container)
@@ -235,22 +238,52 @@ class LiveEditorWindow(QMainWindow):
                 h_layout.addWidget(slider)
                 h_layout.addWidget(value_label)
 
-                def update_wrapper(val,
-                                   fname=field_name,
-                                   idx=op_index,
-                                   lbl=value_label):
+                def update_float_wrapper(val, fname=field_name, idx=op_index, lbl=value_label):
                     real_val = val / 10.0
                     lbl.setText(f"{real_val:.1f}")
                     self.update_parameter(idx, fname, real_val)
 
-                slider.valueChanged.connect(update_wrapper)
+                slider.valueChanged.connect(update_float_wrapper)
+                self.form_layout.addRow(field_name, container)
+
+            # --- Handle Integer Parameters ---
+            elif field_info.annotation == int:
+                container = QWidget()
+                h_layout = QHBoxLayout(container)
+                h_layout.setContentsMargins(0, 0, 0, 0)
+
+                spin_box = QSpinBox()
+                spin_box.setRange(0, 10000) # Give it a generous default range
+                # If current_value is None for some reason, default to 0 to prevent crashes
+                spin_box.setValue(int(current_value) if current_value is not None else 0)
+
+                def update_int_wrapper(val, fname=field_name, idx=op_index):
+                    self.update_parameter(idx, fname, val)
+
+                spin_box.valueChanged.connect(update_int_wrapper)
+                
+                h_layout.addWidget(spin_box)
+                self.form_layout.addRow(field_name, container)
+
+            # --- Handle String Parameters ---
+            elif field_info.annotation == str:
+                container = QWidget()
+                h_layout = QHBoxLayout(container)
+                h_layout.setContentsMargins(0, 0, 0, 0)
+
+                # Initialize with existing string, or empty string if None
+                line_edit = QLineEdit(str(current_value) if current_value else "")
+
+                def update_str_wrapper(text, fname=field_name, idx=op_index):
+                    self.update_parameter(idx, fname, text)
+
+                line_edit.textChanged.connect(update_str_wrapper)
+                
+                h_layout.addWidget(line_edit)
                 self.form_layout.addRow(field_name, container)
 
             # --- Dynamic Poly-morphic Nested Settings Section ---
-            elif isinstance(current_value,
-                            dict) or field_info.annotation == dict or getattr(
-                                field_info.annotation, '__origin__',
-                                None) is dict:
+            elif isinstance(current_value, dict) or field_info.annotation == dict or getattr(field_info.annotation, '__origin__', None) is dict:
                 # Infer what the target sub-registry schema is by checking adjacent sibling attributes
                 # e.g., if we are looking at generator_settings, check if self.config.generator exists.
                 registry_key = None
