@@ -1,10 +1,9 @@
 # yaml-language-server: $schema=./recipe-schema.json
 
-- operation: chladni
+- operation: photo_stipple
   settings:
     overscan: 0
-    n: 3
-    m: 5
-    sign: -1
-    res: 0.5
-    simplify: 0
+    dots: 5000
+    image_path: "images/loz.jpg"
+    dot_size: 0.1
+    seed: 42

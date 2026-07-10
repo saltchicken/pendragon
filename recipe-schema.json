@@ -314,7 +314,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "description": "Optional configuration to dynamically modulate a setting based on an image."
         }
       },
@@ -505,32 +504,30 @@
     "ImageModulatorConfig": {
       "properties": {
         "image_path": {
+          "default": "",
           "description": "File path to the source image to sample.",
           "title": "Image Path",
           "type": "string"
         },
         "target_setting": {
+          "default": "revolutions",
           "description": "The parameter name in the sub-generator to modulate (e.g., 'revolutions', 'spacing').",
           "title": "Target Setting",
           "type": "string"
         },
         "min_val": {
+          "default": 0.0,
           "description": "The setting value when the image is pure white (0% darkness).",
           "title": "Min Val",
           "type": "number"
         },
         "max_val": {
+          "default": 1.0,
           "description": "The setting value when the image is pure black (100% darkness).",
           "title": "Max Val",
           "type": "number"
         }
       },
-      "required": [
-        "image_path",
-        "target_setting",
-        "min_val",
-        "max_val"
-      ],
       "title": "ImageModulatorConfig",
       "type": "object"
     },
@@ -884,17 +881,10 @@
           "type": "integer"
         },
         "image_path": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
+          "default": "",
           "description": "Source image.",
-          "title": "Image Path"
+          "title": "Image Path",
+          "type": "string"
         },
         "dot_size": {
           "default": 0.1,
@@ -1916,36 +1906,6 @@
   "items": {
     "anyOf": [
       {
-        "$ref": "#/$defs/Step_chaotic"
-      },
-      {
-        "$ref": "#/$defs/Step_hexagon"
-      },
-      {
-        "$ref": "#/$defs/Step_hilbert"
-      },
-      {
-        "$ref": "#/$defs/Step_lichtenberg"
-      },
-      {
-        "$ref": "#/$defs/Step_peano"
-      },
-      {
-        "$ref": "#/$defs/Step_penrose"
-      },
-      {
-        "$ref": "#/$defs/Step_photo_concentric"
-      },
-      {
-        "$ref": "#/$defs/Step_photo_stipple"
-      },
-      {
-        "$ref": "#/$defs/Step_photo_tsp"
-      },
-      {
-        "$ref": "#/$defs/Step_triangle"
-      },
-      {
         "$ref": "#/$defs/Step_add_boundary"
       },
       {
@@ -1985,6 +1945,36 @@
         "$ref": "#/$defs/Step_voronoi_dual"
       },
       {
+        "$ref": "#/$defs/Step_chaotic"
+      },
+      {
+        "$ref": "#/$defs/Step_hexagon"
+      },
+      {
+        "$ref": "#/$defs/Step_hilbert"
+      },
+      {
+        "$ref": "#/$defs/Step_lichtenberg"
+      },
+      {
+        "$ref": "#/$defs/Step_peano"
+      },
+      {
+        "$ref": "#/$defs/Step_photo_concentric"
+      },
+      {
+        "$ref": "#/$defs/Step_photo_tsp"
+      },
+      {
+        "$ref": "#/$defs/Step_triangle"
+      },
+      {
+        "$ref": "#/$defs/Step_photo_stipple"
+      },
+      {
+        "$ref": "#/$defs/Step_penrose"
+      },
+      {
         "$ref": "#/$defs/Step_clip"
       },
       {
@@ -2019,6 +2009,6 @@
       }
     ]
   },
-  "title": "RootModel[List[Union[Step_chaotic, Step_hexagon, Step_hilbert, Step_lichtenberg, Step_peano, Step_penrose, Step_photo_concentric, Step_photo_stipple, Step_photo_tsp, Step_triangle, Step_add_boundary, Step_grid_lines, Step_image_outline, Step_photo_contour, Step_photo_wave, Step_concentric, Step_spiral, Step_chladni, Step_flow_field, Step_guilloche, Step_offset_fill, Step_venation, Step_voronoi_dual, Step_clip, Step_deduplicate, Step_merge, Step_polygonize, Step_zoom, Step_connect_continuous, Step_optimize, Step_scale, Step_simplify, Step_generate_in_cells, Step_image_mask]]]",
+  "title": "RootModel[List[Union[Step_add_boundary, Step_grid_lines, Step_image_outline, Step_photo_contour, Step_photo_wave, Step_concentric, Step_spiral, Step_chladni, Step_flow_field, Step_guilloche, Step_offset_fill, Step_venation, Step_voronoi_dual, Step_chaotic, Step_hexagon, Step_hilbert, Step_lichtenberg, Step_peano, Step_photo_concentric, Step_photo_tsp, Step_triangle, Step_photo_stipple, Step_penrose, Step_clip, Step_deduplicate, Step_merge, Step_polygonize, Step_zoom, Step_connect_continuous, Step_optimize, Step_scale, Step_simplify, Step_generate_in_cells, Step_image_mask]]]",
   "type": "array"
 }
