@@ -1,3 +1,4 @@
+import math
 from typing import Any, Dict
 
 from loguru import logger
@@ -46,6 +47,14 @@ class GenerateInCellsConfig(BasePluginConfig):
     auto_center: bool = Field(
         default=True,
         description="Automatically inject center_x and center_y for the sub-generator based on cell centroid."
+    )
+    auto_rotate: bool = Field(
+        default=False,
+        description="Automatically calculate the minimum rotated rectangle of the cell and inject its angle."
+    )
+    rotation_setting: str = Field(
+        default="rotation",
+        description="The parameter name in the sub-generator to inject the calculated angle into (e.g., 'rotation')."
     )
     keep_scaffolding: bool = Field(
         default=False,
@@ -116,6 +125,30 @@ class GenerateInCellsOp(PipelineOperation):
             if cfg.auto_center:
                 cell_settings["center_x"] = centroid.x
                 cell_settings["center_y"] = centroid.y
+
+            # Apply Geometry-Aware Rotation logic
+            if cfg.auto_rotate:
+                min_rect = poly.minimum_rotated_rectangle
+                if min_rect.geom_type == 'Polygon':
+                    coords = list(min_rect.exterior.coords)
+                    longest_length = -1
+                    best_angle = 0.0
+                    # Find the longest edge of the bounding rectangle
+                    for i in range(len(coords) - 1):
+                        p1, p2 = coords[i], coords[i+1]
+                        dx, dy = p2[0] - p1[0], p2[1] - p1[1]
+                        length = math.hypot(dx, dy)
+                        if length > longest_length:
+                            longest_length = length
+                            best_angle = math.degrees(math.atan2(dy, dx))
+                    
+                    # Normalize angle to 0-180 for consistent geometric fills
+                    cell_settings[cfg.rotation_setting] = best_angle % 180.0
+                elif min_rect.geom_type == 'LineString':
+                    # Edge case: degenerate cell that collapsed into a line
+                    coords = list(min_rect.coords)
+                    dx, dy = coords[-1][0] - coords[0][0], coords[-1][1] - coords[0][1]
+                    cell_settings[cfg.rotation_setting] = math.degrees(math.atan2(dy, dx)) % 180.0
 
             # Apply Image Modulation logic
             if sampler and cfg.image_modulator:
