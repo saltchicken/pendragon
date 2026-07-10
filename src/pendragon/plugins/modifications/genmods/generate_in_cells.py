@@ -38,8 +38,10 @@ class ImageModulatorConfig(BaseModel):
 
 class GenerateInCellsConfig(BasePluginConfig):
     generator: str = Field(
-        default="grid_lines",  # <-- Changed from ... to a safe default
-        description="The registry name of the generator to run in each cell.")
+        default="grid_lines",
+        description="The registry name of the generator to run in each cell.",
+        json_schema_extra={"widget": "operation_selector"}
+    )
     
     generator_settings: Dict[str, Any] = Field(
         default_factory=dict,

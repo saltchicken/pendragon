@@ -286,6 +286,24 @@ class LiveEditorWindow(QMainWindow):
                 h_layout.addWidget(spin_box)
                 self.form_layout.addRow(field_name, container)
 
+            # --- Handle Boolean Parameters ---
+            elif field_info.annotation == bool:
+                container = QWidget()
+                h_layout = QHBoxLayout(container)
+                h_layout.setContentsMargins(0, 0, 0, 0)
+
+                checkbox = QCheckBox()
+                checkbox.setChecked(bool(current_value))
+
+                def update_bool_wrapper(state, fname=field_name, idx=op_index):
+                    # state is an int (0 for unchecked, 2 for checked), bool() converts it safely
+                    self.update_parameter(idx, fname, bool(state))
+
+                checkbox.stateChanged.connect(update_bool_wrapper)
+                
+                h_layout.addWidget(checkbox)
+                self.form_layout.addRow(field_name, container)
+
             elif origin is Literal:
                 container = QWidget()
                 h_layout = QHBoxLayout(container)
@@ -318,34 +336,46 @@ class LiveEditorWindow(QMainWindow):
                 container = QWidget()
                 h_layout = QHBoxLayout(container)
                 h_layout.setContentsMargins(0, 0, 0, 0)
+                
+                schema_extra = field_info.json_schema_extra or {}
+                widget_type = schema_extra.get("widget")
 
-                # Initialize with existing string, or empty string if None
-                line_edit = QLineEdit(str(current_value) if current_value else "")
-
-                def update_str_wrapper(text, fname=field_name, idx=op_index):
+                # Shared updater for both QComboBox and QLineEdit
+                def update_value(text, fname=field_name, idx=op_index):
                     self.update_parameter(idx, fname, text)
 
-                line_edit.textChanged.connect(update_str_wrapper)
-                
-                h_layout.addWidget(line_edit)
-                schema_extra = field_info.json_schema_extra or {}
-                
-                if schema_extra.get("widget") == "file_picker":
-                    browse_btn = QPushButton("Browse...")
+                # 1. Custom Operation Selector Dropdown
+                if widget_type == "operation_selector":
+                    widget = QComboBox()
+                    widget.addItems(sorted(OPERATION_REGISTRY.keys()))
+                    if current_value:
+                        widget.setCurrentText(str(current_value))
                     
-                    # ADDED 'checked=False' to absorb the PyQt signal argument
-                    def open_file_dialog(checked=False, le=line_edit):
-                        file_path, _ = QFileDialog.getOpenFileName(
-                            self, 
-                            f"Select {field_name}", 
-                            "", 
-                            "Images (*.png *.jpg *.jpeg);;All Files (*)"
-                        )
-                        if file_path:
-                            le.setText(file_path)
+                    widget.currentTextChanged.connect(update_value)
+                    h_layout.addWidget(widget)
 
-                    browse_btn.clicked.connect(open_file_dialog)
-                    h_layout.addWidget(browse_btn)
+                # 2. Standard Text Box / File Picker
+                else:
+                    widget = QLineEdit(str(current_value or ""))
+                    widget.textChanged.connect(update_value)
+                    h_layout.addWidget(widget)
+                    
+                    if widget_type == "file_picker":
+                        browse_btn = QPushButton("Browse...")
+                        
+                        def open_file_dialog(checked=False, le=widget):
+                            file_path, _ = QFileDialog.getOpenFileName(
+                                self, 
+                                f"Select {field_name}", 
+                                "", 
+                                "Images (*.png *.jpg *.jpeg);;All Files (*)"
+                            )
+                            if file_path:
+                                le.setText(file_path)
+
+                        browse_btn.clicked.connect(open_file_dialog)
+                        h_layout.addWidget(browse_btn)
+
                 self.form_layout.addRow(field_name, container)
 
             # --- Dynamic Poly-morphic Nested Settings Section ---
