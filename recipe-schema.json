@@ -17,6 +17,81 @@
       "title": "ClipConfig",
       "type": "object"
     },
+    "ConcentricConfig": {
+      "properties": {
+        "overscan": {
+          "default": 0.0,
+          "description": "Distance to expand (positive) or shrink (negative) the operation's clipping boundary.",
+          "title": "Overscan",
+          "type": "number"
+        },
+        "center_x": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "X coordinate of the pattern center. Defaults to centroid.",
+          "title": "Center X"
+        },
+        "center_y": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Y coordinate of the pattern center. Defaults to centroid.",
+          "title": "Center Y"
+        },
+        "group_boundaries": {
+          "default": false,
+          "description": "If true, generates a single pattern globally centered across all boundaries.",
+          "title": "Group Boundaries",
+          "type": "boolean"
+        },
+        "min_radius": {
+          "default": 5.0,
+          "description": "Radius of the innermost shape.",
+          "title": "Min Radius",
+          "type": "number"
+        },
+        "max_radius": {
+          "default": 100.0,
+          "description": "Radius of the outermost shape.",
+          "title": "Max Radius",
+          "type": "number"
+        },
+        "spacing": {
+          "default": 5.0,
+          "description": "Distance between consecutive concentric rings.",
+          "title": "Spacing",
+          "type": "number"
+        },
+        "sides": {
+          "default": 64,
+          "description": "Number of sides. Use high values (e.g., 64) for circles, or low values (e.g., 3, 4, 6) for polygons.",
+          "minimum": 3,
+          "title": "Sides",
+          "type": "integer"
+        },
+        "rotation": {
+          "default": 0.0,
+          "description": "Rotation angle in degrees for the generated shapes.",
+          "title": "Rotation",
+          "type": "number"
+        }
+      },
+      "title": "ConcentricConfig",
+      "type": "object"
+    },
     "ConnectContinuousConfig": {
       "properties": {
         "snap_distance": {
@@ -225,6 +300,52 @@
       "title": "ImageMaskConfig",
       "type": "object"
     },
+    "ImageOutlineConfig": {
+      "properties": {
+        "overscan": {
+          "default": 0.0,
+          "description": "Distance to expand (positive) or shrink (negative) the operation's clipping boundary.",
+          "title": "Overscan",
+          "type": "number"
+        },
+        "image_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "File path to the source image.",
+          "title": "Image Path"
+        },
+        "resolution": {
+          "default": 0.5,
+          "description": "Sampling grid resolution. Lower = higher detail.",
+          "exclusiveMinimum": 0.0,
+          "title": "Resolution",
+          "type": "number"
+        },
+        "sigma": {
+          "default": 1.0,
+          "description": "Blur factor to smooth out noise. Increase if you get too many tiny stray lines.",
+          "minimum": 0.0,
+          "title": "Sigma",
+          "type": "number"
+        },
+        "min_length": {
+          "default": 2.0,
+          "description": "Minimum physical length of a line to keep.",
+          "minimum": 0.0,
+          "title": "Min Length",
+          "type": "number"
+        }
+      },
+      "title": "ImageOutlineConfig",
+      "type": "object"
+    },
     "MergeConfig": {
       "properties": {
         "precision": {
@@ -235,6 +356,32 @@
         }
       },
       "title": "MergeConfig",
+      "type": "object"
+    },
+    "OffsetFillConfig": {
+      "properties": {
+        "overscan": {
+          "default": 0.0,
+          "description": "Distance to expand (positive) or shrink (negative) the operation's clipping boundary.",
+          "title": "Overscan",
+          "type": "number"
+        },
+        "spacing": {
+          "default": 2.0,
+          "description": "Distance between concentric offset rings.",
+          "exclusiveMinimum": 0.0,
+          "title": "Spacing",
+          "type": "number"
+        },
+        "ring_simplify": {
+          "default": 0.2,
+          "description": "Simplification tolerance for the generated rings.",
+          "minimum": 0.0,
+          "title": "Ring Simplify",
+          "type": "number"
+        }
+      },
+      "title": "OffsetFillConfig",
       "type": "object"
     },
     "OptimizeConfig": {
@@ -253,6 +400,90 @@
         }
       },
       "title": "OptimizeConfig",
+      "type": "object"
+    },
+    "PhotoContourConfig": {
+      "properties": {
+        "overscan": {
+          "default": 0.0,
+          "description": "Distance to expand (positive) or shrink (negative) the operation's clipping boundary.",
+          "title": "Overscan",
+          "type": "number"
+        },
+        "levels": {
+          "default": 15,
+          "description": "Number of contour levels to generate between light and dark.",
+          "exclusiveMinimum": 0,
+          "title": "Levels",
+          "type": "integer"
+        },
+        "resolution": {
+          "default": 0.5,
+          "description": "Sampling grid resolution (smaller is higher detail but slower).",
+          "exclusiveMinimum": 0.0,
+          "title": "Resolution",
+          "type": "number"
+        },
+        "min_length": {
+          "default": 2.0,
+          "description": "Minimum physical length of a contour line to keep.",
+          "minimum": 0.0,
+          "title": "Min Length",
+          "type": "number"
+        },
+        "image_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "File path to the source image to sample.",
+          "title": "Image Path"
+        }
+      },
+      "title": "PhotoContourConfig",
+      "type": "object"
+    },
+    "PhotoWaveConfig": {
+      "properties": {
+        "overscan": {
+          "default": 0.0,
+          "description": "Distance to expand (positive) or shrink (negative) the operation's clipping boundary.",
+          "title": "Overscan",
+          "type": "number"
+        },
+        "lines": {
+          "default": 80,
+          "description": "Number of horizontal wave lines to generate.",
+          "exclusiveMinimum": 0,
+          "title": "Lines",
+          "type": "integer"
+        },
+        "amp": {
+          "default": 2.0,
+          "description": "Amplitude multiplier for the generated waves.",
+          "title": "Amp",
+          "type": "number"
+        },
+        "image_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "File path to the source image to sample.",
+          "title": "Image Path"
+        }
+      },
+      "title": "PhotoWaveConfig",
       "type": "object"
     },
     "PolygonizeConfig": {
@@ -403,6 +634,25 @@
       "title": "Step_clip",
       "type": "object"
     },
+    "Step_concentric": {
+      "properties": {
+        "operation": {
+          "const": "concentric",
+          "description": "Execute the 'concentric' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/ConcentricConfig",
+          "description": "Settings for 'concentric'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_concentric",
+      "type": "object"
+    },
     "Step_connect_continuous": {
       "properties": {
         "operation": {
@@ -517,6 +767,25 @@
       "title": "Step_image_mask",
       "type": "object"
     },
+    "Step_image_outline": {
+      "properties": {
+        "operation": {
+          "const": "image_outline",
+          "description": "Execute the 'image_outline' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/ImageOutlineConfig",
+          "description": "Settings for 'image_outline'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_image_outline",
+      "type": "object"
+    },
     "Step_merge": {
       "properties": {
         "operation": {
@@ -536,6 +805,25 @@
       "title": "Step_merge",
       "type": "object"
     },
+    "Step_offset_fill": {
+      "properties": {
+        "operation": {
+          "const": "offset_fill",
+          "description": "Execute the 'offset_fill' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/OffsetFillConfig",
+          "description": "Settings for 'offset_fill'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_offset_fill",
+      "type": "object"
+    },
     "Step_optimize": {
       "properties": {
         "operation": {
@@ -553,6 +841,44 @@
         "operation"
       ],
       "title": "Step_optimize",
+      "type": "object"
+    },
+    "Step_photo_contour": {
+      "properties": {
+        "operation": {
+          "const": "photo_contour",
+          "description": "Execute the 'photo_contour' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/PhotoContourConfig",
+          "description": "Settings for 'photo_contour'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_photo_contour",
+      "type": "object"
+    },
+    "Step_photo_wave": {
+      "properties": {
+        "operation": {
+          "const": "photo_wave",
+          "description": "Execute the 'photo_wave' operation.",
+          "title": "Operation",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/PhotoWaveConfig",
+          "description": "Settings for 'photo_wave'."
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "Step_photo_wave",
       "type": "object"
     },
     "Step_polygonize": {
@@ -861,16 +1187,16 @@
         "$ref": "#/$defs/Step_merge"
       },
       {
-        "$ref": "#/$defs/Step_polygonize"
-      },
-      {
-        "$ref": "#/$defs/Step_generate_in_cells"
+        "$ref": "#/$defs/Step_scale"
       },
       {
         "$ref": "#/$defs/Step_zoom"
       },
       {
-        "$ref": "#/$defs/Step_scale"
+        "$ref": "#/$defs/Step_generate_in_cells"
+      },
+      {
+        "$ref": "#/$defs/Step_polygonize"
       },
       {
         "$ref": "#/$defs/Step_guilloche"
@@ -889,9 +1215,24 @@
       },
       {
         "$ref": "#/$defs/Step_venation"
+      },
+      {
+        "$ref": "#/$defs/Step_concentric"
+      },
+      {
+        "$ref": "#/$defs/Step_offset_fill"
+      },
+      {
+        "$ref": "#/$defs/Step_photo_contour"
+      },
+      {
+        "$ref": "#/$defs/Step_image_outline"
+      },
+      {
+        "$ref": "#/$defs/Step_photo_wave"
       }
     ]
   },
-  "title": "RootModel[List[Union[Step_clip, Step_deduplicate, Step_image_mask, Step_optimize, Step_simplify, Step_connect_continuous, Step_merge, Step_polygonize, Step_generate_in_cells, Step_zoom, Step_scale, Step_guilloche, Step_spiral, Step_voronoi_dual, Step_grid_lines, Step_add_boundary, Step_venation]]]",
+  "title": "RootModel[List[Union[Step_clip, Step_deduplicate, Step_image_mask, Step_optimize, Step_simplify, Step_connect_continuous, Step_merge, Step_scale, Step_zoom, Step_generate_in_cells, Step_polygonize, Step_guilloche, Step_spiral, Step_voronoi_dual, Step_grid_lines, Step_add_boundary, Step_venation, Step_concentric, Step_offset_fill, Step_photo_contour, Step_image_outline, Step_photo_wave]]]",
   "type": "array"
 }

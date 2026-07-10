@@ -1,29 +1,16 @@
 # yaml-language-server: $schema=./recipe-schema.json
 
-- operation: guilloche
+# Test with a low polygon count to draw nesting hexagons (6 sides)
+- operation: photo_wave
   settings:
     overscan: 0
-    group_boundaries: false
-    R: 50
-    r: 35
-    p: 25
-    steps: 1000
-    revolutions: 10
-    amplitude_mod: 0
-    frequency_mod: 0
+    lines: 80
+    amp: 2
+    image_path: "images/loz.jpg"
 
 - operation: connect_continuous
   settings:
     snap_distance: 0.1
-
-# Critical: Removes collinear vertices created by the step-by-step growth
-- operation: simplify
-  settings:
-    tolerance: 0.2
-
-- operation: scale
-  settings:
-    factor: 2
 
 - operation: optimize
   settings:
