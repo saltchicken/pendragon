@@ -1,6 +1,5 @@
 # yaml-language-server: $schema=./recipe-schema.json
 
-# Test with a low polygon count to draw nesting hexagons (6 sides)
 - operation: chladni
   settings:
     overscan: 0
@@ -9,17 +8,3 @@
     sign: -1
     res: 0.5
     simplify: 0
-
-- operation: simplify
-  settings:
-    tolerance: 0.1
-    preserve_topology: false
-
-- operation: connect_continuous
-  settings:
-    snap_distance: 0.1
-
-- operation: optimize
-  settings:
-    start_x: 0.0
-    start_y: 0.0
