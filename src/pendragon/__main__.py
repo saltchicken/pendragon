@@ -23,7 +23,9 @@ def main():
         description="Pendragon CNC G-code generator.")
     parser.add_argument("recipe",
                         type=str,
-                        help="Path to the YAML recipe file.")
+                        nargs="?",
+                        default=None,
+                        help="Path to the YAML recipe file (optional).")
     parser.add_argument("--output",
                         type=str,
                         default="output.nc",
@@ -56,21 +58,26 @@ def main():
     load_plugins()
 
     # 2. Load user recipe
-    try:
-        with open(args.recipe, 'r') as f:
-            raw_user_recipe = yaml.safe_load(f)
-    except FileNotFoundError:
-        logger.error(f"Recipe file not found: {args.recipe}")
-        sys.exit(1)
-    except yaml.YAMLError as e:
-        logger.error(f"Error parsing YAML file: {e}")
-        sys.exit(1)
+    raw_user_recipe = []
+    if args.recipe:
+        try:
+            with open(args.recipe, 'r') as f:
+                # Fallback to empty list if file is completely empty
+                raw_user_recipe = yaml.safe_load(f) or [] 
+        except FileNotFoundError:
+            logger.error(f"Recipe file not found: {args.recipe}")
+            sys.exit(1)
+        except yaml.YAMLError as e:
+            logger.error(f"Error parsing YAML file: {e}")
+            sys.exit(1)
 
-    if not isinstance(raw_user_recipe, list):
-        logger.error(
-            "Invalid recipe format: The YAML file must contain a list of operations."
-        )
-        sys.exit(1)
+        if not isinstance(raw_user_recipe, list):
+            logger.error(
+                "Invalid recipe format: The YAML file must contain a list of operations."
+            )
+            sys.exit(1)
+    else:
+        logger.info("No recipe specified. Starting an empty pipeline for the GUI.")
 
     boundary = None
     if args.dxf:

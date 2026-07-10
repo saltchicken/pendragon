@@ -582,11 +582,21 @@ class PipelineViewer(scene.SceneCanvas):
         self.view.camera = 'panzoom'
         self.view.camera.aspect = 1.0
 
-        self.lines_visual = scene.visuals.Line(parent=self.view.scene,
+        dummy_pos = np.zeros((2, 2), dtype=np.float32)
+
+        self.lines_visual = scene.visuals.Line(pos=dummy_pos,
+                                               parent=self.view.scene,
                                                color='white')
-        self.boundary_visual = scene.visuals.Line(parent=self.view.scene,
+        self.boundary_visual = scene.visuals.Line(pos=dummy_pos,
+                                                  parent=self.view.scene,
                                                   color='red')
-        self.vertices_visual = scene.visuals.Markers(parent=self.view.scene)
+        self.vertices_visual = scene.visuals.Markers(pos=dummy_pos, 
+                                                     parent=self.view.scene)
+        
+        # Hide them initially. update_view() will reveal them when data exists.
+        self.lines_visual.visible = False
+        self.boundary_visual.visible = False
+        self.vertices_visual.visible = False
 
         self.freeze()
         self.update_view()
