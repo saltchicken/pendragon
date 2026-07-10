@@ -6,8 +6,9 @@ from shapely.geometry import MultiPolygon
 from shapely.geometry import Polygon
 
 from pendragon.core import BasePluginConfig
+from pendragon.core import PipelineContext
 from pendragon.core import PipelineOperation
-from pendragon.core import PipelineState, PipelineContext
+from pendragon.core import PipelineState
 from pendragon.core import register_operation
 
 
@@ -19,7 +20,9 @@ class AddBoundaryConfig(BasePluginConfig):
 class AddBoundaryGen(PipelineOperation):
     """Extracts the linear rings from the current boundary and adds them to the toolpath."""
 
-    def process(self, state: PipelineState, context: Optional[PipelineContext] = None) -> PipelineState:
+    def process(self,
+                state: PipelineState,
+                context: Optional[PipelineContext] = None) -> PipelineState:
         effective_boundary = self.get_effective_boundary(state)
 
         if not effective_boundary or effective_boundary.is_empty:
@@ -41,11 +44,12 @@ class AddBoundaryGen(PipelineOperation):
             for poly in effective_boundary.geoms:
                 new_lines.extend(extract_rings(poly))
         else:
-            logger.error(f"Unsupported boundary geometry type: {type(effective_boundary)}")
+            logger.error(
+                f"Unsupported boundary geometry type: {type(effective_boundary)}"
+            )
             return state
 
         logger.success(f"Successfully added {len(new_lines)} boundary paths.")
-        return PipelineState(
-            boundary=state.boundary, 
-            lines=state.lines + new_lines,
-            operation_name="add_boundary")
+        return PipelineState(boundary=state.boundary,
+                             lines=state.lines + new_lines,
+                             operation_name="add_boundary")

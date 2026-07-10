@@ -4,24 +4,40 @@ from loguru import logger
 import numpy as np
 from pydantic import Field
 from scipy import ndimage
-from shapely.geometry import LineString, MultiLineString
+from shapely.geometry import LineString
+from shapely.geometry import MultiLineString
 from skimage import measure
 
-from pendragon.core import BasePluginConfig, PipelineOperation, PipelineState, PipelineContext, register_operation
+from pendragon.core import BasePluginConfig
+from pendragon.core import PipelineContext
+from pendragon.core import PipelineOperation
+from pendragon.core import PipelineState
+from pendragon.core import register_operation
 from pendragon.utils import ImageSampler
 
 
 class PhotoConcentricConfig(BasePluginConfig):
-    spacing: float = Field(default=2.0, gt=0.0, description="Distance between contour lines.")
-    threshold: float = Field(default=0.5, description="Darkness threshold (0.0-1.0).")
-    resolution: float = Field(default=0.25, gt=0.0, description="Sampling grid resolution.")
-    min_length: float = Field(default=2.0, ge=0.0, description="Minimum length to keep.")
-    image_path: str | None = Field(default=None, description="File path to the source image.")
+    spacing: float = Field(default=2.0,
+                           gt=0.0,
+                           description="Distance between contour lines.")
+    threshold: float = Field(default=0.5,
+                             description="Darkness threshold (0.0-1.0).")
+    resolution: float = Field(default=0.25,
+                              gt=0.0,
+                              description="Sampling grid resolution.")
+    min_length: float = Field(default=2.0,
+                              ge=0.0,
+                              description="Minimum length to keep.")
+    image_path: str | None = Field(default=None,
+                                   description="File path to the source image.")
 
 
 @register_operation("photo_concentric", config_class=PhotoConcentricConfig)
 class PhotoConcentricGen(PipelineOperation):
-    def process(self, state: PipelineState, context: Optional[PipelineContext] = None) -> PipelineState:
+
+    def process(self,
+                state: PipelineState,
+                context: Optional[PipelineContext] = None) -> PipelineState:
         cfg = self.config or PhotoConcentricConfig()
         ctx = context or PipelineContext()
         effective_boundary = self.get_effective_boundary(state)
@@ -36,12 +52,15 @@ class PhotoConcentricGen(PipelineOperation):
         threshold = ctx.variables.get("threshold", cfg.threshold)
         resolution = ctx.variables.get("resolution", cfg.resolution)
 
-        logger.info(f"Generating photo concentric fills from {cfg.image_path} with spacing {spacing} and threshold {threshold}...")
+        logger.info(
+            f"Generating photo concentric fills from {cfg.image_path} with spacing {spacing} and threshold {threshold}..."
+        )
 
         minx, miny, maxx, maxy = effective_boundary.bounds
         width, height = maxx - minx, maxy - miny
 
-        res_x, res_y = max(2, int(width / resolution)), max(2, int(height / resolution))
+        res_x, res_y = max(2, int(width / resolution)), max(
+            2, int(height / resolution))
         sampler = ImageSampler(cfg.image_path, effective_boundary.bounds)
 
         grid = np.zeros((res_y, res_x))
@@ -86,5 +105,8 @@ class PhotoConcentricGen(PipelineOperation):
                         if not sub_line.is_empty:
                             clipped_lines.append(sub_line)
 
-        logger.success(f"Generated {len(clipped_lines)} bounded concentric fill lines.")
-        return PipelineState(boundary=state.boundary, lines=state.lines + clipped_lines, operation_name="photo_concentric")
+        logger.success(
+            f"Generated {len(clipped_lines)} bounded concentric fill lines.")
+        return PipelineState(boundary=state.boundary,
+                             lines=state.lines + clipped_lines,
+                             operation_name="photo_concentric")

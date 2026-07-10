@@ -10,8 +10,9 @@ from shapely.geometry import Point
 from shapely.ops import linemerge
 
 from pendragon.core import CenteredPluginConfig
+from pendragon.core import PipelineContext
 from pendragon.core import PipelineOperation
-from pendragon.core import PipelineState, PipelineContext
+from pendragon.core import PipelineState
 from pendragon.core import register_operation
 
 
@@ -44,16 +45,20 @@ class VenationConfig(CenteredPluginConfig):
 class VenationGen(PipelineOperation):
     """Generates organic branching structures using the Space Colonization Algorithm."""
 
-    def process(self, state: PipelineState, context: Optional[PipelineContext] = None) -> PipelineState:
+    def process(self,
+                state: PipelineState,
+                context: Optional[PipelineContext] = None) -> PipelineState:
         cfg = self.config or VenationConfig()
         ctx = context or PipelineContext()
         boundary = self.get_effective_boundary(state)
         minx, miny, maxx, maxy = boundary.bounds
 
-        # Clean fallback hierarchy for the venation root 
-        root_x = ctx.local_center_x if ctx.local_center_x is not None else (cfg.center_x if cfg.center_x is not None else cfg.root_x)
-        root_y = ctx.local_center_y if ctx.local_center_y is not None else (cfg.center_y if cfg.center_y is not None else cfg.root_y)
-        
+        # Clean fallback hierarchy for the venation root
+        root_x = ctx.local_center_x if ctx.local_center_x is not None else (
+            cfg.center_x if cfg.center_x is not None else cfg.root_x)
+        root_y = ctx.local_center_y if ctx.local_center_y is not None else (
+            cfg.center_y if cfg.center_y is not None else cfg.root_y)
+
         segment_length = ctx.variables.get("segment_length", cfg.segment_length)
 
         logger.info(
@@ -90,7 +95,7 @@ class VenationGen(PipelineOperation):
             distances, indices = node_tree.query(
                 leaves, distance_upper_bound=cfg.attract_distance)
 
-            active_nodes = {}  
+            active_nodes = {}
             leaves_to_remove = []
 
             for i, (dist, node_idx) in enumerate(zip(distances, indices)):
@@ -134,7 +139,7 @@ class VenationGen(PipelineOperation):
         elif isinstance(merged_geometry, MultiLineString):
             merged_lines = list(merged_geometry.geoms)
         else:
-            merged_lines = raw_lines  
+            merged_lines = raw_lines
 
         logger.info(
             f"Growth complete. Merged {len(raw_lines)} micro-segments into {len(merged_lines)} contiguous branches."

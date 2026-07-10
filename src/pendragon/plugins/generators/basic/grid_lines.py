@@ -8,8 +8,9 @@ from shapely.geometry import LineString
 from shapely.geometry import MultiLineString
 
 from pendragon.core import BasePluginConfig
+from pendragon.core import PipelineContext
 from pendragon.core import PipelineOperation
-from pendragon.core import PipelineState, PipelineContext
+from pendragon.core import PipelineState
 from pendragon.core import register_operation
 
 
@@ -18,16 +19,19 @@ class GridLinesConfig(BasePluginConfig):
                            description="Distance between consecutive lines.")
     orientation: str = Field(
         default="horizontal",
-        description="Orientation of lines: 'horizontal', 'vertical', or 'crosshatch'.")
+        description=
+        "Orientation of lines: 'horizontal', 'vertical', or 'crosshatch'.")
 
 
 @register_operation("grid_lines", config_class=GridLinesConfig)
 class GridLinesGen(PipelineOperation):
 
-    def process(self, state: PipelineState, context: Optional[PipelineContext] = None) -> PipelineState:
+    def process(self,
+                state: PipelineState,
+                context: Optional[PipelineContext] = None) -> PipelineState:
         cfg = self.config or GridLinesConfig()
         ctx = context or PipelineContext()
-        
+
         spacing = ctx.variables.get("spacing", cfg.spacing)
         orientation = ctx.variables.get("orientation", cfg.orientation)
 
@@ -46,9 +50,11 @@ class GridLinesGen(PipelineOperation):
 
             for k in range(start_k, end_k + 1):
                 current_y = phase_y + k * spacing
-                if abs(current_y - eff_miny) < 1e-7 or abs(current_y - eff_maxy) < 1e-7:
+                if abs(current_y - eff_miny) < 1e-7 or abs(current_y -
+                                                           eff_maxy) < 1e-7:
                     continue
-                lines.append(LineString([(eff_minx, current_y), (eff_maxx, current_y)]))
+                lines.append(
+                    LineString([(eff_minx, current_y), (eff_maxx, current_y)]))
             return lines
 
         def make_vertical():
@@ -59,9 +65,11 @@ class GridLinesGen(PipelineOperation):
 
             for k in range(start_k, end_k + 1):
                 current_x = phase_x + k * spacing
-                if abs(current_x - eff_minx) < 1e-7 or abs(current_x - eff_maxx) < 1e-7:
+                if abs(current_x - eff_minx) < 1e-7 or abs(current_x -
+                                                           eff_maxx) < 1e-7:
                     continue
-                lines.append(LineString([(current_x, eff_miny), (current_x, eff_maxy)]))
+                lines.append(
+                    LineString([(current_x, eff_miny), (current_x, eff_maxy)]))
             return lines
 
         if orientation in ("horizontal", "crosshatch"):
@@ -80,7 +88,8 @@ class GridLinesGen(PipelineOperation):
                         if not sub_line.is_empty:
                             clipped_lines.append(sub_line)
 
-        logger.success(f"Generated and clipped {len(clipped_lines)} pattern lines.")
+        logger.success(
+            f"Generated and clipped {len(clipped_lines)} pattern lines.")
         return PipelineState(boundary=state.boundary,
                              lines=state.lines + clipped_lines,
                              operation_name="grid_lines")

@@ -3,22 +3,36 @@ from typing import List, Optional
 
 from loguru import logger
 from pydantic import Field
-from shapely.geometry import LineString, MultiLineString
+from shapely.geometry import LineString
+from shapely.geometry import MultiLineString
 
-from pendragon.core import BasePluginConfig, PipelineOperation, PipelineState, PipelineContext, register_operation
+from pendragon.core import BasePluginConfig
+from pendragon.core import PipelineContext
+from pendragon.core import PipelineOperation
+from pendragon.core import PipelineState
+from pendragon.core import register_operation
+
 
 class TriangleConfig(BasePluginConfig):
-    cell_size: float = Field(default=5.0, gt=0.0, description="Side length of equilateral triangles.")
+    cell_size: float = Field(
+        default=5.0,
+        gt=0.0,
+        description="Side length of equilateral triangles.")
+
 
 @register_operation("triangle", config_class=TriangleConfig)
 class TriangleGen(PipelineOperation):
-    def process(self, state: PipelineState, context: Optional[PipelineContext] = None) -> PipelineState:
+
+    def process(self,
+                state: PipelineState,
+                context: Optional[PipelineContext] = None) -> PipelineState:
         cfg = self.config or TriangleConfig()
         ctx = context or PipelineContext()
         effective_boundary = self.get_effective_boundary(state)
 
-        if not effective_boundary or effective_boundary.is_empty: return state
-        
+        if not effective_boundary or effective_boundary.is_empty:
+            return state
+
         cell_size = ctx.variables.get("cell_size", cfg.cell_size)
         logger.info(f"Generating triangle grid with cell size {cell_size}...")
 
@@ -29,7 +43,8 @@ class TriangleGen(PipelineOperation):
         diag = math.hypot(maxx - minx, maxy - miny)
         r = diag / 2.0 + cell_size
         spacing = cell_size * math.sqrt(3.0) / 2.0
-        if spacing <= 0: return state
+        if spacing <= 0:
+            return state
 
         raw_lines = []
         for angle_deg in [0, 60, 120]:
@@ -41,7 +56,9 @@ class TriangleGen(PipelineOperation):
             for i in range(-num_lines // 2, num_lines // 2 + 1):
                 offset = i * spacing
                 px, py = cx + nx * offset, cy + ny * offset
-                raw_lines.append(LineString([(px - cos_a * r, py - sin_a * r), (px + cos_a * r, py + sin_a * r)]))
+                raw_lines.append(
+                    LineString([(px - cos_a * r, py - sin_a * r),
+                                (px + cos_a * r, py + sin_a * r)]))
 
         clipped_lines: List[LineString] = []
         for line in raw_lines:
@@ -54,5 +71,8 @@ class TriangleGen(PipelineOperation):
                         if not sub_line.is_empty:
                             clipped_lines.append(sub_line)
 
-        logger.success(f"Generated {len(clipped_lines)} bounded triangle grid lines.")
-        return PipelineState(boundary=state.boundary, lines=state.lines + clipped_lines, operation_name="triangle")
+        logger.success(
+            f"Generated {len(clipped_lines)} bounded triangle grid lines.")
+        return PipelineState(boundary=state.boundary,
+                             lines=state.lines + clipped_lines,
+                             operation_name="triangle")

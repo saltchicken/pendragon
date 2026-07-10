@@ -2,22 +2,32 @@ import math
 from typing import List, Optional
 
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+from pydantic import Field
 from shapely.geometry import LineString
 
-from pendragon.core import PipelineOperation, PipelineState, PipelineContext, register_operation
+from pendragon.core import PipelineContext
+from pendragon.core import PipelineOperation
+from pendragon.core import PipelineState
+from pendragon.core import register_operation
 from pendragon.utils import ImageSampler
 
 
 class ImageMaskConfig(BaseModel):
     mask_image: str | None = None
-    threshold: float = Field(default=0.5, description="Darkness threshold (0.0 to 1.0) to keep lines.")
-    sample_step: float = Field(default=0.5, description="Resolution step size for sampling.")
+    threshold: float = Field(
+        default=0.5,
+        description="Darkness threshold (0.0 to 1.0) to keep lines.")
+    sample_step: float = Field(default=0.5,
+                               description="Resolution step size for sampling.")
 
 
 @register_operation("image_mask", config_class=ImageMaskConfig)
 class ImageMaskMod(PipelineOperation):
-    def process(self, state: PipelineState, context: Optional[PipelineContext] = None) -> PipelineState:
+
+    def process(self,
+                state: PipelineState,
+                context: Optional[PipelineContext] = None) -> PipelineState:
         cfg = self.config or ImageMaskConfig()
         ctx = context or PipelineContext()
 
@@ -37,7 +47,8 @@ class ImageMaskMod(PipelineOperation):
         for line in current_lines:
             current_segment_coords = []
             line_length = line.length
-            if line_length == 0: continue
+            if line_length == 0:
+                continue
 
             num_samples = max(2, math.ceil(line_length / step_size))
             for i in range(num_samples):
@@ -50,10 +61,14 @@ class ImageMaskMod(PipelineOperation):
                 else:
                     if len(current_segment_coords) >= 2:
                         new_lines.append(LineString(current_segment_coords))
-                    current_segment_coords = [] 
+                    current_segment_coords = []
 
             if len(current_segment_coords) >= 2:
                 new_lines.append(LineString(current_segment_coords))
 
-        logger.success(f"Mask filtering complete. Retained {len(new_lines)} segmented lines.")
-        return PipelineState(boundary=current_boundary, lines=new_lines, operation_name="image_mask")
+        logger.success(
+            f"Mask filtering complete. Retained {len(new_lines)} segmented lines."
+        )
+        return PipelineState(boundary=current_boundary,
+                             lines=new_lines,
+                             operation_name="image_mask")

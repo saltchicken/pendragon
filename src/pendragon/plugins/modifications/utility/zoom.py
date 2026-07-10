@@ -1,11 +1,16 @@
 from typing import List, Optional
 
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+from pydantic import Field
 from shapely.affinity import scale
-from shapely.geometry import LineString, MultiLineString
+from shapely.geometry import LineString
+from shapely.geometry import MultiLineString
 
-from pendragon.core import PipelineOperation, PipelineState, PipelineContext, register_operation
+from pendragon.core import PipelineContext
+from pendragon.core import PipelineOperation
+from pendragon.core import PipelineState
+from pendragon.core import register_operation
 
 
 class ZoomConfig(BaseModel):
@@ -15,14 +20,18 @@ class ZoomConfig(BaseModel):
 
 @register_operation("zoom", config_class=ZoomConfig)
 class ZoomMod(PipelineOperation):
-    def process(self, state: PipelineState, context: Optional[PipelineContext] = None) -> PipelineState:
+
+    def process(self,
+                state: PipelineState,
+                context: Optional[PipelineContext] = None) -> PipelineState:
         cfg = self.config or ZoomConfig()
         ctx = context or PipelineContext()
         current_lines = state.lines
         boundary = state.boundary
 
-        if not current_lines: return state
-        
+        if not current_lines:
+            return state
+
         factor = ctx.variables.get("factor", cfg.factor)
         origin = ctx.variables.get("origin", cfg.origin)
 
@@ -31,12 +40,17 @@ class ZoomMod(PipelineOperation):
         else:
             origin_coords = origin
 
-        logger.info(f"Zooming {len(current_lines)} lines by a factor of {factor}...")
+        logger.info(
+            f"Zooming {len(current_lines)} lines by a factor of {factor}...")
 
         scaled_lines: List[LineString] = []
         for line in current_lines:
-            if line.is_empty: continue
-            scaled_geom = scale(line, xfact=factor, yfact=factor, origin=origin_coords)
+            if line.is_empty:
+                continue
+            scaled_geom = scale(line,
+                                xfact=factor,
+                                yfact=factor,
+                                origin=origin_coords)
             scaled_lines.append(scaled_geom)
 
         clipped_lines: List[LineString] = []
@@ -53,5 +67,8 @@ class ZoomMod(PipelineOperation):
         else:
             clipped_lines = scaled_lines
 
-        logger.success(f"Zoom complete. Yielded {len(clipped_lines)} bounded lines.")
-        return PipelineState(boundary=boundary, lines=clipped_lines, operation_name="zoom")
+        logger.success(
+            f"Zoom complete. Yielded {len(clipped_lines)} bounded lines.")
+        return PipelineState(boundary=boundary,
+                             lines=clipped_lines,
+                             operation_name="zoom")

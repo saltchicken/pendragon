@@ -3,21 +3,34 @@ from typing import List, Optional
 
 from loguru import logger
 from pydantic import Field
-from shapely.geometry import LineString, MultiLineString
+from shapely.geometry import LineString
+from shapely.geometry import MultiLineString
 
-from pendragon.core import BasePluginConfig, PipelineOperation, PipelineState, PipelineContext, register_operation
+from pendragon.core import BasePluginConfig
+from pendragon.core import PipelineContext
+from pendragon.core import PipelineOperation
+from pendragon.core import PipelineState
+from pendragon.core import register_operation
+
 
 class PeanoConfig(BasePluginConfig):
-    spacing: float = Field(default=2.0, gt=0.0, description="Target spacing between lines.")
+    spacing: float = Field(default=2.0,
+                           gt=0.0,
+                           description="Target spacing between lines.")
+
 
 @register_operation("peano", config_class=PeanoConfig)
 class PeanoGen(PipelineOperation):
-    def process(self, state: PipelineState, context: Optional[PipelineContext] = None) -> PipelineState:
+
+    def process(self,
+                state: PipelineState,
+                context: Optional[PipelineContext] = None) -> PipelineState:
         cfg = self.config or PeanoConfig()
         ctx = context or PipelineContext()
         effective_boundary = self.get_effective_boundary(state)
 
-        if not effective_boundary or effective_boundary.is_empty: return state
+        if not effective_boundary or effective_boundary.is_empty:
+            return state
 
         spacing = ctx.variables.get("spacing", cfg.spacing)
         safe_spacing = max(spacing, 0.1)
@@ -25,10 +38,13 @@ class PeanoGen(PipelineOperation):
         minx, miny, maxx, maxy = effective_boundary.bounds
         width, height = maxx - minx, maxy - miny
         size = max(width, height)
-        order = int(math.ceil(math.log(size / safe_spacing, 3))) if size > safe_spacing else 1
+        order = int(math.ceil(math.log(size / safe_spacing,
+                                       3))) if size > safe_spacing else 1
         order = min(max(order, 1), 5)
 
-        logger.info(f"Generating Peano curve (order={order}) with spacing {safe_spacing}...")
+        logger.info(
+            f"Generating Peano curve (order={order}) with spacing {safe_spacing}..."
+        )
 
         num_points = 9**order
         pts = []
@@ -52,9 +68,11 @@ class PeanoGen(PipelineOperation):
                 x_grid = x_grid * 3 + x_k
                 y_grid = y_grid * 3 + y_k
 
-            pts.append((minx + (x_grid + 0.5) * cell_size, miny + (y_grid + 0.5) * cell_size))
+            pts.append((minx + (x_grid + 0.5) * cell_size,
+                        miny + (y_grid + 0.5) * cell_size))
 
-        if len(pts) < 2: return state
+        if len(pts) < 2:
+            return state
 
         raw_line = LineString(pts)
         clipped_lines: List[LineString] = []
@@ -67,5 +85,9 @@ class PeanoGen(PipelineOperation):
                     if not sub_line.is_empty:
                         clipped_lines.append(sub_line)
 
-        logger.success(f"Generated Peano curve. Retained {len(clipped_lines)} continuous paths.")
-        return PipelineState(boundary=state.boundary, lines=state.lines + clipped_lines, operation_name="peano")
+        logger.success(
+            f"Generated Peano curve. Retained {len(clipped_lines)} continuous paths."
+        )
+        return PipelineState(boundary=state.boundary,
+                             lines=state.lines + clipped_lines,
+                             operation_name="peano")

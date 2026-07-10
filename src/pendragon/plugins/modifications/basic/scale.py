@@ -1,26 +1,37 @@
 from typing import List, Optional
 
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+from pydantic import Field
 from shapely.affinity import scale
 from shapely.geometry import LineString
 
-from pendragon.core import PipelineOperation, PipelineState, PipelineContext, register_operation
+from pendragon.core import PipelineContext
+from pendragon.core import PipelineOperation
+from pendragon.core import PipelineState
+from pendragon.core import register_operation
 
 
 class ScaleConfig(BaseModel):
-    factor: float = Field(default=1.0, description="Uniform scaling multiplier.")
-    origin: str = Field(default="center", description="Origin point for scaling ('center', 'centroid', etc).")
+    factor: float = Field(default=1.0,
+                          description="Uniform scaling multiplier.")
+    origin: str = Field(
+        default="center",
+        description="Origin point for scaling ('center', 'centroid', etc).")
 
 
 @register_operation("scale", config_class=ScaleConfig)
 class ScaleMod(PipelineOperation):
-    def process(self, state: PipelineState, context: Optional[PipelineContext] = None) -> PipelineState:
+
+    def process(self,
+                state: PipelineState,
+                context: Optional[PipelineContext] = None) -> PipelineState:
         cfg = self.config or ScaleConfig()
         ctx = context or PipelineContext()
         current_lines = state.lines
 
-        if not current_lines: return state
+        if not current_lines:
+            return state
 
         factor = ctx.variables.get("factor", cfg.factor)
         origin = ctx.variables.get("origin", cfg.origin)
@@ -31,13 +42,20 @@ class ScaleMod(PipelineOperation):
         else:
             origin_coords = origin
 
-        logger.info(f"Scaling {len(current_lines)} lines by a factor of {factor}...")
+        logger.info(
+            f"Scaling {len(current_lines)} lines by a factor of {factor}...")
 
         scaled_lines: List[LineString] = []
         for line in current_lines:
-            if line.is_empty: continue
-            scaled_geom = scale(line, xfact=factor, yfact=factor, origin=origin_coords)
+            if line.is_empty:
+                continue
+            scaled_geom = scale(line,
+                                xfact=factor,
+                                yfact=factor,
+                                origin=origin_coords)
             scaled_lines.append(scaled_geom)
 
         logger.success("Scaling complete.")
-        return PipelineState(boundary=state.boundary, lines=scaled_lines, operation_name="scale")
+        return PipelineState(boundary=state.boundary,
+                             lines=scaled_lines,
+                             operation_name="scale")

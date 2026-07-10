@@ -8,23 +8,33 @@ from shapely.geometry import MultiLineString
 from skimage import measure
 
 from pendragon.core import BasePluginConfig
+from pendragon.core import PipelineContext
 from pendragon.core import PipelineOperation
-from pendragon.core import PipelineState, PipelineContext
+from pendragon.core import PipelineState
 from pendragon.core import register_operation
 from pendragon.utils import ImageSampler
 
 
 class PhotoContourConfig(BasePluginConfig):
-    levels: int = Field(default=15, gt=0, description="Number of contour levels to generate.")
-    resolution: float = Field(default=0.5, gt=0.0, description="Sampling grid resolution.")
-    min_length: float = Field(default=2.0, ge=0.0, description="Minimum physical length to keep.")
-    image_path: str | None = Field(default=None, description="File path to the source image.")
+    levels: int = Field(default=15,
+                        gt=0,
+                        description="Number of contour levels to generate.")
+    resolution: float = Field(default=0.5,
+                              gt=0.0,
+                              description="Sampling grid resolution.")
+    min_length: float = Field(default=2.0,
+                              ge=0.0,
+                              description="Minimum physical length to keep.")
+    image_path: str | None = Field(default=None,
+                                   description="File path to the source image.")
 
 
 @register_operation("photo_contour", config_class=PhotoContourConfig)
 class PhotoContourGen(PipelineOperation):
 
-    def process(self, state: PipelineState, context: Optional[PipelineContext] = None) -> PipelineState:
+    def process(self,
+                state: PipelineState,
+                context: Optional[PipelineContext] = None) -> PipelineState:
         cfg = self.config or PhotoContourConfig()
         ctx = context or PipelineContext()
         effective_boundary = self.get_effective_boundary(state)
@@ -34,11 +44,13 @@ class PhotoContourGen(PipelineOperation):
 
         if not cfg.image_path:
             return state
-            
+
         levels = int(ctx.variables.get("levels", cfg.levels))
         resolution = ctx.variables.get("resolution", cfg.resolution)
 
-        logger.info(f"Generating {levels} photo contours from {cfg.image_path} at resolution {resolution}...")
+        logger.info(
+            f"Generating {levels} photo contours from {cfg.image_path} at resolution {resolution}..."
+        )
 
         minx, miny, maxx, maxy = effective_boundary.bounds
         sampler = ImageSampler(cfg.image_path, effective_boundary.bounds)
@@ -72,7 +84,8 @@ class PhotoContourGen(PipelineOperation):
                     if line.length >= cfg.min_length:
                         if line.intersects(effective_boundary):
                             clipped = line.intersection(effective_boundary)
-                            if isinstance(clipped, LineString) and not clipped.is_empty:
+                            if isinstance(clipped,
+                                          LineString) and not clipped.is_empty:
                                 out_lines.append(clipped)
                             elif isinstance(clipped, MultiLineString):
                                 for sub_line in clipped.geoms:
@@ -80,4 +93,6 @@ class PhotoContourGen(PipelineOperation):
                                         out_lines.append(sub_line)
 
         logger.success(f"Generated {len(out_lines)} bounded contour paths.")
-        return PipelineState(boundary=state.boundary, lines=state.lines + out_lines, operation_name="photo_contour")
+        return PipelineState(boundary=state.boundary,
+                             lines=state.lines + out_lines,
+                             operation_name="photo_contour")

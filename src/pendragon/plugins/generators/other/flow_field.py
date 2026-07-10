@@ -7,36 +7,56 @@ from pydantic import Field
 from shapely.geometry import LineString
 from shapely.geometry import MultiLineString
 
-from pendragon.core import BasePluginConfig, PipelineOperation, PipelineState, PipelineContext, register_operation
+from pendragon.core import BasePluginConfig
+from pendragon.core import PipelineContext
+from pendragon.core import PipelineOperation
+from pendragon.core import PipelineState
+from pendragon.core import register_operation
+
 
 class FlowFieldConfig(BasePluginConfig):
-    spacing: float = Field(default=3.0, gt=0.0, description="Distance between initial seed points.")
-    step_length: float = Field(default=1.0, gt=0.0, description="Distance path travels in single step.")
-    max_steps: int = Field(default=50, gt=0, description="Maximum number of steps.")
-    scale: float = Field(default=0.1, description="Scaling factor for vector field math.")
+    spacing: float = Field(default=3.0,
+                           gt=0.0,
+                           description="Distance between initial seed points.")
+    step_length: float = Field(
+        default=1.0,
+        gt=0.0,
+        description="Distance path travels in single step.")
+    max_steps: int = Field(default=50,
+                           gt=0,
+                           description="Maximum number of steps.")
+    scale: float = Field(default=0.1,
+                         description="Scaling factor for vector field math.")
     seed: int = Field(default=42, description="Random seed.")
+
 
 @register_operation("flow_field", config_class=FlowFieldConfig)
 class FlowFieldGen(PipelineOperation):
-    def process(self, state: PipelineState, context: Optional[PipelineContext] = None) -> PipelineState:
+
+    def process(self,
+                state: PipelineState,
+                context: Optional[PipelineContext] = None) -> PipelineState:
         cfg = self.config or FlowFieldConfig()
         ctx = context or PipelineContext()
         effective_boundary = self.get_effective_boundary(state)
 
         if not effective_boundary or effective_boundary.is_empty:
             return state
-            
+
         spacing = ctx.variables.get("spacing", cfg.spacing)
         scale = ctx.variables.get("scale", cfg.scale)
         max_steps = int(ctx.variables.get("max_steps", cfg.max_steps))
 
-        logger.info(f"Generating flow field (spacing={spacing}, steps={max_steps}) using scale {scale}...")
+        logger.info(
+            f"Generating flow field (spacing={spacing}, steps={max_steps}) using scale {scale}..."
+        )
 
         random.seed(cfg.seed)
         minx, miny, maxx, maxy = effective_boundary.bounds
         width, height = maxx - minx, maxy - miny
 
-        if width <= 0 or height <= 0: return state
+        if width <= 0 or height <= 0:
+            return state
 
         seeds = []
         x = minx
@@ -69,7 +89,8 @@ class FlowFieldGen(PipelineOperation):
                 path.append((nx_pt, ny_pt))
                 cx_pt, cy_pt = nx_pt, ny_pt
 
-                if not (minx - 10 <= cx_pt <= maxx + 10 and miny - 10 <= cy_pt <= maxy + 10):
+                if not (minx - 10 <= cx_pt <= maxx + 10 and
+                        miny - 10 <= cy_pt <= maxy + 10):
                     break
 
             if len(path) > 1:
@@ -86,5 +107,8 @@ class FlowFieldGen(PipelineOperation):
                         if not sub_line.is_empty:
                             clipped_lines.append(sub_line)
 
-        logger.success(f"Generated {len(clipped_lines)} bounded flow field paths.")
-        return PipelineState(boundary=state.boundary, lines=state.lines + clipped_lines, operation_name="flow_field")
+        logger.success(
+            f"Generated {len(clipped_lines)} bounded flow field paths.")
+        return PipelineState(boundary=state.boundary,
+                             lines=state.lines + clipped_lines,
+                             operation_name="flow_field")

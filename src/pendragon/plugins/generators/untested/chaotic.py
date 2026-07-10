@@ -4,21 +4,38 @@ from typing import List, Optional
 from loguru import logger
 from pydantic import Field
 from shapely import affinity
-from shapely.geometry import LineString, MultiLineString
+from shapely.geometry import LineString
+from shapely.geometry import MultiLineString
 
-from pendragon.core import BasePluginConfig, PipelineOperation, PipelineState, PipelineContext, register_operation
+from pendragon.core import BasePluginConfig
+from pendragon.core import PipelineContext
+from pendragon.core import PipelineOperation
+from pendragon.core import PipelineState
+from pendragon.core import register_operation
 
 
 class ChaoticConfig(BasePluginConfig):
-    spacing: float = Field(default=2.0, gt=0.0, description="Spacing between the coarse baseline segments.")
-    depth: int = Field(default=4, ge=0, description="Recursion depth for the fractal generation.")
-    chaos_freq: float = Field(default=0.15, description="Spatial frequency of the chaotic distortion.")
-    chaos_amp: float = Field(default=0.8, description="Amplitude of the chaotic distortion.")
+    spacing: float = Field(
+        default=2.0,
+        gt=0.0,
+        description="Spacing between the coarse baseline segments.")
+    depth: int = Field(
+        default=4,
+        ge=0,
+        description="Recursion depth for the fractal generation.")
+    chaos_freq: float = Field(
+        default=0.15,
+        description="Spatial frequency of the chaotic distortion.")
+    chaos_amp: float = Field(default=0.8,
+                             description="Amplitude of the chaotic distortion.")
 
 
 @register_operation("chaotic", config_class=ChaoticConfig)
 class ChaoticFill(PipelineOperation):
-    def process(self, state: PipelineState, context: Optional[PipelineContext] = None) -> PipelineState:
+
+    def process(self,
+                state: PipelineState,
+                context: Optional[PipelineContext] = None) -> PipelineState:
         cfg = self.config or ChaoticConfig()
         ctx = context or PipelineContext()
         effective_boundary = self.get_effective_boundary(state)
@@ -32,7 +49,9 @@ class ChaoticFill(PipelineOperation):
         chaos_freq = ctx.variables.get("chaos_freq", cfg.chaos_freq)
         chaos_amp = ctx.variables.get("chaos_amp", cfg.chaos_amp)
 
-        logger.info(f"Generating chaotic fill (depth={depth}, spacing={spacing}) over the bounding area...")
+        logger.info(
+            f"Generating chaotic fill (depth={depth}, spacing={spacing}) over the bounding area..."
+        )
 
         minx, miny, maxx, maxy = effective_boundary.bounds
         coarse_spacing = max(spacing * 4.0, 1.0)
@@ -41,7 +60,11 @@ class ChaoticFill(PipelineOperation):
         left_to_right = True
 
         while y <= maxy + coarse_spacing:
-            x1, x2 = (minx - coarse_spacing, maxx + coarse_spacing) if left_to_right else (maxx + coarse_spacing, minx - coarse_spacing)
+            x1, x2 = (minx - coarse_spacing, maxx +
+                      coarse_spacing) if left_to_right else (maxx +
+                                                             coarse_spacing,
+                                                             minx -
+                                                             coarse_spacing)
             base_lines.append(LineString([(x1, y), (x2, y)]))
             y += coarse_spacing
             left_to_right = not left_to_right
@@ -67,28 +90,42 @@ class ChaoticFill(PipelineOperation):
 
             shear_x = math.sin(mx * chaos_freq) * chaos_amp
             shear_y = math.cos(my * chaos_freq) * chaos_amp
-            scale_y = 1.0 + math.sin((mx + my) * (chaos_freq * 0.7)) * (chaos_amp * 0.75)
+            scale_y = 1.0 + math.sin(
+                (mx + my) * (chaos_freq * 0.7)) * (chaos_amp * 0.75)
 
             matrix = [1.0, shear_x, shear_y, scale_y, 0.0, 0.0]
             warped_motif = affinity.affine_transform(base_motif, matrix)
 
-            scaled = affinity.scale(warped_motif, xfact=dist, yfact=current_scale, origin=(0, 0))
-            rotated = affinity.rotate(scaled, seg_angle, origin=(0, 0), use_radians=False)
+            scaled = affinity.scale(warped_motif,
+                                    xfact=dist,
+                                    yfact=current_scale,
+                                    origin=(0, 0))
+            rotated = affinity.rotate(scaled,
+                                      seg_angle,
+                                      origin=(0, 0),
+                                      use_radians=False)
             translated = affinity.translate(rotated, xoff=p1[0], yoff=p1[1])
 
             motif_coords = list(translated.coords)
             result_path = []
             for i in range(len(motif_coords) - 1):
-                sub_path = recursive_affine_fractal(motif_coords[i], motif_coords[i + 1], current_depth - 1, current_scale * 0.5)
-                if i > 0: sub_path = sub_path[1:]
+                sub_path = recursive_affine_fractal(motif_coords[i],
+                                                    motif_coords[i + 1],
+                                                    current_depth - 1,
+                                                    current_scale * 0.5)
+                if i > 0:
+                    sub_path = sub_path[1:]
                 result_path.extend(sub_path)
             return result_path
 
         fractal_coords = []
         coords = list(base_path.coords)
         for i in range(len(coords) - 1):
-            segment_fractal = recursive_affine_fractal(coords[i], coords[i + 1], depth, coarse_spacing * 1.5)
-            if i > 0: segment_fractal = segment_fractal[1:]
+            segment_fractal = recursive_affine_fractal(coords[i], coords[i + 1],
+                                                       depth,
+                                                       coarse_spacing * 1.5)
+            if i > 0:
+                segment_fractal = segment_fractal[1:]
             fractal_coords.extend(segment_fractal)
 
         raw_fractal_line = LineString(fractal_coords)
@@ -104,4 +141,6 @@ class ChaoticFill(PipelineOperation):
                         clipped_lines.append(sub_line)
 
         logger.success(f"Generated {len(clipped_lines)} bounded chaotic paths.")
-        return PipelineState(boundary=state.boundary, lines=state.lines + clipped_lines, operation_name="chaotic")
+        return PipelineState(boundary=state.boundary,
+                             lines=state.lines + clipped_lines,
+                             operation_name="chaotic")

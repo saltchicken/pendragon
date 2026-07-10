@@ -10,22 +10,33 @@ from skimage import feature
 from skimage import measure
 
 from pendragon.core import BasePluginConfig
+from pendragon.core import PipelineContext
 from pendragon.core import PipelineOperation
-from pendragon.core import PipelineState, PipelineContext
+from pendragon.core import PipelineState
 from pendragon.core import register_operation
 from pendragon.utils import ImageSampler
 
 
 class ImageOutlineConfig(BasePluginConfig):
-    image_path: str | None = Field(default=None, description="File path to the source image.")
-    resolution: float = Field(default=0.5, gt=0.0, description="Sampling grid resolution.")
-    sigma: float = Field(default=1.0, ge=0.0, description="Blur factor to smooth out noise.")
-    min_length: float = Field(default=2.0, ge=0.0, description="Minimum physical length to keep.")
+    image_path: str | None = Field(default=None,
+                                   description="File path to the source image.")
+    resolution: float = Field(default=0.5,
+                              gt=0.0,
+                              description="Sampling grid resolution.")
+    sigma: float = Field(default=1.0,
+                         ge=0.0,
+                         description="Blur factor to smooth out noise.")
+    min_length: float = Field(default=2.0,
+                              ge=0.0,
+                              description="Minimum physical length to keep.")
 
 
 @register_operation("image_outline", config_class=ImageOutlineConfig)
 class ImageOutlineGen(PipelineOperation):
-    def process(self, state: PipelineState, context: Optional[PipelineContext] = None) -> PipelineState:
+
+    def process(self,
+                state: PipelineState,
+                context: Optional[PipelineContext] = None) -> PipelineState:
         cfg = self.config or ImageOutlineConfig()
         ctx = context or PipelineContext()
         effective_boundary = self.get_effective_boundary(state)
@@ -37,11 +48,12 @@ class ImageOutlineGen(PipelineOperation):
         if not cfg.image_path:
             logger.warning("No image_path provided. Skipping image_outline.")
             return state
-            
+
         sigma = ctx.variables.get("sigma", cfg.sigma)
         resolution = ctx.variables.get("resolution", cfg.resolution)
 
-        logger.info(f"Detecting outlines in {cfg.image_path} with sigma {sigma}...")
+        logger.info(
+            f"Detecting outlines in {cfg.image_path} with sigma {sigma}...")
 
         minx, miny, maxx, maxy = effective_boundary.bounds
         sampler = ImageSampler(cfg.image_path, effective_boundary.bounds)
@@ -74,7 +86,8 @@ class ImageOutlineGen(PipelineOperation):
                 if line.length >= cfg.min_length:
                     if line.intersects(effective_boundary):
                         clipped = line.intersection(effective_boundary)
-                        if isinstance(clipped, LineString) and not clipped.is_empty:
+                        if isinstance(clipped,
+                                      LineString) and not clipped.is_empty:
                             out_lines.append(clipped)
                         elif isinstance(clipped, MultiLineString):
                             for sub_line in clipped.geoms:
@@ -82,4 +95,6 @@ class ImageOutlineGen(PipelineOperation):
                                     out_lines.append(sub_line)
 
         logger.success(f"Generated {len(out_lines)} bounded outline paths.")
-        return PipelineState(boundary=state.boundary, lines=state.lines + out_lines, operation_name="image_outline")
+        return PipelineState(boundary=state.boundary,
+                             lines=state.lines + out_lines,
+                             operation_name="image_outline")

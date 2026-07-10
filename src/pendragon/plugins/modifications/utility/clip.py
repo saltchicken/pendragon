@@ -2,22 +2,34 @@ from typing import List, Optional
 
 from loguru import logger
 from pydantic import BaseModel
-from shapely.geometry import LineString, MultiLineString
+from shapely.geometry import LineString
+from shapely.geometry import MultiLineString
 
-from pendragon.core import PipelineOperation, PipelineState, PipelineContext, register_operation
+from pendragon.core import PipelineContext
+from pendragon.core import PipelineOperation
+from pendragon.core import PipelineState
+from pendragon.core import register_operation
+
 
 class ClipConfig(BaseModel):
     pass
 
+
 @register_operation("clip", config_class=ClipConfig)
 class ClipMod(PipelineOperation):
-    def process(self, state: PipelineState, context: Optional[PipelineContext] = None) -> PipelineState:
+
+    def process(self,
+                state: PipelineState,
+                context: Optional[PipelineContext] = None) -> PipelineState:
         current_lines = state.lines
         boundary = state.boundary
 
-        if not current_lines or not boundary: return state
+        if not current_lines or not boundary:
+            return state
 
-        logger.info(f"Clipping {len(current_lines)} lines strictly to the current pipeline boundary...")
+        logger.info(
+            f"Clipping {len(current_lines)} lines strictly to the current pipeline boundary..."
+        )
         clipped_lines: List[LineString] = []
 
         for line in current_lines:
@@ -30,5 +42,8 @@ class ClipMod(PipelineOperation):
                         if not sub_line.is_empty:
                             clipped_lines.append(sub_line)
 
-        logger.success(f"Clipping complete. Yielded {len(clipped_lines)} bounded lines.")
-        return PipelineState(boundary=boundary, lines=clipped_lines, operation_name="clip")
+        logger.success(
+            f"Clipping complete. Yielded {len(clipped_lines)} bounded lines.")
+        return PipelineState(boundary=boundary,
+                             lines=clipped_lines,
+                             operation_name="clip")

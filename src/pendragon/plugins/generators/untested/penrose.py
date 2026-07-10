@@ -1,16 +1,16 @@
 import math
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
 
 from loguru import logger
 from pydantic import Field
-from shapely.geometry import LineString, MultiLineString
+from shapely.geometry import LineString
+from shapely.geometry import MultiLineString
 
-from pendragon.core import (
-    CenteredPluginConfig,
-    PipelineOperation,
-    PipelineState, PipelineContext,
-    register_operation,
-)
+from pendragon.core import CenteredPluginConfig
+from pendragon.core import PipelineContext
+from pendragon.core import PipelineOperation
+from pendragon.core import PipelineState
+from pendragon.core import register_operation
 from pendragon.utils import extract_target_polygons
 
 PHI = (1.0 + math.sqrt(5.0)) / 2.0
@@ -18,9 +18,10 @@ PHI = (1.0 + math.sqrt(5.0)) / 2.0
 
 class PenroseConfig(CenteredPluginConfig):
     depth: int = Field(
-        default=5, 
+        default=5,
         ge=1,
-        description="Number of recursive deflation iterations. High values exponentially increase detail."
+        description=
+        "Number of recursive deflation iterations. High values exponentially increase detail."
     )
 
 
@@ -31,7 +32,9 @@ class PenroseGen(PipelineOperation):
     using recursive Robinson triangle deflation.
     """
 
-    def process(self, state: PipelineState, context: Optional[PipelineContext] = None) -> PipelineState:
+    def process(self,
+                state: PipelineState,
+                context: Optional[PipelineContext] = None) -> PipelineState:
         cfg = self.config or PenroseConfig()
         ctx = context or PipelineContext()
         effective_boundary = self.get_effective_boundary(state)
@@ -40,19 +43,20 @@ class PenroseGen(PipelineOperation):
             logger.warning("No boundary available. Skipping penrose.")
             return state
 
-        polygons = extract_target_polygons(effective_boundary, cfg.group_boundaries)
+        polygons = extract_target_polygons(effective_boundary,
+                                           cfg.group_boundaries)
         clipped_lines: List[LineString] = []
 
-        logger.info(
-            f"Generating Penrose tiling (depth {cfg.depth}) "
-            f"across {len(polygons)} boundary region(s)..."
-        )
+        logger.info(f"Generating Penrose tiling (depth {cfg.depth}) "
+                    f"across {len(polygons)} boundary region(s)...")
 
         for poly in polygons:
             # Fallback hierarchy: Context -> YAML Config -> Geometry Centroid
-            cx = ctx.local_center_x if ctx.local_center_x is not None else (cfg.center_x if cfg.center_x is not None else poly.centroid.x)
-            cy = ctx.local_center_y if ctx.local_center_y is not None else (cfg.center_y if cfg.center_y is not None else poly.centroid.y)
-            
+            cx = ctx.local_center_x if ctx.local_center_x is not None else (
+                cfg.center_x if cfg.center_x is not None else poly.centroid.x)
+            cy = ctx.local_center_y if ctx.local_center_y is not None else (
+                cfg.center_y if cfg.center_y is not None else poly.centroid.y)
+
             minx, miny, maxx, maxy = poly.bounds
 
             dx = max(abs(maxx - cx), abs(cx - minx))
@@ -99,8 +103,10 @@ class PenroseGen(PipelineOperation):
                 triangles = next_triangles
 
             seen_edges = set()
-            
-            def get_edge_key(pt1: Tuple[float, float], pt2: Tuple[float, float]) -> Tuple[Tuple[int, int], Tuple[int, int]]:
+
+            def get_edge_key(
+                pt1: Tuple[float, float], pt2: Tuple[float, float]
+            ) -> Tuple[Tuple[int, int], Tuple[int, int]]:
                 k1 = (int(round(pt1[0] * 100)), int(round(pt1[1] * 100)))
                 k2 = (int(round(pt2[0] * 100)), int(round(pt2[1] * 100)))
                 return (k1, k2) if k1 < k2 else (k2, k1)
@@ -110,22 +116,23 @@ class PenroseGen(PipelineOperation):
                     key = get_edge_key(start, end)
                     if key not in seen_edges:
                         seen_edges.add(key)
-                        
+
                         line = LineString([start, end])
                         if line.intersects(poly):
                             clipped = line.intersection(poly)
-                            
-                            if isinstance(clipped, LineString) and not clipped.is_empty:
+
+                            if isinstance(clipped,
+                                          LineString) and not clipped.is_empty:
                                 clipped_lines.append(clipped)
                             elif isinstance(clipped, MultiLineString):
                                 for sub_line in clipped.geoms:
                                     if not sub_line.is_empty:
                                         clipped_lines.append(sub_line)
 
-        logger.success(f"Generated Penrose tiling. Retained {len(clipped_lines)} continuous paths.")
-
-        return PipelineState(
-            boundary=state.boundary, 
-            lines=state.lines + clipped_lines,
-            operation_name="penrose"
+        logger.success(
+            f"Generated Penrose tiling. Retained {len(clipped_lines)} continuous paths."
         )
+
+        return PipelineState(boundary=state.boundary,
+                             lines=state.lines + clipped_lines,
+                             operation_name="penrose")
