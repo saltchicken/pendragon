@@ -328,6 +328,24 @@ class LiveEditorWindow(QMainWindow):
                 line_edit.textChanged.connect(update_str_wrapper)
                 
                 h_layout.addWidget(line_edit)
+                schema_extra = field_info.json_schema_extra or {}
+                
+                if schema_extra.get("widget") == "file_picker":
+                    browse_btn = QPushButton("Browse...")
+                    
+                    # ADDED 'checked=False' to absorb the PyQt signal argument
+                    def open_file_dialog(checked=False, le=line_edit):
+                        file_path, _ = QFileDialog.getOpenFileName(
+                            self, 
+                            f"Select {field_name}", 
+                            "", 
+                            "Images (*.png *.jpg *.jpeg);;All Files (*)"
+                        )
+                        if file_path:
+                            le.setText(file_path)
+
+                    browse_btn.clicked.connect(open_file_dialog)
+                    h_layout.addWidget(browse_btn)
                 self.form_layout.addRow(field_name, container)
 
             # --- Dynamic Poly-morphic Nested Settings Section ---
