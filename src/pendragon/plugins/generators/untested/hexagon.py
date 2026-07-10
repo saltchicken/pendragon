@@ -97,10 +97,6 @@ class HexagonGen(PipelineOperation):
         while unique_edges:
             start_node = None
 
-            # Start prioritization:
-            # 1. Degree 1 (Clear true dead ends first)
-            # 2. Degree 3 (Standard odd nodes, clearing them makes the graph even)
-            # 3. Degree 2/4 (Even nodes last)
             for target_degree in [1, 3, 2, 4]:
                 candidates = [
                     n for n, neighbors in adj.items()
@@ -109,6 +105,12 @@ class HexagonGen(PipelineOperation):
                 if candidates:
                     start_node = candidates[0]
                     break
+            
+            # Fallback for nodes that were quantized into degrees > 4
+            if start_node is None:
+                candidates = [n for n, neighbors in adj.items() if len(neighbors) > 0]
+                if candidates:
+                    start_node = candidates[0]
 
             if start_node is None:
                 break
@@ -118,12 +120,9 @@ class HexagonGen(PipelineOperation):
 
             # Walk the graph
             while adj[curr]:
-                # THE HEURISTIC: Look at all connected nodes.
-                # Sort them by how many connections THEY have remaining.
-                # Pick the one with the HIGHEST remaining connections to avoid walking into a trap.
                 neighbors = list(adj[curr])
-                neighbors.sort(key=lambda n: len(adj[n]), reverse=True)
-
+                # reverse=False traces dead-ends first (Warnsdorff's Rule for Eulerian paths)
+                neighbors.sort(key=lambda n: len(adj[n]), reverse=False)
                 nxt = neighbors[0]
 
                 # Consume the edge
@@ -144,16 +143,28 @@ class HexagonGen(PipelineOperation):
 
         # 5. Clip the generated curves against the complex boundary
         clipped_lines: List[LineString] = []
+        
+        # Helper function to robustly extract lines, safely ignoring points/polygons
+        def extract_valid_lines(geom):
+            extracted = []
+            if geom.is_empty:
+                return extracted
+            if geom.geom_type == 'LineString':
+                extracted.append(geom)
+            elif geom.geom_type == 'MultiLineString':
+                extracted.extend(list(geom.geoms))
+            elif geom.geom_type == 'GeometryCollection':
+                for g in geom.geoms:
+                    if g.geom_type == 'LineString':
+                        extracted.append(g)
+                    elif g.geom_type == 'MultiLineString':
+                        extracted.extend(list(g.geoms))
+            return extracted
+
         for line in raw_lines:
             if line.intersects(effective_boundary):
                 clipped = line.intersection(effective_boundary)
-                
-                if isinstance(clipped, LineString) and not clipped.is_empty:
-                    clipped_lines.append(clipped)
-                elif isinstance(clipped, MultiLineString):
-                    for sub_line in clipped.geoms:
-                        if not sub_line.is_empty:
-                            clipped_lines.append(sub_line)
+                clipped_lines.extend(extract_valid_lines(clipped))
 
         logger.success(f"Generated Hexagon fill. Retained {len(clipped_lines)} continuous bounded paths.")
 
