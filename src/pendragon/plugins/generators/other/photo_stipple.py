@@ -18,7 +18,10 @@ class PhotoStippleConfig(BasePluginConfig):
     dots: int = Field(default=5000,
                       gt=0,
                       description="Target number of stipple dots to generate.")
-    image_path: str | None = Field(default=None, description="Source image.")
+    image_path: str = Field(
+        default="", 
+        description="Source image."
+    )
     dot_size: float = Field(default=0.1,
                             gt=0.0,
                             description="Length of microscopic line.")
