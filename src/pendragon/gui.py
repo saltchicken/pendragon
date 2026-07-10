@@ -617,6 +617,8 @@ class PipelineViewer(scene.SceneCanvas):
                 self.on_step_changed()
 
     def on_key_press(self, event):
+        if event.key is None:
+            return
         if event.key.name == 'Right':
             self.step_forward()
         elif event.key.name == 'Left':
