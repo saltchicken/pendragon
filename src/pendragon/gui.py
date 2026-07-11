@@ -124,9 +124,13 @@ class LiveEditorWindow(QMainWindow):
         self.stats_layout.addRow("Vertices:", self.vertices_label)
 
         self.control_layout.addWidget(self.stats_group)
-        # -------------------------------
 
-        # View Mode Toggle
+        # Add this near your existing final_view_checkbox
+        self.show_vertices_checkbox = QCheckBox("Show Vertices")
+        self.show_vertices_checkbox.setChecked(True) # Default on
+        self.show_vertices_checkbox.toggled.connect(self._on_vertices_toggled)
+        self.control_layout.addWidget(self.show_vertices_checkbox)
+
         self.final_view_checkbox = QCheckBox("Show Final View")
         self.final_view_checkbox.setChecked(False)
         self.final_view_checkbox.toggled.connect(self._on_view_mode_toggled)
@@ -202,6 +206,11 @@ class LiveEditorWindow(QMainWindow):
     def _on_view_mode_toggled(self, checked):
         """Swaps the viewer mode and forces a visual update."""
         self.viewer.show_final_view = checked
+        self.viewer.update_view()
+
+    def _on_vertices_toggled(self, checked):
+        """Updates the visibility of vertices in the viewer."""
+        self.viewer.show_vertices = checked
         self.viewer.update_view()
 
     def update_stats_ui(self, step, total_ops, op_name, lines, vertices,
@@ -602,6 +611,7 @@ class PipelineViewer(scene.SceneCanvas):
         self.unfreeze()
         self.engine = engine
         self.current_step = min(1, len(self.engine.runner.operations))
+        self.show_vertices = True
         self.show_final_view = False
 
         self.on_step_changed = None
@@ -744,11 +754,14 @@ class PipelineViewer(scene.SceneCanvas):
                                        connect=np.array(connect))
             self.lines_visual.visible = True
 
-            self.vertices_visual.set_data(pos=stacked_pos,
-                                          face_color='red',
-                                          edge_color=None,
-                                          size=10)
-            self.vertices_visual.visible = True
+            if self.show_vertices:
+                self.vertices_visual.set_data(pos=stacked_pos,
+                                            face_color='red',
+                                            edge_color=None,
+                                            size=10)
+                self.vertices_visual.visible = True
+            else:
+                self.vertices_visual.visible = False
         else:
             self.lines_visual.visible = False
             self.vertices_visual.visible = False
