@@ -9,12 +9,16 @@ from pendragon.core.registry import OPERATION_REGISTRY
 
 from .pen import PenConfig
 from .pen import PenTool
-from .runner import PipelineRunner, InteractiveRunner
+from .runner import InteractiveRunner
+from .runner import PipelineRunner
 
 
 class PendragonEngine:
 
-    def __init__(self, recipe: list, boundary: Optional[Polygon] = None, interactive: bool = False):
+    def __init__(self,
+                 recipe: list,
+                 boundary: Optional[Polygon] = None,
+                 interactive: bool = False):
         """
         Initializes the engine with a recipe and an optional boundary.
         """
@@ -25,7 +29,7 @@ class PendragonEngine:
 
         initial_state = PipelineState(boundary=self.boundary,
                                       operation_name="base_geometry")
-        
+
         if self.interactive:
             self.runner = InteractiveRunner(initial_state)
         else:

@@ -69,10 +69,13 @@ class InteractiveRunner(PipelineRunner):
         try:
             return self.history[step_index]
         except IndexError:
-            logger.error(f"Step {step_index} does not exist. Returning latest state.")
+            logger.error(
+                f"Step {step_index} does not exist. Returning latest state.")
             return self.history[-1]
 
-    def recompute_from(self, step_index: int, target_step: Optional[int] = None):
+    def recompute_from(self,
+                       step_index: int,
+                       target_step: Optional[int] = None):
         """Re-runs the pipeline starting from a specific operation index."""
         if step_index < 0 or step_index >= len(self.operations):
             return

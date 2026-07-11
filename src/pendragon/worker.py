@@ -1,9 +1,12 @@
 import inspect
+
 from loguru import logger
 
 from pendragon.core.discovery import load_plugins
-from pendragon.core.models import PipelineContext, PipelineState
+from pendragon.core.models import PipelineContext
+from pendragon.core.models import PipelineState
 from pendragon.core.registry import OPERATION_REGISTRY
+
 
 def run_pipeline_streaming(recipe, boundary, progress_queue):
     """
@@ -12,17 +15,20 @@ def run_pipeline_streaming(recipe, boundary, progress_queue):
     """
     load_plugins()
 
-    initial_state = PipelineState(boundary=boundary, operation_name="base_geometry")
+    initial_state = PipelineState(boundary=boundary,
+                                  operation_name="base_geometry")
     history = [initial_state]
     operations = []
 
     for step in recipe:
         op_name = step.get("operation")
         op_info = OPERATION_REGISTRY.get(op_name)
-        if not op_info: continue
-            
+        if not op_info:
+            continue
+
         PluginClass, ConfigClass = op_info["class"], op_info["config"]
-        config = ConfigClass(**step.get("settings", {})) if ConfigClass else None
+        config = ConfigClass(
+            **step.get("settings", {})) if ConfigClass else None
         operations.append(PluginClass(config=config))
 
     empty_context = PipelineContext()
@@ -39,12 +45,12 @@ def run_pipeline_streaming(recipe, boundary, progress_queue):
     for i, op in enumerate(operations):
         current_state = history[-1]
         sig = inspect.signature(op.process)
-        
+
         if 'context' in sig.parameters:
             new_state = op.process(current_state, context=empty_context)
         else:
             new_state = op.process(current_state)
-            
+
         history.append(new_state)
 
         progress_queue.put({

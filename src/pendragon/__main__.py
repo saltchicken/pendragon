@@ -99,7 +99,9 @@ def main():
 
     # 3. Initialize Orchestrator
     is_interactive = not args.no_vis
-    engine = PendragonEngine(recipe=raw_user_recipe, boundary=boundary, interactive=is_interactive)
+    engine = PendragonEngine(recipe=raw_user_recipe,
+                             boundary=boundary,
+                             interactive=is_interactive)
 
     # 4. Build Pipeline
     if not engine.build_pipeline():
@@ -120,6 +122,7 @@ def main():
         logger.info("Opening live editor visualization window...")
         try:
             from PyQt5.QtWidgets import QApplication
+
             from pendragon.gui import LiveEditorWindow
 
             qt_app = QApplication.instance() or QApplication([])
