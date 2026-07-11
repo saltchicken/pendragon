@@ -748,10 +748,23 @@ class LiveEditorWindow(QMainWindow):
 
         return current_recipe
 
-    def _reload_pipeline(self, new_recipe: list, target_step: int):
+    def _reload_pipeline(self, new_recipe: list, target_step: int, valid_history_idx: int = 0):
+        # 1. Rescue the valid portion of the history BEFORE the engine wipes it
+        valid_history = []
+        if valid_history_idx > 0 and len(self.engine.runner.history) > valid_history_idx:
+            valid_history = self.engine.runner.history[:valid_history_idx + 1]
+
+        # 2. Load the new recipe (this creates a brand new PipelineRunner)
         success = self.engine.load_recipe(new_recipe)
+        
         if success:
-            self._pending_op_index = 0  # Force a full recalculation from scratch
+            # 3. Inject the rescued history back into the new runner
+            if valid_history:
+                self.engine.runner.history = valid_history
+
+            # 4. Tell the trigger to start calculating from the insertion point
+            self._pending_op_index = valid_history_idx 
+            
             max_step = len(self.engine.runner.operations)
             self.viewer.current_step = max(0, min(target_step, max_step))
             self.build_ui_for_current_step()
@@ -766,7 +779,13 @@ class LiveEditorWindow(QMainWindow):
         insert_idx = self.viewer.current_step
 
         recipe.insert(insert_idx, {"operation": op_name, "settings": {}})
-        self._reload_pipeline(recipe, target_step=insert_idx + 1)
+        
+        # History is perfectly valid up to the insertion point
+        self._reload_pipeline(
+            recipe, 
+            target_step=insert_idx + 1, 
+            valid_history_idx=insert_idx
+        )
 
     def _remove_operation(self):
         recipe = self._get_current_recipe()
@@ -774,7 +793,13 @@ class LiveEditorWindow(QMainWindow):
 
         if 0 <= remove_idx < len(recipe):
             recipe.pop(remove_idx)
-            self._reload_pipeline(recipe, target_step=max(0, remove_idx))
+            
+            # History is perfectly valid up to the step right before the one we deleted
+            self._reload_pipeline(
+                recipe, 
+                target_step=max(0, remove_idx), 
+                valid_history_idx=remove_idx
+            )
 
     def _load_live_recipe(self):
         file_path, _ = QFileDialog.getOpenFileName(
