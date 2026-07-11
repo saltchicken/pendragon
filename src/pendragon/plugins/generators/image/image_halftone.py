@@ -3,9 +3,10 @@ from typing import Optional
 
 from loguru import logger
 from pydantic import BaseModel, Field
-from shapely.geometry import LineString, Point
+from shapely.geometry import LineString, box
 
 from pendragon.core import PipelineContext, PipelineOperation, PipelineState, register_operation
+from pendragon.core.registry import OPERATION_REGISTRY
 from pendragon.utils import ImageSampler
 
 class ImageHalftoneConfig(BaseModel):
@@ -19,19 +20,35 @@ class ImageHalftoneConfig(BaseModel):
         ge=0.1,
         description="Grid spacing between generated shapes."
     )
-    min_radius: float = Field(
-        default=0.1, 
-        ge=0.0,
-        description="Radius size in pure white areas."
+    
+    # --- Meta-Generator Config ---
+    generator: str = Field(
+        default="concentric", 
+        description="The generator to run in each cell.",
+        json_schema_extra={"widget": "operation_selector"}
     )
-    max_radius: float = Field(
+    generator_settings: dict = Field(
+        default_factory=dict, 
+        description="Settings for the chosen generator."
+    )
+    target_setting: str = Field(
+        default="max_radius", 
+        description="The exact name of the parameter to modulate."
+    )
+    
+    # --- Modulation Bounds ---
+    min_val: float = Field(
+        default=0.1, 
+        description="Value applied in pure white areas."
+    )
+    max_val: float = Field(
         default=2.5, 
-        ge=0.1,
-        description="Radius size in pure black areas."
+        description="Value applied in pure black areas."
     )
 
 @register_operation("image_halftone", config_class=ImageHalftoneConfig)
 class ImageHalftoneGen(PipelineOperation):
+    
     def process(self, state: PipelineState, context: Optional[PipelineContext] = None) -> PipelineState:
         cfg = self.config or ImageHalftoneConfig()
         
@@ -39,38 +56,72 @@ class ImageHalftoneGen(PipelineOperation):
             logger.warning("No source image provided. Skipping halftone generation.")
             return state
 
+        # 1. Look up the chosen sub-generator from the registry
+        op_info = OPERATION_REGISTRY.get(cfg.generator)
+        if not op_info:
+            logger.error(f"Halftone sub-generator '{cfg.generator}' not found.")
+            return state
+            
+        SubGenClass = op_info["class"]
+        SubConfigClass = op_info["config"]
+        
+        # 2. Instantiate the sub-generator with its baseline settings
+        try:
+            sub_config = SubConfigClass(**cfg.generator_settings)
+            sub_gen = SubGenClass(config=sub_config)
+        except Exception as e:
+            logger.error(f"Failed to initialize '{cfg.generator}': {e}")
+            return state
+
         effective_boundary = self.get_effective_boundary(state)
         minx, miny, maxx, maxy = effective_boundary.bounds
 
-        logger.info(f"Generating halftone pattern from {cfg.source_image}")
+        logger.info(f"Generating modulated {cfg.generator} pattern from {cfg.source_image}")
         sampler = ImageSampler(cfg.source_image, effective_boundary.bounds)
         
         new_lines = []
+        half_space = cfg.spacing / 2.0
         
-        # 1. Iterate over the boundary in a grid
         current_x = minx
         while current_x <= maxx:
             current_y = miny
             while current_y <= maxy:
                 
-                # 2. Sample the image darkness (0.0 to 1.0) at this specific X/Y coordinate
+                # 3. Calculate the modulated value (Lerp)
                 darkness = sampler.get_darkness(current_x, current_y)
+                modulated_val = cfg.min_val + (darkness * (cfg.max_val - cfg.min_val))
                 
-                # 3. Map the 0-1 darkness to our target radius range (Lerp)
-                radius = cfg.min_radius + (darkness * (cfg.max_radius - cfg.min_radius))
+                # 4. Inject the new value directly into the sub-generator's config
+                if hasattr(sub_gen.config, cfg.target_setting):
+                    setattr(sub_gen.config, cfg.target_setting, modulated_val)
+                else:
+                    logger.warning(f"Setting '{cfg.target_setting}' does not exist on {cfg.generator}")
+                    return state
                 
-                # 4. Generate the geometry if the radius is large enough to warrant it
-                if radius > 0.05:
-                    # Create a circle and extract its perimeter as a drawable LineString
-                    circle_poly = Point(current_x, current_y).buffer(radius, resolution=16)
-                    new_lines.append(LineString(circle_poly.exterior.coords))
+                # 5. Create a localized context so the generator knows its explicit center
+                local_ctx = PipelineContext(
+                    local_center_x=current_x,
+                    local_center_y=current_y
+                )
+                
+                # 6. Create a distinct boundary box for this specific cell to allow local clipping
+                cell_poly = box(
+                    current_x - half_space, 
+                    current_y - half_space, 
+                    current_x + half_space, 
+                    current_y + half_space
+                )
+                local_state = PipelineState(boundary=cell_poly)
+                
+                # 7. Execute the sub-generator and collect its lines
+                result_state = sub_gen.process(local_state, context=local_ctx)
+                new_lines.extend(result_state.lines)
                 
                 current_y += cfg.spacing
             current_x += cfg.spacing
 
-        logger.success(f"Halftone generation complete. Created {len(new_lines)} shapes.")
+        logger.success(f"Halftone generation complete. Created {len(new_lines)} path segments.")
         
-        # 5. Append the new lines to the existing state
         return PipelineState(
             boundary=state.boundary,
             lines=state.lines + new_lines,
