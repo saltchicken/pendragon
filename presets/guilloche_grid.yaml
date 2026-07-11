@@ -24,7 +24,13 @@
   settings:
     tolerance: 0.1
     preserve_topology: false
+- operation: add_boundary
+  settings:
+    overscan: 0.0
 - operation: optimize
   settings:
     start_x: 0.0
     start_y: 0.0
+- operation: connect_continuous
+  settings:
+    snap_distance: 0.05
