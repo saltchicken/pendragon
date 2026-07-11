@@ -674,8 +674,6 @@ class LiveEditorWindow(QMainWindow):
         connect = state_data["connect"]
         vertices = len(pos)  # The total number of points is just the length of the position array
         
-        self.update_stats_ui(step, total, op_name, line_count, vertices, False)
-        
         # --- 1. PRE-RENDER UI UPDATE ---
         safe_total = max(1, total) 
         self.progress_bar.setMaximum(safe_total)
@@ -685,8 +683,11 @@ class LiveEditorWindow(QMainWindow):
         QApplication.processEvents()
         
         # --- 2. INSTANT GPU INJECTION ---
-        # Bypasses all main-thread math; passes the arrays directly to Vispy
-        self.viewer.set_live_vectors(pos, connect)
+        # ONLY update the visuals if we are actively tracking the final view, 
+        # or if the pipeline is streaming the exact step we are currently inspecting.
+        if self.viewer.show_final_view or step == self.viewer.current_step:
+            self.update_stats_ui(step, total, op_name, line_count, vertices, False)
+            self.viewer.set_live_vectors(pos, connect)
 
         # --- 3. POST-RENDER CLEANUP ---
         self.progress_bar.setFormat(f"{step} / {total} ({op_name})")
