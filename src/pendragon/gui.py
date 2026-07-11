@@ -109,7 +109,7 @@ QProgressBar::chunk {
 
 
 class PipelineStreamingThread(QThread):
-    step_completed = pyqtSignal(dict) 
+    step_completed = pyqtSignal(dict)
     finished = pyqtSignal(list)
     error = pyqtSignal(str)
     cancelled = pyqtSignal()
@@ -118,7 +118,7 @@ class PipelineStreamingThread(QThread):
         super().__init__()
         self.recipe = recipe
         self.boundary = boundary
-        self.frame_time = 1.0 / target_fps 
+        self.frame_time = 1.0 / target_fps
         self.process = None
 
     def cancel(self):
@@ -132,24 +132,23 @@ class PipelineStreamingThread(QThread):
         try:
             self.progress_queue = multiprocessing.Queue()
             self.process = multiprocessing.Process(
-                target=run_pipeline_streaming, 
-                args=(self.recipe, self.boundary, self.progress_queue)
-            )
+                target=run_pipeline_streaming,
+                args=(self.recipe, self.boundary, self.progress_queue))
             self.process.start()
-            
+
             last_emit_time = 0.0
             pending_data = None
-            
+
             # Loop while the process runs OR there is still data to flush
             while self.process.is_alive() or not self.progress_queue.empty():
                 try:
-                    data = self.progress_queue.get(timeout=0.01) 
-                    
+                    data = self.progress_queue.get(timeout=0.01)
+
                     if data["type"] == "DONE":
                         if pending_data is not None:
                             self.step_completed.emit(pending_data)
                         self.finished.emit(data["history"])
-                        return # Clean exit
+                        return  # Clean exit
 
                     if data["type"] == "FRAME":
                         pending_data = data
@@ -157,15 +156,15 @@ class PipelineStreamingThread(QThread):
                         if current_time - last_emit_time >= self.frame_time:
                             self.step_completed.emit(pending_data)
                             last_emit_time = current_time
-                            pending_data = None 
-                            
+                            pending_data = None
+
                 except standard_queue.Empty:
                     if pending_data is not None:
                         self.step_completed.emit(pending_data)
                         last_emit_time = time.time()
                         pending_data = None
                     continue
-                    
+
         except Exception as e:
             self.error.emit(str(e))
 
@@ -211,9 +210,10 @@ class LiveEditorWindow(QMainWindow):
         self.progress_bar = QProgressBar()
         self.progress_bar.setValue(0)
         self.progress_bar.setTextVisible(True)
-        
+
         self.btn_cancel = QPushButton("Cancel")
-        self.btn_cancel.setStyleSheet("background-color: #8b0000; font-weight: bold;")
+        self.btn_cancel.setStyleSheet(
+            "background-color: #8b0000; font-weight: bold;")
         self.btn_cancel.setEnabled(False)
         self.btn_cancel.clicked.connect(self._cancel_computation)
 
@@ -304,21 +304,23 @@ class LiveEditorWindow(QMainWindow):
             return
 
         self._is_computing = True
-        
+
         # Reset UI for computation
         self.btn_cancel.setEnabled(True)
-        self.btn_cancel.setStyleSheet("background-color: #ff4444; color: white; font-weight: bold;")
+        self.btn_cancel.setStyleSheet(
+            "background-color: #ff4444; color: white; font-weight: bold;")
         self.progress_bar.setValue(0)
         self.progress_bar.setFormat("Initializing...")
 
         current_recipe = self._get_current_recipe()
-        
-        self.worker_thread = PipelineStreamingThread(current_recipe, self.engine.boundary)
+
+        self.worker_thread = PipelineStreamingThread(current_recipe,
+                                                     self.engine.boundary)
         self.worker_thread.step_completed.connect(self._on_step_streamed)
         self.worker_thread.finished.connect(self._on_calculation_finished)
         self.worker_thread.error.connect(self._on_calculation_error)
         self.worker_thread.cancelled.connect(self._on_calculation_cancelled)
-        
+
         self.worker_thread.start()
 
     def _cancel_computation(self):
@@ -330,9 +332,10 @@ class LiveEditorWindow(QMainWindow):
 
     def _on_calculation_cancelled(self):
         self._is_computing = False
-        self._computation_queued = False # Flush queue on abort
+        self._computation_queued = False  # Flush queue on abort
         self.btn_cancel.setEnabled(False)
-        self.btn_cancel.setStyleSheet("background-color: #8b0000; color: #aaaaaa; font-weight: bold;")
+        self.btn_cancel.setStyleSheet(
+            "background-color: #8b0000; color: #aaaaaa; font-weight: bold;")
         self.progress_bar.setFormat("Computation Aborted")
         logger.warning("Pipeline calculation cancelled by user.")
 
@@ -344,7 +347,8 @@ class LiveEditorWindow(QMainWindow):
         self.viewer.show_vertices = checked
         self.viewer.update_view()
 
-    def update_stats_ui(self, step, total_ops, op_name, lines, vertices, final_view):
+    def update_stats_ui(self, step, total_ops, op_name, lines, vertices,
+                        final_view):
         step_text = f"{step} / {total_ops}"
         if final_view:
             step_text += " (FINAL VIEW)"
@@ -364,15 +368,18 @@ class LiveEditorWindow(QMainWindow):
 
         op_index = self.viewer.current_step - 1
         if op_index < 0 or op_index >= len(self.engine.runner.operations):
-            self.form_layout.addRow(QLabel("No configurable parameters for this state."))
+            self.form_layout.addRow(
+                QLabel("No configurable parameters for this state."))
             return
 
         operation = self.engine.runner.operations[op_index]
         if not operation.config:
-            self.form_layout.addRow(QLabel(f"{operation.__class__.__name__} has no config."))
+            self.form_layout.addRow(
+                QLabel(f"{operation.__class__.__name__} has no config."))
             return
 
-        self.form_layout.addRow(QLabel(f"<b>Editing: {operation.__class__.__name__}</b>"))
+        self.form_layout.addRow(
+            QLabel(f"<b>Editing: {operation.__class__.__name__}</b>"))
 
         for field_name, field_info in operation.config.model_fields.items():
             current_value = getattr(operation.config, field_name)
@@ -396,14 +403,20 @@ class LiveEditorWindow(QMainWindow):
                     slider.setMinimum(0)
                     slider.setMaximum(100)
 
-                    current_percent = int(((current_value - val_min) / (val_max - val_min)) * 100)
+                    current_percent = int(
+                        ((current_value - val_min) / (val_max - val_min)) * 100)
                     slider.setValue(current_percent)
 
                     value_label = QLabel(f"{current_value:.2f}")
                     value_label.setMinimumWidth(35)
                     value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
-                    def update_bounded_float(val, fname=field_name, idx=op_index, lbl=value_label, v_min=val_min, v_max=val_max):
+                    def update_bounded_float(val,
+                                             fname=field_name,
+                                             idx=op_index,
+                                             lbl=value_label,
+                                             v_min=val_min,
+                                             v_max=val_max):
                         real_val = v_min + (val / 100.0) * (v_max - v_min)
                         lbl.setText(f"{real_val:.2f}")
                         self.update_parameter(idx, fname, real_val)
@@ -419,7 +432,9 @@ class LiveEditorWindow(QMainWindow):
                     spin_box.setSingleStep(0.1)
                     spin_box.setValue(current_value)
 
-                    def update_unbounded_float(val, fname=field_name, idx=op_index):
+                    def update_unbounded_float(val,
+                                               fname=field_name,
+                                               idx=op_index):
                         self.update_parameter(idx, fname, val)
 
                     spin_box.valueChanged.connect(update_unbounded_float)
@@ -434,7 +449,8 @@ class LiveEditorWindow(QMainWindow):
 
                 spin_box = QSpinBox()
                 spin_box.setRange(0, 10000)
-                spin_box.setValue(int(current_value) if current_value is not None else 0)
+                spin_box.setValue(
+                    int(current_value) if current_value is not None else 0)
 
                 def update_int_wrapper(val, fname=field_name, idx=op_index):
                     self.update_parameter(idx, fname, val)
@@ -478,7 +494,9 @@ class LiveEditorWindow(QMainWindow):
 
                 combo_box.blockSignals(False)
 
-                def update_literal_wrapper(text, fname=field_name, idx=op_index):
+                def update_literal_wrapper(text,
+                                           fname=field_name,
+                                           idx=op_index):
                     self.update_parameter(idx, fname, text)
 
                 combo_box.currentTextChanged.connect(update_literal_wrapper)
@@ -494,7 +512,10 @@ class LiveEditorWindow(QMainWindow):
                 schema_extra = field_info.json_schema_extra or {}
                 widget_type = schema_extra.get("widget")
 
-                def update_value(text, fname=field_name, idx=op_index, wtype=widget_type):
+                def update_value(text,
+                                 fname=field_name,
+                                 idx=op_index,
+                                 wtype=widget_type):
                     op = self.engine.runner.operations[idx]
                     if getattr(op.config, fname) == text:
                         return
@@ -538,7 +559,10 @@ class LiveEditorWindow(QMainWindow):
 
                 self.form_layout.addRow(field_name, container)
 
-            elif isinstance(current_value, dict) or field_info.annotation == dict or getattr(field_info.annotation, '__origin__', None) is dict:
+            elif isinstance(current_value,
+                            dict) or field_info.annotation == dict or getattr(
+                                field_info.annotation, '__origin__',
+                                None) is dict:
                 registry_key = None
                 prefix = field_name.split('_')[0] if '_' in field_name else ""
                 if prefix and hasattr(operation.config, prefix):
@@ -546,16 +570,22 @@ class LiveEditorWindow(QMainWindow):
                 elif hasattr(operation.config, "generator"):
                     registry_key = getattr(operation.config, "generator")
 
-                op_info = OPERATION_REGISTRY.get(registry_key) if registry_key else None
+                op_info = OPERATION_REGISTRY.get(
+                    registry_key) if registry_key else None
 
                 if op_info and op_info["config"]:
                     sub_config_class = op_info["config"]
-                    self.form_layout.addRow(QLabel(f"<br><i>Nested Context: {registry_key} ({field_name})</i>"))
+                    self.form_layout.addRow(
+                        QLabel(
+                            f"<br><i>Nested Context: {registry_key} ({field_name})</i>"
+                        ))
 
-                    for sub_field_name, sub_field_info in sub_config_class.model_fields.items():
+                    for sub_field_name, sub_field_info in sub_config_class.model_fields.items(
+                    ):
                         if sub_field_info.annotation == float:
                             sub_current_value = current_value.get(
-                                sub_field_name, sub_field_info.default if sub_field_info.default is not None else 0.0)
+                                sub_field_name, sub_field_info.default
+                                if sub_field_info.default is not None else 0.0)
 
                             sub_container = QWidget()
                             sub_h_layout = QHBoxLayout(sub_container)
@@ -568,18 +598,25 @@ class LiveEditorWindow(QMainWindow):
 
                             sub_value_label = QLabel(f"{sub_current_value:.1f}")
                             sub_value_label.setMinimumWidth(35)
-                            sub_value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                            sub_value_label.setAlignment(Qt.AlignRight |
+                                                         Qt.AlignVCenter)
 
                             sub_h_layout.addWidget(sub_slider)
                             sub_h_layout.addWidget(sub_value_label)
 
-                            def sub_update_wrapper(val, parent_dict=field_name, fname=sub_field_name, idx=op_index, lbl=sub_value_label):
+                            def sub_update_wrapper(val,
+                                                   parent_dict=field_name,
+                                                   fname=sub_field_name,
+                                                   idx=op_index,
+                                                   lbl=sub_value_label):
                                 real_val = val / 10.0
                                 lbl.setText(f"{real_val:.1f}")
-                                self.update_nested_parameter(idx, parent_dict, fname, real_val)
+                                self.update_nested_parameter(
+                                    idx, parent_dict, fname, real_val)
 
                             sub_slider.valueChanged.connect(sub_update_wrapper)
-                            self.form_layout.addRow(f"↳ {sub_field_name}", sub_container)
+                            self.form_layout.addRow(f"↳ {sub_field_name}",
+                                                    sub_container)
 
     def update_parameter(self, op_index, field_name, new_value):
         operation = self.engine.runner.operations[op_index]
@@ -587,7 +624,8 @@ class LiveEditorWindow(QMainWindow):
         self._pending_op_index = op_index
         self.debounce_timer.start()
 
-    def update_nested_parameter(self, op_index, parent_dict_name, sub_field_name, new_value):
+    def update_nested_parameter(self, op_index, parent_dict_name,
+                                sub_field_name, new_value):
         operation = self.engine.runner.operations[op_index]
         if hasattr(operation.config, parent_dict_name):
             target_dict = getattr(operation.config, parent_dict_name)
@@ -606,7 +644,7 @@ class LiveEditorWindow(QMainWindow):
         op_name = state_data["op_name"]
         lines = state_data["lines"]
         vertices = sum(len(line.coords) for line in lines)
-        
+
         self.update_stats_ui(step, total, op_name, len(lines), vertices, False)
         self.viewer.set_live_lines(lines)
 
@@ -617,20 +655,23 @@ class LiveEditorWindow(QMainWindow):
 
     def _on_calculation_finished(self, history):
         self._is_computing = False
-        
+
         # Cleanup UI
         self.btn_cancel.setEnabled(False)
-        self.btn_cancel.setStyleSheet("background-color: #8b0000; color: #aaaaaa; font-weight: bold;")
-        
-        # Sometimes processes finish so fast the queue skips intermediate UI updates. 
+        self.btn_cancel.setStyleSheet(
+            "background-color: #8b0000; color: #aaaaaa; font-weight: bold;")
+
+        # Sometimes processes finish so fast the queue skips intermediate UI updates.
         # Force the bar to 100% on success.
         self.progress_bar.setValue(self.progress_bar.maximum())
         self.progress_bar.setFormat("Ready")
 
         # Sync the engine's runner history for localized scrubbing
         self.engine.runner.history = history
-        
-        target = len(self.engine.runner.operations) if self.viewer.show_final_view else self.viewer.current_step
+
+        target = len(
+            self.engine.runner.operations
+        ) if self.viewer.show_final_view else self.viewer.current_step
         self.viewer.current_step = min(target, len(history) - 1)
         self.viewer.update_view()
         self._pending_op_index = None
@@ -645,7 +686,8 @@ class LiveEditorWindow(QMainWindow):
         logger.error(f"Background pipeline failed: {error_msg}")
         self.progress_bar.setFormat("Error")
         self.btn_cancel.setEnabled(False)
-        self.btn_cancel.setStyleSheet("background-color: #8b0000; color: #aaaaaa; font-weight: bold;")
+        self.btn_cancel.setStyleSheet(
+            "background-color: #8b0000; color: #aaaaaa; font-weight: bold;")
 
     def _get_current_recipe(self) -> list:
         current_recipe = []
@@ -701,7 +743,8 @@ class LiveEditorWindow(QMainWindow):
                 new_recipe = yaml.safe_load(f)
 
             if not isinstance(new_recipe, list):
-                logger.error("Invalid recipe format: must be a list of operations.")
+                logger.error(
+                    "Invalid recipe format: must be a list of operations.")
                 return
 
             success = self.engine.load_recipe(new_recipe)
@@ -742,6 +785,25 @@ class LiveEditorWindow(QMainWindow):
             logger.success(f"Recipe successfully saved to {file_path}")
         except Exception as e:
             logger.error(f"Failed to save recipe: {e}")
+
+    def closeEvent(self, event):
+        """
+        Intercepts the window close action to guarantee no background
+        processes are left orphaned consuming CPU.
+        """
+        if self.worker_thread and self.worker_thread.isRunning():
+            logger.info(
+                "Application closing: Terminating background workers...")
+
+            # Hard kill the multiprocessing.Process
+            self.worker_thread.cancel()
+
+            # Tell the QThread to stop and wait up to 1000ms for it to clean up
+            self.worker_thread.quit()
+            self.worker_thread.wait(1000)
+
+        # Accept the event so the window actually closes
+        event.accept()
 
 
 class PipelineViewer(scene.SceneCanvas):
@@ -837,11 +899,15 @@ class PipelineViewer(scene.SceneCanvas):
 
             stacked_pos = np.vstack(pos)
 
-            self.lines_visual.set_data(pos=stacked_pos, connect=np.array(connect))
+            self.lines_visual.set_data(pos=stacked_pos,
+                                       connect=np.array(connect))
             self.lines_visual.visible = True
 
             if self.show_vertices:
-                self.vertices_visual.set_data(pos=stacked_pos, face_color='red', edge_color=None, size=10)
+                self.vertices_visual.set_data(pos=stacked_pos,
+                                              face_color='red',
+                                              edge_color=None,
+                                              size=10)
                 self.vertices_visual.visible = True
             else:
                 self.vertices_visual.visible = False
@@ -850,7 +916,8 @@ class PipelineViewer(scene.SceneCanvas):
             self.vertices_visual.visible = False
 
     def update_view(self):
-        target_step = len(self.engine.runner.operations) if self.show_final_view else self.current_step
+        target_step = len(self.engine.runner.operations
+                         ) if self.show_final_view else self.current_step
 
         # Safely cap the display step to whatever history currently exists
         display_step = min(target_step, len(self.engine.runner.history) - 1)
