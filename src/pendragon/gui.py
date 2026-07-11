@@ -114,10 +114,12 @@ class PipelineStreamingThread(QThread):
     error = pyqtSignal(str)
     cancelled = pyqtSignal()
 
-    def __init__(self, recipe, boundary, target_fps=30):
+    def __init__(self, recipe, boundary, prior_history=None, start_index=0, target_fps=30):
         super().__init__()
         self.recipe = recipe
         self.boundary = boundary
+        self.prior_history = prior_history or []
+        self.start_index = start_index
         self.frame_time = 1.0 / target_fps
         self.process = None
 
@@ -133,7 +135,7 @@ class PipelineStreamingThread(QThread):
             self.progress_queue = multiprocessing.Queue()
             self.process = multiprocessing.Process(
                 target=run_pipeline_streaming,
-                args=(self.recipe, self.boundary, self.progress_queue))
+                args=(self.recipe, self.boundary, self.progress_queue, self.prior_history, self.start_index))
             self.process.start()
 
             last_emit_time = 0.0
@@ -299,23 +301,39 @@ class LiveEditorWindow(QMainWindow):
     def _trigger_computation(self):
         """Centralized queue manager. Prevents overlapping threads and freezes."""
         if self._is_computing:
-            # Mark that a new calculation is requested, but do NOT block or kill the current one.
             self._computation_queued = True
             return
 
         self._is_computing = True
 
+        # 1. Determine where to start
+        start_index = self._pending_op_index if self._pending_op_index is not None else 0
+        self._pending_op_index = None  # Clear it immediately so edits while computing are tracked
+
+        # 2. Grab history up to the point of change (start_index + 1 includes the base geometry at index 0)
+        prior_history = None
+        if start_index > 0 and len(self.engine.runner.history) > start_index:
+            prior_history = self.engine.runner.history[:start_index + 1]
+        else:
+            start_index = 0  # Fallback to scratch if history doesn't exist
+
         # Reset UI for computation
         self.btn_cancel.setEnabled(True)
-        self.btn_cancel.setStyleSheet(
-            "background-color: #ff4444; color: white; font-weight: bold;")
-        self.progress_bar.setValue(0)
+        self.btn_cancel.setStyleSheet("background-color: #ff4444; color: white; font-weight: bold;")
+        
+        # Visually jump the progress bar to the starting step
+        self.progress_bar.setValue(start_index) 
         self.progress_bar.setFormat("Initializing...")
 
         current_recipe = self._get_current_recipe()
 
-        self.worker_thread = PipelineStreamingThread(current_recipe,
-                                                     self.engine.boundary)
+        # 3. Fire up the thread with the partial history
+        self.worker_thread = PipelineStreamingThread(
+            current_recipe,
+            self.engine.boundary,
+            prior_history=prior_history,
+            start_index=start_index
+        )
         self.worker_thread.step_completed.connect(self._on_step_streamed)
         self.worker_thread.finished.connect(self._on_calculation_finished)
         self.worker_thread.error.connect(self._on_calculation_error)
@@ -621,17 +639,24 @@ class LiveEditorWindow(QMainWindow):
     def update_parameter(self, op_index, field_name, new_value):
         operation = self.engine.runner.operations[op_index]
         setattr(operation.config, field_name, new_value)
-        self._pending_op_index = op_index
+        # Track the lowest index modified
+        if self._pending_op_index is None:
+            self._pending_op_index = op_index
+        else:
+            self._pending_op_index = min(self._pending_op_index, op_index)
         self.debounce_timer.start()
 
-    def update_nested_parameter(self, op_index, parent_dict_name,
-                                sub_field_name, new_value):
+    def update_nested_parameter(self, op_index, parent_dict_name, sub_field_name, new_value):
         operation = self.engine.runner.operations[op_index]
         if hasattr(operation.config, parent_dict_name):
             target_dict = getattr(operation.config, parent_dict_name)
             if isinstance(target_dict, dict):
                 target_dict[sub_field_name] = new_value
-                self._pending_op_index = op_index
+                # Track the lowest index modified
+                if self._pending_op_index is None:
+                    self._pending_op_index = op_index
+                else:
+                    self._pending_op_index = min(self._pending_op_index, op_index)
                 self.debounce_timer.start()
 
     def _execute_recalculation(self):
@@ -644,52 +669,57 @@ class LiveEditorWindow(QMainWindow):
         op_name = state_data["op_name"]
         lines = state_data["lines"]
         vertices = sum(len(line.coords) for line in lines)
-
+        
         self.update_stats_ui(step, total, op_name, len(lines), vertices, False)
-        self.viewer.set_live_lines(lines)
-
-        safe_total = max(1, total)
-
-        # Update Progress Bar
+        
+        # --- 1. PRE-RENDER UI UPDATE ---
+        safe_total = max(1, total) 
         self.progress_bar.setMaximum(safe_total)
         self.progress_bar.setValue(step)
+        
+        # Explicitly tell the user we are rendering this specific step
+        self.progress_bar.setFormat(f"{step} / {total} ({op_name}) - Rendering...")
+        
+        # Force PyQt to draw the "Rendering..." text to the screen immediately
+        QApplication.processEvents()
+        
+        # --- 2. HEAVY LIFTING ---
+        # Now we do the heavy numpy/Vispy array conversions
+        self.viewer.set_live_lines(lines)
+
+        # --- 3. POST-RENDER CLEANUP ---
+        # Strip the "Rendering..." text off now that the graphic is on screen
         self.progress_bar.setFormat(f"{step} / {total} ({op_name})")
 
     def _on_calculation_finished(self, history):
         self._is_computing = False
-
-        # Cleanup UI
+        
+        # Cleanup UI buttons
         self.btn_cancel.setEnabled(False)
-        self.btn_cancel.setStyleSheet(
-            "background-color: #8b0000; color: #aaaaaa; font-weight: bold;")
-
-        # --- NEW UX CODE ---
-        # Force the progress bar to 100% and tell the user we are drawing
+        self.btn_cancel.setStyleSheet("background-color: #8b0000; color: #aaaaaa; font-weight: bold;")
+        
+        # Lock bar at 100% and show finalization status
         self.progress_bar.setValue(self.progress_bar.maximum())
-        self.progress_bar.setFormat("Rendering Graphic to Screen...")
-
-        # This is the magic line. It forces PyQt to instantly redraw the
-        # UI with the text above BEFORE proceeding to the heavy blocking code below.
-        QApplication.processEvents()
-        # -------------------
+        self.progress_bar.setFormat("Finalizing Display...")
+        QApplication.processEvents() 
 
         # Sync the engine's runner history for localized scrubbing
         self.engine.runner.history = history
-
-        target = len(
-            self.engine.runner.operations
-        ) if self.viewer.show_final_view else self.viewer.current_step
+        
+        target = len(self.engine.runner.operations) if self.viewer.show_final_view else self.viewer.current_step
         self.viewer.current_step = min(target, len(history) - 1)
+        
+        # Update view (now blazingly fast due to numpy)
+        self.viewer.update_view() 
 
-        # This is the heavy Vispy method that freezes the thread
-        self.viewer.update_view()
+        # Give Vispy's OpenGL backend 150ms to push the final frame to the monitor 
+        # before we declare the UI perfectly "Ready".
+        QTimer.singleShot(150, self._set_ready_state)
 
-        self._pending_op_index = None
-
-        # --- AFTER RENDER ---
+    def _set_ready_state(self):
+        """Clears the progress bar and queues the next run if needed."""
         self.progress_bar.setFormat("Ready")
-        # --------------------
-
+        
         # Automatically start the next computation if the user kept sliding the bar
         if self._computation_queued:
             self._computation_queued = False
@@ -721,6 +751,7 @@ class LiveEditorWindow(QMainWindow):
     def _reload_pipeline(self, new_recipe: list, target_step: int):
         success = self.engine.load_recipe(new_recipe)
         if success:
+            self._pending_op_index = 0  # Force a full recalculation from scratch
             max_step = len(self.engine.runner.operations)
             self.viewer.current_step = max(0, min(target_step, max_step))
             self.build_ui_for_current_step()
@@ -959,24 +990,30 @@ class PipelineViewer(scene.SceneCanvas):
             elif isinstance(state.boundary, MultiPolygon):
                 polygons = list(state.boundary.geoms)
 
-            b_pos = []
-            b_connect = []
-            b_idx = 0
-
+            # --- FAST VECTORIZED BOUNDARY PREP ---
+            coords_list = []
             for poly in polygons:
-                rings = [poly.exterior] + list(poly.interiors)
-                for ring in rings:
-                    coords = np.array(ring.coords)
-                    b_pos.append(coords)
-                    n_pts = len(coords)
-                    for i in range(n_pts - 1):
-                        b_connect.append([b_idx + i, b_idx + i + 1])
-                    b_idx += n_pts
+                coords_list.append(np.array(poly.exterior.coords))
+                for interior in poly.interiors:
+                    coords_list.append(np.array(interior.coords))
 
-            if b_pos:
-                stacked_b_pos = np.vstack(b_pos)
-                self.boundary_visual.set_data(pos=stacked_b_pos,
-                                              connect=np.array(b_connect))
+            if coords_list:
+                stacked_b_pos = np.vstack(coords_list)
+                lengths = [len(c) for c in coords_list]
+                connect_blocks = []
+                current_idx = 0
+                
+                for n in lengths:
+                    if n > 1:
+                        # Rapidly generate [0,1], [1,2], [2,3] index pairs
+                        starts = np.arange(current_idx, current_idx + n - 1)
+                        ends = starts + 1
+                        connect_blocks.append(np.column_stack((starts, ends)))
+                    current_idx += n
+                    
+                b_connect = np.vstack(connect_blocks) if connect_blocks else np.empty((0, 2))
+                
+                self.boundary_visual.set_data(pos=stacked_b_pos, connect=b_connect)
                 self.boundary_visual.visible = True
             else:
                 self.boundary_visual.visible = False

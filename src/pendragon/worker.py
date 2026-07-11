@@ -8,18 +8,21 @@ from pendragon.core.models import PipelineState
 from pendragon.core.registry import OPERATION_REGISTRY
 
 
-def run_pipeline_streaming(recipe, boundary, progress_queue):
+def run_pipeline_streaming(recipe, boundary, progress_queue, prior_history=None, start_index=0):
     """
     Executes the pipeline in a background process, pushing intermediate states.
     Pushes the final history array to the queue at the end.
     """
     load_plugins()
 
-    initial_state = PipelineState(boundary=boundary,
-                                  operation_name="base_geometry")
-    history = [initial_state]
-    operations = []
+    # 1. Use the provided history, or start from scratch if none exists
+    if prior_history:
+        history = prior_history
+    else:
+        initial_state = PipelineState(boundary=boundary, operation_name="base_geometry")
+        history = [initial_state]
 
+    operations = []
     for step in recipe:
         op_name = step.get("operation")
         op_info = OPERATION_REGISTRY.get(op_name)
@@ -27,25 +30,28 @@ def run_pipeline_streaming(recipe, boundary, progress_queue):
             continue
 
         PluginClass, ConfigClass = op_info["class"], op_info["config"]
-        config = ConfigClass(
-            **step.get("settings", {})) if ConfigClass else None
+        config = ConfigClass(**step.get("settings", {})) if ConfigClass else None
         operations.append(PluginClass(config=config))
 
     empty_context = PipelineContext()
     total_ops = len(operations)
 
-    progress_queue.put({
-        "type": "FRAME",
-        "step": 0,
-        "total": total_ops,
-        "op_name": history[-1].operation_name,
-        "lines": history[-1].lines
-    })
+    # (Optional) Notify UI of the starting frame if we are starting from 0
+    if start_index == 0:
+        progress_queue.put({
+            "type": "FRAME",
+            "step": 0,
+            "total": total_ops,
+            "op_name": history[-1].operation_name,
+            "lines": history[-1].lines
+        })
 
-    for i, op in enumerate(operations):
+    # 2. Only process operations from the modified index onward
+    for i in range(start_index, total_ops):
+        op = operations[i]
         current_state = history[-1]
+        
         sig = inspect.signature(op.process)
-
         if 'context' in sig.parameters:
             new_state = op.process(current_state, context=empty_context)
         else:
@@ -61,5 +67,4 @@ def run_pipeline_streaming(recipe, boundary, progress_queue):
             "lines": new_state.lines
         })
 
-    # Push the final result through the queue instead of returning it
     progress_queue.put({"type": "DONE", "history": history})
