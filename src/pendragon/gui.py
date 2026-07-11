@@ -127,7 +127,7 @@ class LiveEditorWindow(QMainWindow):
 
         # Add this near your existing final_view_checkbox
         self.show_vertices_checkbox = QCheckBox("Show Vertices")
-        self.show_vertices_checkbox.setChecked(True) # Default on
+        self.show_vertices_checkbox.setChecked(False)
         self.show_vertices_checkbox.toggled.connect(self._on_vertices_toggled)
         self.control_layout.addWidget(self.show_vertices_checkbox)
 
@@ -226,10 +226,13 @@ class LiveEditorWindow(QMainWindow):
         self.vertices_label.setText(str(vertices))
 
     def build_ui_for_current_step(self):
-        while self.form_layout.count():
-            child = self.form_layout.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
+        # 1. Safely obliterate the old layout container and start fresh
+        self.control_layout.removeWidget(self.dynamic_form_widget)
+        self.dynamic_form_widget.deleteLater()
+        
+        self.dynamic_form_widget = QWidget()
+        self.form_layout = QFormLayout(self.dynamic_form_widget)
+        self.control_layout.addWidget(self.dynamic_form_widget)
 
         op_index = self.viewer.current_step - 1
         if op_index < 0 or op_index >= len(self.engine.runner.operations):
@@ -321,8 +324,9 @@ class LiveEditorWindow(QMainWindow):
                 combo_box = QComboBox()
                 
                 # get_args extracts the allowed values from the Literal
-                # e.g., ("horizontal", "vertical", "crosshatch")
                 allowed_options = get_args(field_info.annotation)
+                
+                combo_box.blockSignals(True)
                 combo_box.addItems([str(opt) for opt in allowed_options])
 
                 # Set the current active text
@@ -330,6 +334,8 @@ class LiveEditorWindow(QMainWindow):
                     combo_box.setCurrentText(str(current_value))
                 elif allowed_options:
                     combo_box.setCurrentText(str(allowed_options[0]))
+                
+                combo_box.blockSignals(False)
 
                 def update_literal_wrapper(text, fname=field_name, idx=op_index):
                     self.update_parameter(idx, fname, text)
@@ -349,16 +355,31 @@ class LiveEditorWindow(QMainWindow):
                 schema_extra = field_info.json_schema_extra or {}
                 widget_type = schema_extra.get("widget")
 
-                # Shared updater for both QComboBox and QLineEdit
-                def update_value(text, fname=field_name, idx=op_index):
+                # Shared updater 
+                def update_value(text, fname=field_name, idx=op_index, wtype=widget_type):
+                    op = self.engine.runner.operations[idx]
+                    
+                    if getattr(op.config, fname) == text:
+                        return
+                        
                     self.update_parameter(idx, fname, text)
+
+                    if wtype == "operation_selector":
+                        settings_key = f"{fname}_settings"
+                        if hasattr(op.config, settings_key):
+                            setattr(op.config, settings_key, {})
+                        
+                        QTimer.singleShot(0, self.build_ui_for_current_step)
 
                 # 1. Custom Operation Selector Dropdown
                 if widget_type == "operation_selector":
                     widget = QComboBox()
+                    
+                    widget.blockSignals(True)
                     widget.addItems(sorted(OPERATION_REGISTRY.keys()))
                     if current_value:
                         widget.setCurrentText(str(current_value))
+                    widget.blockSignals(False)
                     
                     widget.currentTextChanged.connect(update_value)
                     h_layout.addWidget(widget)
@@ -611,7 +632,7 @@ class PipelineViewer(scene.SceneCanvas):
         self.unfreeze()
         self.engine = engine
         self.current_step = min(1, len(self.engine.runner.operations))
-        self.show_vertices = True
+        self.show_vertices = False
         self.show_final_view = False
 
         self.on_step_changed = None
