@@ -1,5 +1,5 @@
 import math
-from typing import List, Optional, Literal
+from typing import List, Literal, Optional
 
 from loguru import logger
 from pydantic import Field

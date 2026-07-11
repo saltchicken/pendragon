@@ -1,4 +1,4 @@
-from typing import get_args, get_origin, Any, Dict, List, Literal
+from typing import Any, Dict, get_args, get_origin, List, Literal
 
 from loguru import logger
 import numpy as np
@@ -6,21 +6,20 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtWidgets import QCheckBox
+from PyQt5.QtWidgets import QComboBox
+from PyQt5.QtWidgets import QDoubleSpinBox
 from PyQt5.QtWidgets import QFileDialog
 from PyQt5.QtWidgets import QFormLayout
 from PyQt5.QtWidgets import QGroupBox
 from PyQt5.QtWidgets import QHBoxLayout
 from PyQt5.QtWidgets import QLabel
+from PyQt5.QtWidgets import QLineEdit
 from PyQt5.QtWidgets import QMainWindow
 from PyQt5.QtWidgets import QPushButton
 from PyQt5.QtWidgets import QSlider
+from PyQt5.QtWidgets import QSpinBox
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
-from PyQt5.QtWidgets import QSpinBox
-from PyQt5.QtWidgets import QDoubleSpinBox
-from PyQt5.QtWidgets import QLineEdit
-from PyQt5.QtWidgets import QComboBox
-
 from shapely.geometry import MultiPolygon
 from shapely.geometry import Polygon
 from vispy import scene
@@ -166,21 +165,21 @@ class LiveEditorWindow(QMainWindow):
 
         # --- Pipeline Editing Tools ---
         self.edit_layout = QHBoxLayout()
-        
+
         self.op_selector = QComboBox()
         # Populate dropdown directly from the registry keys
         self.op_selector.addItems(sorted(OPERATION_REGISTRY.keys()))
-        
+
         self.btn_add_op = QPushButton("Add Step")
         self.btn_remove_op = QPushButton("Remove Step")
-        
+
         self.btn_add_op.clicked.connect(self._add_operation)
         self.btn_remove_op.clicked.connect(self._remove_operation)
-        
+
         self.edit_layout.addWidget(self.op_selector, stretch=2)
         self.edit_layout.addWidget(self.btn_add_op, stretch=1)
         self.edit_layout.addWidget(self.btn_remove_op, stretch=1)
-        
+
         self.control_layout.addLayout(self.edit_layout)
         # -----------------------------------
 
@@ -202,7 +201,8 @@ class LiveEditorWindow(QMainWindow):
         self._pending_op_index = None
 
         self.build_ui_for_current_step()
-        self.viewer.update_view()  # Force initial stats update now that callbacks are bound
+        self.viewer.update_view(
+        )  # Force initial stats update now that callbacks are bound
 
     def _on_view_mode_toggled(self, checked):
         """Swaps the viewer mode and forces a visual update."""
@@ -230,7 +230,7 @@ class LiveEditorWindow(QMainWindow):
         # 1. Safely obliterate the old layout container and start fresh
         self.control_layout.removeWidget(self.dynamic_form_widget)
         self.dynamic_form_widget.deleteLater()
-        
+
         self.dynamic_form_widget = QWidget()
         self.form_layout = QFormLayout(self.dynamic_form_widget)
         self.control_layout.addWidget(self.dynamic_form_widget)
@@ -273,16 +273,22 @@ class LiveEditorWindow(QMainWindow):
                 if val_min is not None and val_max is not None:
                     slider = QSlider(Qt.Horizontal)
                     slider.setMinimum(0)
-                    slider.setMaximum(100) # Standard percentage-based steps
-                    
-                    current_percent = int(((current_value - val_min) / (val_max - val_min)) * 100)
+                    slider.setMaximum(100)  # Standard percentage-based steps
+
+                    current_percent = int(
+                        ((current_value - val_min) / (val_max - val_min)) * 100)
                     slider.setValue(current_percent)
 
                     value_label = QLabel(f"{current_value:.2f}")
                     value_label.setMinimumWidth(35)
                     value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
-                    def update_bounded_float(val, fname=field_name, idx=op_index, lbl=value_label, v_min=val_min, v_max=val_max):
+                    def update_bounded_float(val,
+                                             fname=field_name,
+                                             idx=op_index,
+                                             lbl=value_label,
+                                             v_min=val_min,
+                                             v_max=val_max):
                         real_val = v_min + (val / 100.0) * (v_max - v_min)
                         lbl.setText(f"{real_val:.2f}")
                         self.update_parameter(idx, fname, real_val)
@@ -294,12 +300,15 @@ class LiveEditorWindow(QMainWindow):
                 # SCENARIO B: Unbounded Float -> QDoubleSpinBox
                 else:
                     spin_box = QDoubleSpinBox()
-                    spin_box.setRange(-10000.0, 10000.0) # Generous default range
+                    spin_box.setRange(-10000.0,
+                                      10000.0)  # Generous default range
                     spin_box.setDecimals(2)
                     spin_box.setSingleStep(0.1)
                     spin_box.setValue(current_value)
 
-                    def update_unbounded_float(val, fname=field_name, idx=op_index):
+                    def update_unbounded_float(val,
+                                               fname=field_name,
+                                               idx=op_index):
                         self.update_parameter(idx, fname, val)
 
                     spin_box.valueChanged.connect(update_unbounded_float)
@@ -314,15 +323,16 @@ class LiveEditorWindow(QMainWindow):
                 h_layout.setContentsMargins(0, 0, 0, 0)
 
                 spin_box = QSpinBox()
-                spin_box.setRange(0, 10000) # Give it a generous default range
+                spin_box.setRange(0, 10000)  # Give it a generous default range
                 # If current_value is None for some reason, default to 0 to prevent crashes
-                spin_box.setValue(int(current_value) if current_value is not None else 0)
+                spin_box.setValue(
+                    int(current_value) if current_value is not None else 0)
 
                 def update_int_wrapper(val, fname=field_name, idx=op_index):
                     self.update_parameter(idx, fname, val)
 
                 spin_box.valueChanged.connect(update_int_wrapper)
-                
+
                 h_layout.addWidget(spin_box)
                 self.form_layout.addRow(field_name, container)
 
@@ -340,7 +350,7 @@ class LiveEditorWindow(QMainWindow):
                     self.update_parameter(idx, fname, bool(state))
 
                 checkbox.stateChanged.connect(update_bool_wrapper)
-                
+
                 h_layout.addWidget(checkbox)
                 self.form_layout.addRow(field_name, container)
 
@@ -350,10 +360,10 @@ class LiveEditorWindow(QMainWindow):
                 h_layout.setContentsMargins(0, 0, 0, 0)
 
                 combo_box = QComboBox()
-                
+
                 # get_args extracts the allowed values from the Literal
                 allowed_options = get_args(field_info.annotation)
-                
+
                 combo_box.blockSignals(True)
                 combo_box.addItems([str(opt) for opt in allowed_options])
 
@@ -362,15 +372,17 @@ class LiveEditorWindow(QMainWindow):
                     combo_box.setCurrentText(str(current_value))
                 elif allowed_options:
                     combo_box.setCurrentText(str(allowed_options[0]))
-                
+
                 combo_box.blockSignals(False)
 
-                def update_literal_wrapper(text, fname=field_name, idx=op_index):
+                def update_literal_wrapper(text,
+                                           fname=field_name,
+                                           idx=op_index):
                     self.update_parameter(idx, fname, text)
 
                 # currentTextChanged fires whenever the user selects a new dropdown option
                 combo_box.currentTextChanged.connect(update_literal_wrapper)
-                
+
                 h_layout.addWidget(combo_box)
                 self.form_layout.addRow(field_name, container)
 
@@ -379,36 +391,39 @@ class LiveEditorWindow(QMainWindow):
                 container = QWidget()
                 h_layout = QHBoxLayout(container)
                 h_layout.setContentsMargins(0, 0, 0, 0)
-                
+
                 schema_extra = field_info.json_schema_extra or {}
                 widget_type = schema_extra.get("widget")
 
-                # Shared updater 
-                def update_value(text, fname=field_name, idx=op_index, wtype=widget_type):
+                # Shared updater
+                def update_value(text,
+                                 fname=field_name,
+                                 idx=op_index,
+                                 wtype=widget_type):
                     op = self.engine.runner.operations[idx]
-                    
+
                     if getattr(op.config, fname) == text:
                         return
-                        
+
                     self.update_parameter(idx, fname, text)
 
                     if wtype == "operation_selector":
                         settings_key = f"{fname}_settings"
                         if hasattr(op.config, settings_key):
                             setattr(op.config, settings_key, {})
-                        
+
                         QTimer.singleShot(0, self.build_ui_for_current_step)
 
                 # 1. Custom Operation Selector Dropdown
                 if widget_type == "operation_selector":
                     widget = QComboBox()
-                    
+
                     widget.blockSignals(True)
                     widget.addItems(sorted(OPERATION_REGISTRY.keys()))
                     if current_value:
                         widget.setCurrentText(str(current_value))
                     widget.blockSignals(False)
-                    
+
                     widget.currentTextChanged.connect(update_value)
                     h_layout.addWidget(widget)
 
@@ -417,17 +432,14 @@ class LiveEditorWindow(QMainWindow):
                     widget = QLineEdit(str(current_value or ""))
                     widget.textChanged.connect(update_value)
                     h_layout.addWidget(widget)
-                    
+
                     if widget_type == "file_picker":
                         browse_btn = QPushButton("Browse...")
-                        
+
                         def open_file_dialog(checked=False, le=widget):
                             file_path, _ = QFileDialog.getOpenFileName(
-                                self, 
-                                f"Select {field_name}", 
-                                "", 
-                                "Images (*.png *.jpg *.jpeg);;All Files (*)"
-                            )
+                                self, f"Select {field_name}", "",
+                                "Images (*.png *.jpg *.jpeg);;All Files (*)")
                             if file_path:
                                 le.setText(file_path)
 
@@ -437,7 +449,10 @@ class LiveEditorWindow(QMainWindow):
                 self.form_layout.addRow(field_name, container)
 
             # --- Dynamic Poly-morphic Nested Settings Section ---
-            elif isinstance(current_value, dict) or field_info.annotation == dict or getattr(field_info.annotation, '__origin__', None) is dict:
+            elif isinstance(current_value,
+                            dict) or field_info.annotation == dict or getattr(
+                                field_info.annotation, '__origin__',
+                                None) is dict:
                 # Infer what the target sub-registry schema is by checking adjacent sibling attributes
                 # e.g., if we are looking at generator_settings, check if self.config.generator exists.
                 registry_key = None
@@ -536,12 +551,12 @@ class LiveEditorWindow(QMainWindow):
                             if isinstance(op, info["class"])), None)
             if not op_name:
                 continue
-            
+
             step = {"operation": op_name}
             if op.config:
                 step["settings"] = op.config.model_dump()
             current_recipe.append(step)
-            
+
         return current_recipe
 
     def _reload_pipeline(self, new_recipe: list, target_step: int):
@@ -551,7 +566,7 @@ class LiveEditorWindow(QMainWindow):
             # Clamp the target step to ensure we don't go out of bounds
             max_step = len(self.engine.runner.operations)
             self.viewer.current_step = max(0, min(target_step, max_step))
-            
+
             self.build_ui_for_current_step()
             self.viewer.update_view()
 
@@ -560,13 +575,13 @@ class LiveEditorWindow(QMainWindow):
         op_name = self.op_selector.currentText()
         if not op_name:
             return
-            
+
         recipe = self._get_current_recipe()
         insert_idx = self.viewer.current_step
-        
+
         # Insert a fresh operation with default settings
         recipe.insert(insert_idx, {"operation": op_name, "settings": {}})
-        
+
         # Reload and step forward into the new operation
         self._reload_pipeline(recipe, target_step=insert_idx + 1)
 
@@ -574,7 +589,7 @@ class LiveEditorWindow(QMainWindow):
         """Removes the currently viewed operation from the pipeline."""
         recipe = self._get_current_recipe()
         remove_idx = self.viewer.current_step - 1
-        
+
         if 0 <= remove_idx < len(recipe):
             recipe.pop(remove_idx)
             # Reload and step back to the previous operation
@@ -679,9 +694,9 @@ class PipelineViewer(scene.SceneCanvas):
         self.boundary_visual = scene.visuals.Line(pos=dummy_pos,
                                                   parent=self.view.scene,
                                                   color='red')
-        self.vertices_visual = scene.visuals.Markers(pos=dummy_pos, 
+        self.vertices_visual = scene.visuals.Markers(pos=dummy_pos,
                                                      parent=self.view.scene)
-        
+
         # Hide them initially. update_view() will reveal them when data exists.
         self.lines_visual.visible = False
         self.boundary_visual.visible = False
@@ -731,7 +746,7 @@ class PipelineViewer(scene.SceneCanvas):
     def update_view(self):
         # 1. Determine how far we need to compute based on the view mode
         target_step = len(self.engine.runner.operations
-                          ) if self.show_final_view else self.current_step
+                         ) if self.show_final_view else self.current_step
 
         # 2. Lazily compute history if we haven't reached the required target step yet
         current_history_max = len(self.engine.runner.history) - 1
@@ -740,7 +755,7 @@ class PipelineViewer(scene.SceneCanvas):
 
         # 3. Fetch the appropriate state to display
         display_step = len(self.engine.runner.history
-                           ) - 1 if self.show_final_view else self.current_step
+                          ) - 1 if self.show_final_view else self.current_step
         state = self.engine.runner.history[display_step]
 
         total_vertices = sum(len(line.coords) for line in state.lines)
@@ -805,9 +820,9 @@ class PipelineViewer(scene.SceneCanvas):
 
             if self.show_vertices:
                 self.vertices_visual.set_data(pos=stacked_pos,
-                                            face_color='red',
-                                            edge_color=None,
-                                            size=10)
+                                              face_color='red',
+                                              edge_color=None,
+                                              size=10)
                 self.vertices_visual.visible = True
             else:
                 self.vertices_visual.visible = False

@@ -63,7 +63,7 @@ def main():
         try:
             with open(args.recipe, 'r') as f:
                 # Fallback to empty list if file is completely empty
-                raw_user_recipe = yaml.safe_load(f) or [] 
+                raw_user_recipe = yaml.safe_load(f) or []
         except FileNotFoundError:
             logger.error(f"Recipe file not found: {args.recipe}")
             sys.exit(1)
@@ -77,7 +77,8 @@ def main():
             )
             sys.exit(1)
     else:
-        logger.info("No recipe specified. Starting an empty pipeline for the GUI.")
+        logger.info(
+            "No recipe specified. Starting an empty pipeline for the GUI.")
 
     boundary = None
     if args.dxf:

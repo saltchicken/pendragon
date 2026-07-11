@@ -14,17 +14,13 @@ from pendragon.utils import ImageSampler
 
 
 class ImageMaskConfig(BaseModel):
-    mask_image: str = Field(
-        default="", 
-        description="Source image.",
-        json_schema_extra={"widget": "file_picker"}
-    )
-    threshold: float = Field(
-        default=0.5,
-        ge=0.0,
-        le=1.0,
-        description="Darkness threshold to keep lines."
-    )
+    mask_image: str = Field(default="",
+                            description="Source image.",
+                            json_schema_extra={"widget": "file_picker"})
+    threshold: float = Field(default=0.5,
+                             ge=0.0,
+                             le=1.0,
+                             description="Darkness threshold to keep lines.")
     sample_step: float = Field(default=0.5,
                                description="Resolution step size for sampling.")
 

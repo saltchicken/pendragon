@@ -1,17 +1,22 @@
-import numpy as np
 from typing import List, Optional
+
+from loguru import logger
+import numpy as np
 from pydantic import Field
 from shapely.geometry import LineString
-from loguru import logger
 
 from pendragon.core import BasePluginConfig
 from pendragon.core import PipelineOperation
 from pendragon.core import PipelineState
 from pendragon.core import register_operation
 
+
 class JitterLinesConfig(BasePluginConfig):
-    amount: float = Field(default=1.0, description="Maximum displacement distance.")
-    seed: int = Field(default=42, description="Random seed for reproducibility.")
+    amount: float = Field(default=1.0,
+                          description="Maximum displacement distance.")
+    seed: int = Field(default=42,
+                      description="Random seed for reproducibility.")
+
 
 @register_operation("jitter_lines", config_class=JitterLinesConfig)
 class JitterLinesMod(PipelineOperation):
@@ -22,9 +27,11 @@ class JitterLinesMod(PipelineOperation):
         if not state.lines:
             return state
 
-        logger.info(f"Applying jitter (amount={cfg.amount}) to {len(state.lines)} paths.")
+        logger.info(
+            f"Applying jitter (amount={cfg.amount}) to {len(state.lines)} paths."
+        )
         np.random.seed(cfg.seed)
-        
+
         jittered_lines: List[LineString] = []
         for line in state.lines:
             # Add random noise to each coordinate
@@ -33,8 +40,6 @@ class JitterLinesMod(PipelineOperation):
             jittered_coords = coords + noise
             jittered_lines.append(LineString(jittered_coords))
 
-        return PipelineState(
-            boundary=state.boundary,
-            lines=jittered_lines,
-            operation_name="jitter_lines"
-        )
+        return PipelineState(boundary=state.boundary,
+                             lines=jittered_lines,
+                             operation_name="jitter_lines")
