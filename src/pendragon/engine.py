@@ -9,22 +9,27 @@ from pendragon.core.registry import OPERATION_REGISTRY
 
 from .pen import PenConfig
 from .pen import PenTool
-from .runner import PipelineRunner
+from .runner import PipelineRunner, InteractiveRunner
 
 
 class PendragonEngine:
 
-    def __init__(self, recipe: list, boundary: Optional[Polygon] = None):
+    def __init__(self, recipe: list, boundary: Optional[Polygon] = None, interactive: bool = False):
         """
         Initializes the engine with a recipe and an optional boundary.
         """
         self.recipe = recipe
         self.boundary = boundary or Polygon([(0, 0), (200, 0), (200, 200),
                                              (0, 200), (0, 0)])
+        self.interactive = interactive
 
         initial_state = PipelineState(boundary=self.boundary,
                                       operation_name="base_geometry")
-        self.runner = PipelineRunner(initial_state)
+        
+        if self.interactive:
+            self.runner = InteractiveRunner(initial_state)
+        else:
+            self.runner = PipelineRunner(initial_state)
 
     def load_recipe(self, new_recipe: list) -> bool:
         """
@@ -37,7 +42,10 @@ class PendragonEngine:
                                       operation_name="base_geometry")
 
         # 2. Create a brand new runner to clear the old history and operations
-        self.runner = PipelineRunner(initial_state)
+        if self.interactive:
+            self.runner = InteractiveRunner(initial_state)
+        else:
+            self.runner = PipelineRunner(initial_state)
 
         # 3. Rebuild the pipeline with the new recipe
         success = self.build_pipeline()

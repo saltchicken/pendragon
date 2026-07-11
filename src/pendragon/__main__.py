@@ -98,7 +98,8 @@ def main():
         boundary = Polygon([(0, 0), (200, 0), (200, 200), (0, 200), (0, 0)])
 
     # 3. Initialize Orchestrator
-    engine = PendragonEngine(recipe=raw_user_recipe, boundary=boundary)
+    is_interactive = not args.no_vis
+    engine = PendragonEngine(recipe=raw_user_recipe, boundary=boundary, interactive=is_interactive)
 
     # 4. Build Pipeline
     if not engine.build_pipeline():
@@ -118,9 +119,7 @@ def main():
     if not args.no_vis:
         logger.info("Opening live editor visualization window...")
         try:
-            # Lazy load the GUI components only when requested
             from PyQt5.QtWidgets import QApplication
-
             from pendragon.gui import LiveEditorWindow
 
             qt_app = QApplication.instance() or QApplication([])

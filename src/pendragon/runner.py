@@ -9,16 +9,46 @@ from pendragon.core.models import PipelineContext
 
 
 class PipelineRunner:
+    """Core headless runner. Memory-efficient, executes linearly, no history tracking."""
 
     def __init__(self, initial_state: PipelineState):
-        self.history: List[PipelineState] = [initial_state]
+        self.initial_state = initial_state
         self.operations: List[PipelineOperation] = []
+        self._final_state: Optional[PipelineState] = None
 
     def add_operation(self, operation: PipelineOperation):
         self.operations.append(operation)
 
     def execute_all(self):
-        self.history = [self.history[0]]
+        current_state = self.initial_state
+        empty_context = PipelineContext()
+
+        for i, op in enumerate(self.operations):
+            logger.info(f"Running operation {i}: {op.__class__.__name__}")
+
+            sig = inspect.signature(op.process)
+            if 'context' in sig.parameters:
+                current_state = op.process(current_state, context=empty_context)
+            else:
+                current_state = op.process(current_state)
+
+        self._final_state = current_state
+
+    def get_final_lines(self):
+        if not self._final_state:
+            return self.initial_state.lines
+        return self._final_state.lines
+
+
+class InteractiveRunner(PipelineRunner):
+    """GUI-oriented runner. Tracks pipeline history and allows partial recomputation."""
+
+    def __init__(self, initial_state: PipelineState):
+        super().__init__(initial_state)
+        self.history: List[PipelineState] = [initial_state]
+
+    def execute_all(self):
+        self.history = [self.initial_state]
         empty_context = PipelineContext()
 
         for i, op in enumerate(self.operations):
@@ -33,33 +63,27 @@ class PipelineRunner:
 
             self.history.append(new_state)
 
+        self._final_state = self.history[-1]
+
     def get_state_at_step(self, step_index: int) -> PipelineState:
         try:
             return self.history[step_index]
         except IndexError:
-            logger.error(
-                f"Step {step_index} does not exist. Returning latest state.")
+            logger.error(f"Step {step_index} does not exist. Returning latest state.")
             return self.history[-1]
 
-    def recompute_from(self,
-                       step_index: int,
-                       target_step: Optional[int] = None):
-        """Re-runs the pipeline starting from a specific operation index up to an optional target step."""
+    def recompute_from(self, step_index: int, target_step: Optional[int] = None):
+        """Re-runs the pipeline starting from a specific operation index."""
         if step_index < 0 or step_index >= len(self.operations):
             return
 
         if target_step is None:
             target_step = len(self.operations)
 
-        # Ensure we don't try to compute past the end of the pipeline
         target_step = min(target_step, len(self.operations))
-
-        # Truncate history to the state just before the modified step
         self.history = self.history[:step_index + 1]
-
         empty_context = PipelineContext()
 
-        # Re-run from the modified step to the target_step
         for i in range(step_index, target_step):
             op = self.operations[i]
             current_state = self.history[-1]
@@ -72,6 +96,8 @@ class PipelineRunner:
                 new_state = op.process(current_state)
 
             self.history.append(new_state)
+
+        self._final_state = self.history[-1]
 
     def get_final_lines(self):
         return self.history[-1].lines
