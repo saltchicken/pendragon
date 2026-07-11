@@ -17,6 +17,7 @@ from PyQt5.QtWidgets import QSlider
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 from PyQt5.QtWidgets import QSpinBox
+from PyQt5.QtWidgets import QDoubleSpinBox
 from PyQt5.QtWidgets import QLineEdit
 from PyQt5.QtWidgets import QComboBox
 
@@ -253,30 +254,57 @@ class LiveEditorWindow(QMainWindow):
             current_value = getattr(operation.config, field_name)
             origin = get_origin(field_info.annotation)
 
-            # --- Handle Float Parameters (Existing Logic) ---
+            # --- Inside build_ui_for_current_step ---
             if field_info.annotation == float:
                 container = QWidget()
                 h_layout = QHBoxLayout(container)
                 h_layout.setContentsMargins(0, 0, 0, 0)
 
-                slider = QSlider(Qt.Horizontal)
-                slider.setMinimum(0)
-                slider.setMaximum(1000)
-                slider.setValue(int(current_value * 10))
+                # Extract Pydantic V2 metadata by iterating through all constraints
+                val_min = None
+                val_max = None
+                for m in field_info.metadata:
+                    if hasattr(m, 'ge'):
+                        val_min = m.ge
+                    if hasattr(m, 'le'):
+                        val_max = m.le
 
-                value_label = QLabel(f"{current_value:.1f}")
-                value_label.setMinimumWidth(35)
-                value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                # SCENARIO A: Bounded Float -> QSlider
+                if val_min is not None and val_max is not None:
+                    slider = QSlider(Qt.Horizontal)
+                    slider.setMinimum(0)
+                    slider.setMaximum(100) # Standard percentage-based steps
+                    
+                    current_percent = int(((current_value - val_min) / (val_max - val_min)) * 100)
+                    slider.setValue(current_percent)
 
-                h_layout.addWidget(slider)
-                h_layout.addWidget(value_label)
+                    value_label = QLabel(f"{current_value:.2f}")
+                    value_label.setMinimumWidth(35)
+                    value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
-                def update_float_wrapper(val, fname=field_name, idx=op_index, lbl=value_label):
-                    real_val = val / 10.0
-                    lbl.setText(f"{real_val:.1f}")
-                    self.update_parameter(idx, fname, real_val)
+                    def update_bounded_float(val, fname=field_name, idx=op_index, lbl=value_label, v_min=val_min, v_max=val_max):
+                        real_val = v_min + (val / 100.0) * (v_max - v_min)
+                        lbl.setText(f"{real_val:.2f}")
+                        self.update_parameter(idx, fname, real_val)
 
-                slider.valueChanged.connect(update_float_wrapper)
+                    slider.valueChanged.connect(update_bounded_float)
+                    h_layout.addWidget(slider)
+                    h_layout.addWidget(value_label)
+
+                # SCENARIO B: Unbounded Float -> QDoubleSpinBox
+                else:
+                    spin_box = QDoubleSpinBox()
+                    spin_box.setRange(-10000.0, 10000.0) # Generous default range
+                    spin_box.setDecimals(2)
+                    spin_box.setSingleStep(0.1)
+                    spin_box.setValue(current_value)
+
+                    def update_unbounded_float(val, fname=field_name, idx=op_index):
+                        self.update_parameter(idx, fname, val)
+
+                    spin_box.valueChanged.connect(update_unbounded_float)
+                    h_layout.addWidget(spin_box)
+
                 self.form_layout.addRow(field_name, container)
 
             # --- Handle Integer Parameters ---

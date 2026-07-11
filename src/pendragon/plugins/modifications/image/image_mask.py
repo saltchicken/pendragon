@@ -21,7 +21,10 @@ class ImageMaskConfig(BaseModel):
     )
     threshold: float = Field(
         default=0.5,
-        description="Darkness threshold (0.0 to 1.0) to keep lines.")
+        ge=0.0,
+        le=1.0,
+        description="Darkness threshold to keep lines."
+    )
     sample_step: float = Field(default=0.5,
                                description="Resolution step size for sampling.")
 
