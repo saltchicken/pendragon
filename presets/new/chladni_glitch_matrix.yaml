@@ -1,0 +1,38 @@
+# yaml-language-server: $schema=./recipe-schema.json
+
+# 1. Generate an acoustic wave interference pattern
+- operation: chladni
+  settings:
+    n: 4.0
+    m: 3.0
+    sign: 1.0
+    res: 0.5
+
+# 2. Turn the resonance zones into confined clipping masks
+- operation: polygonize
+
+# 3. Fill the resonance zones with dense, glitchy fractal curves
+- operation: generate_in_cells
+  settings:
+    generator: hilbert
+    keep_scaffolding: true
+    auto_center: true
+    generator_settings:
+      spacing: 1.5
+
+# 4. Apply a chaotic displacement to make it look "glitchy"
+- operation: chaotic
+  settings:
+    depth: 1
+    chaos_freq: 0.5
+    chaos_amp: 0.8
+
+# 5. Standard CNC Cleanup
+- operation: clip
+- operation: connect_continuous
+  settings:
+    snap_distance: 0.05
+- operation: simplify
+  settings:
+    tolerance: 0.1
+- operation: optimize

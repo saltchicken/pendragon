@@ -1,0 +1,29 @@
+- operation: concentric
+  settings:
+    overscan: 0.0
+    center_x: null
+    center_y: null
+    group_boundaries: false
+    min_radius: 15.0
+    max_radius: 95.0
+    spacing: 15.0
+    sides: 64
+    rotation: 0.0
+- operation: distribute_along
+  settings:
+    overscan: 0.0
+    generator: hexagon
+    spacing: 13.399999999999995
+    generator_settings:
+      radius: 2.8
+      overscan: 2.3
+- operation: merge
+  settings:
+    precision: 0.0
+- operation: connect_continuous
+  settings:
+    snap_distance: 0.1
+- operation: optimize
+  settings:
+    start_x: 0.0
+    start_y: 0.0

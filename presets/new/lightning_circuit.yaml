@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=./recipe-schema.json
+
+# 1. Create the broad outer structural cells
+- operation: voronoi_dual
+  settings:
+    spacing: 35.0
+    mode: voronoi
+    seed: 42
+
+# 2. Convert the loose Voronoi lines into closed polygon boundaries
+- operation: polygonize
+
+# 3. Inject branching lightning into every closed cell
+- operation: generate_in_cells
+  settings:
+    generator: lichtenberg
+    keep_scaffolding: true
+    auto_center: true
+    generator_settings:
+      nodes: 300
+      spacing: 1.5
+
+# 4. Standard CNC Cleanup
+- operation: connect_continuous
+  settings:
+    snap_distance: 0.1
+- operation: simplify
+  settings:
+    tolerance: 0.1
+- operation: optimize
+  settings:
+    start_x: 0.0
+    start_y: 0.0
