@@ -1,0 +1,11 @@
+- operation: image_halftone
+  settings:
+    source_image: /home/saltchicken/Projects/pendragon/images/lady1.png
+    spacing: 5.0
+    generator: guilloche
+    generator_settings:
+      frequency_mod: 34.1
+      amplitude_mod: 11.9
+    target_setting: revolutions
+    min_val: 0.1
+    max_val: 2.5
