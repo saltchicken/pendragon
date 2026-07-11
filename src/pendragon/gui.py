@@ -1,5 +1,4 @@
-import concurrent.futures
-from multiprocessing import Manager
+import multiprocessing
 import queue as standard_queue
 import time
 from typing import Any, Dict, get_args, get_origin, List, Literal
@@ -21,6 +20,7 @@ from PyQt5.QtWidgets import QHBoxLayout
 from PyQt5.QtWidgets import QLabel
 from PyQt5.QtWidgets import QLineEdit
 from PyQt5.QtWidgets import QMainWindow
+from PyQt5.QtWidgets import QProgressBar
 from PyQt5.QtWidgets import QPushButton
 from PyQt5.QtWidgets import QSlider
 from PyQt5.QtWidgets import QSpinBox
@@ -90,6 +90,21 @@ QPushButton:hover {
 QPushButton:pressed {
     background-color: #222222;
 }
+QPushButton:disabled {
+    background-color: #1a1a1a;
+    color: #555555;
+    border: 1px solid #333333;
+}
+QProgressBar {
+    border: 1px solid #555555;
+    border-radius: 4px;
+    text-align: center;
+    background-color: #333333;
+}
+QProgressBar::chunk {
+    background-color: #007acc;
+    width: 10px;
+}
 """
 
 
@@ -97,56 +112,59 @@ class PipelineStreamingThread(QThread):
     step_completed = pyqtSignal(dict) 
     finished = pyqtSignal(list)
     error = pyqtSignal(str)
+    cancelled = pyqtSignal()
 
     def __init__(self, recipe, boundary, target_fps=30):
         super().__init__()
         self.recipe = recipe
         self.boundary = boundary
         self.frame_time = 1.0 / target_fps 
+        self.process = None
+
+    def cancel(self):
+        """Hard kills the background process immediately."""
+        if self.process and self.process.is_alive():
+            self.process.terminate()
+            self.process.join()
+            self.cancelled.emit()
 
     def run(self):
         try:
-            with Manager() as manager:
-                progress_queue = manager.Queue()
-                
-                with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
-                    future = executor.submit(
-                        run_pipeline_streaming, 
-                        self.recipe, 
-                        self.boundary, 
-                        progress_queue
-                    )
+            self.progress_queue = multiprocessing.Queue()
+            self.process = multiprocessing.Process(
+                target=run_pipeline_streaming, 
+                args=(self.recipe, self.boundary, self.progress_queue)
+            )
+            self.process.start()
+            
+            last_emit_time = 0.0
+            pending_data = None
+            
+            # Loop while the process runs OR there is still data to flush
+            while self.process.is_alive() or not self.progress_queue.empty():
+                try:
+                    data = self.progress_queue.get(timeout=0.01) 
                     
-                    last_emit_time = 0.0
-                    pending_data = None
-                    
-                    while not future.done():
-                        try:
-                            data = progress_queue.get(timeout=0.01) 
-                            if data == "DONE":
-                                break
-                                
-                            pending_data = data
-                            current_time = time.time()
-                            
-                            if current_time - last_emit_time >= self.frame_time:
-                                self.step_completed.emit(pending_data)
-                                last_emit_time = current_time
-                                pending_data = None 
-                                
-                        except standard_queue.Empty:
-                            if pending_data is not None:
-                                self.step_completed.emit(pending_data)
-                                last_emit_time = time.time()
-                                pending_data = None
-                            continue
+                    if data["type"] == "DONE":
+                        if pending_data is not None:
+                            self.step_completed.emit(pending_data)
+                        self.finished.emit(data["history"])
+                        return # Clean exit
 
-                    history = future.result() 
-                    
+                    if data["type"] == "FRAME":
+                        pending_data = data
+                        current_time = time.time()
+                        if current_time - last_emit_time >= self.frame_time:
+                            self.step_completed.emit(pending_data)
+                            last_emit_time = current_time
+                            pending_data = None 
+                            
+                except standard_queue.Empty:
                     if pending_data is not None:
                         self.step_completed.emit(pending_data)
-                        
-                    self.finished.emit(history)
+                        last_emit_time = time.time()
+                        pending_data = None
+                    continue
                     
         except Exception as e:
             self.error.emit(str(e))
@@ -187,6 +205,22 @@ class LiveEditorWindow(QMainWindow):
         self.stats_layout.addRow("Vertices:", self.vertices_label)
 
         self.control_layout.addWidget(self.stats_group)
+
+        # --- PROGRESS & CANCEL UI ---
+        self.progress_layout = QHBoxLayout()
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setValue(0)
+        self.progress_bar.setTextVisible(True)
+        
+        self.btn_cancel = QPushButton("Cancel")
+        self.btn_cancel.setStyleSheet("background-color: #8b0000; font-weight: bold;")
+        self.btn_cancel.setEnabled(False)
+        self.btn_cancel.clicked.connect(self._cancel_computation)
+
+        self.progress_layout.addWidget(self.progress_bar)
+        self.progress_layout.addWidget(self.btn_cancel)
+        self.control_layout.addLayout(self.progress_layout)
+        # --------------------------------
 
         self.show_vertices_checkbox = QCheckBox("Show Vertices")
         self.show_vertices_checkbox.setChecked(False)
@@ -270,14 +304,37 @@ class LiveEditorWindow(QMainWindow):
             return
 
         self._is_computing = True
+        
+        # Reset UI for computation
+        self.btn_cancel.setEnabled(True)
+        self.btn_cancel.setStyleSheet("background-color: #ff4444; color: white; font-weight: bold;")
+        self.progress_bar.setValue(0)
+        self.progress_bar.setFormat("Initializing...")
+
         current_recipe = self._get_current_recipe()
         
         self.worker_thread = PipelineStreamingThread(current_recipe, self.engine.boundary)
         self.worker_thread.step_completed.connect(self._on_step_streamed)
         self.worker_thread.finished.connect(self._on_calculation_finished)
         self.worker_thread.error.connect(self._on_calculation_error)
+        self.worker_thread.cancelled.connect(self._on_calculation_cancelled)
         
         self.worker_thread.start()
+
+    def _cancel_computation(self):
+        """Triggered by the user clicking the red Cancel button."""
+        if self.worker_thread and self.worker_thread.isRunning():
+            self.progress_bar.setFormat("Cancelling...")
+            self.btn_cancel.setEnabled(False)
+            self.worker_thread.cancel()
+
+    def _on_calculation_cancelled(self):
+        self._is_computing = False
+        self._computation_queued = False # Flush queue on abort
+        self.btn_cancel.setEnabled(False)
+        self.btn_cancel.setStyleSheet("background-color: #8b0000; color: #aaaaaa; font-weight: bold;")
+        self.progress_bar.setFormat("Computation Aborted")
+        logger.warning("Pipeline calculation cancelled by user.")
 
     def _on_view_mode_toggled(self, checked):
         self.viewer.show_final_view = checked
@@ -553,9 +610,23 @@ class LiveEditorWindow(QMainWindow):
         self.update_stats_ui(step, total, op_name, len(lines), vertices, False)
         self.viewer.set_live_lines(lines)
 
+        # Update Progress Bar
+        self.progress_bar.setMaximum(total)
+        self.progress_bar.setValue(step)
+        self.progress_bar.setFormat(f"{step} / {total} ({op_name})")
+
     def _on_calculation_finished(self, history):
         self._is_computing = False
         
+        # Cleanup UI
+        self.btn_cancel.setEnabled(False)
+        self.btn_cancel.setStyleSheet("background-color: #8b0000; color: #aaaaaa; font-weight: bold;")
+        
+        # Sometimes processes finish so fast the queue skips intermediate UI updates. 
+        # Force the bar to 100% on success.
+        self.progress_bar.setValue(self.progress_bar.maximum())
+        self.progress_bar.setFormat("Ready")
+
         # Sync the engine's runner history for localized scrubbing
         self.engine.runner.history = history
         
@@ -572,6 +643,9 @@ class LiveEditorWindow(QMainWindow):
     def _on_calculation_error(self, error_msg):
         self._is_computing = False
         logger.error(f"Background pipeline failed: {error_msg}")
+        self.progress_bar.setFormat("Error")
+        self.btn_cancel.setEnabled(False)
+        self.btn_cancel.setStyleSheet("background-color: #8b0000; color: #aaaaaa; font-weight: bold;")
 
     def _get_current_recipe(self) -> list:
         current_recipe = []
@@ -646,8 +720,6 @@ class LiveEditorWindow(QMainWindow):
             "G-Code Files (*.nc *.gcode);;All Files (*)")
 
         if file_path:
-            # We simply grab the final geometry array from the history
-            # No more synchronous calculation blocks here!
             final_lines = self.engine.runner.history[-1].lines
             self.engine.export_gcode(lines=final_lines, output_path=file_path)
 
