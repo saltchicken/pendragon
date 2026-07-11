@@ -648,33 +648,44 @@ class LiveEditorWindow(QMainWindow):
         self.update_stats_ui(step, total, op_name, len(lines), vertices, False)
         self.viewer.set_live_lines(lines)
 
+        safe_total = max(1, total)
+
         # Update Progress Bar
-        self.progress_bar.setMaximum(total)
+        self.progress_bar.setMaximum(safe_total)
         self.progress_bar.setValue(step)
         self.progress_bar.setFormat(f"{step} / {total} ({op_name})")
 
     def _on_calculation_finished(self, history):
         self._is_computing = False
-
+        
         # Cleanup UI
         self.btn_cancel.setEnabled(False)
-        self.btn_cancel.setStyleSheet(
-            "background-color: #8b0000; color: #aaaaaa; font-weight: bold;")
-
-        # Sometimes processes finish so fast the queue skips intermediate UI updates.
-        # Force the bar to 100% on success.
+        self.btn_cancel.setStyleSheet("background-color: #8b0000; color: #aaaaaa; font-weight: bold;")
+        
+        # --- NEW UX CODE ---
+        # Force the progress bar to 100% and tell the user we are drawing
         self.progress_bar.setValue(self.progress_bar.maximum())
-        self.progress_bar.setFormat("Ready")
+        self.progress_bar.setFormat("Rendering Graphic to Screen...")
+        
+        # This is the magic line. It forces PyQt to instantly redraw the 
+        # UI with the text above BEFORE proceeding to the heavy blocking code below.
+        QApplication.processEvents() 
+        # -------------------
 
         # Sync the engine's runner history for localized scrubbing
         self.engine.runner.history = history
-
-        target = len(
-            self.engine.runner.operations
-        ) if self.viewer.show_final_view else self.viewer.current_step
+        
+        target = len(self.engine.runner.operations) if self.viewer.show_final_view else self.viewer.current_step
         self.viewer.current_step = min(target, len(history) - 1)
-        self.viewer.update_view()
+        
+        # This is the heavy Vispy method that freezes the thread
+        self.viewer.update_view() 
+        
         self._pending_op_index = None
+
+        # --- AFTER RENDER ---
+        self.progress_bar.setFormat("Ready")
+        # --------------------
 
         # Automatically start the next computation if the user kept sliding the bar
         if self._computation_queued:
@@ -886,28 +897,30 @@ class PipelineViewer(scene.SceneCanvas):
     def set_live_lines(self, lines):
         """Bypasses normal state management to draw geometry instantly from the streaming worker."""
         if lines:
-            pos = []
-            connect = []
-            idx = 0
-            for line in lines:
-                coords = np.array(line.coords)
-                pos.append(coords)
-                n_pts = len(coords)
-                for i in range(n_pts - 1):
-                    connect.append([idx + i, idx + i + 1])
-                idx += n_pts
+            # 1. Extract all coordinates into a list of arrays much faster
+            coords_list = [np.array(line.coords) for line in lines]
+            stacked_pos = np.vstack(coords_list)
+            
+            # 2. Vectorize the connection index building
+            lengths = [len(c) for c in coords_list]
+            connect_blocks = []
+            current_idx = 0
+            
+            for n in lengths:
+                if n > 1:
+                    # Rapidly generate [0,1], [1,2], [2,3] index pairs for the GPU
+                    starts = np.arange(current_idx, current_idx + n - 1)
+                    ends = starts + 1
+                    connect_blocks.append(np.column_stack((starts, ends)))
+                current_idx += n
+                
+            final_connect = np.vstack(connect_blocks) if connect_blocks else np.empty((0, 2))
 
-            stacked_pos = np.vstack(pos)
-
-            self.lines_visual.set_data(pos=stacked_pos,
-                                       connect=np.array(connect))
+            self.lines_visual.set_data(pos=stacked_pos, connect=final_connect)
             self.lines_visual.visible = True
 
             if self.show_vertices:
-                self.vertices_visual.set_data(pos=stacked_pos,
-                                              face_color='red',
-                                              edge_color=None,
-                                              size=10)
+                self.vertices_visual.set_data(pos=stacked_pos, face_color='red', edge_color=None, size=10)
                 self.vertices_visual.visible = True
             else:
                 self.vertices_visual.visible = False
