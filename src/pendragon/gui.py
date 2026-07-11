@@ -667,28 +667,28 @@ class LiveEditorWindow(QMainWindow):
         step = state_data["step"]
         total = state_data["total"]
         op_name = state_data["op_name"]
-        lines = state_data["lines"]
-        vertices = sum(len(line.coords) for line in lines)
         
-        self.update_stats_ui(step, total, op_name, len(lines), vertices, False)
+        # We now receive pre-computed numpy arrays
+        line_count = state_data["line_count"]
+        pos = state_data["pos"]
+        connect = state_data["connect"]
+        vertices = len(pos)  # The total number of points is just the length of the position array
+        
+        self.update_stats_ui(step, total, op_name, line_count, vertices, False)
         
         # --- 1. PRE-RENDER UI UPDATE ---
         safe_total = max(1, total) 
         self.progress_bar.setMaximum(safe_total)
         self.progress_bar.setValue(step)
         
-        # Explicitly tell the user we are rendering this specific step
         self.progress_bar.setFormat(f"{step} / {total} ({op_name}) - Rendering...")
-        
-        # Force PyQt to draw the "Rendering..." text to the screen immediately
         QApplication.processEvents()
         
-        # --- 2. HEAVY LIFTING ---
-        # Now we do the heavy numpy/Vispy array conversions
-        self.viewer.set_live_lines(lines)
+        # --- 2. INSTANT GPU INJECTION ---
+        # Bypasses all main-thread math; passes the arrays directly to Vispy
+        self.viewer.set_live_vectors(pos, connect)
 
         # --- 3. POST-RENDER CLEANUP ---
-        # Strip the "Rendering..." text off now that the graphic is on screen
         self.progress_bar.setFormat(f"{step} / {total} ({op_name})")
 
     def _on_calculation_finished(self, history):
@@ -953,34 +953,14 @@ class PipelineViewer(scene.SceneCanvas):
             else:
                 self.close()
 
-    def set_live_lines(self, lines):
-        """Bypasses normal state management to draw geometry instantly from the streaming worker."""
-        if lines:
-            # 1. Extract all coordinates into a list of arrays much faster
-            coords_list = [np.array(line.coords) for line in lines]
-            stacked_pos = np.vstack(coords_list)
-
-            # 2. Vectorize the connection index building
-            lengths = [len(c) for c in coords_list]
-            connect_blocks = []
-            current_idx = 0
-
-            for n in lengths:
-                if n > 1:
-                    # Rapidly generate [0,1], [1,2], [2,3] index pairs for the GPU
-                    starts = np.arange(current_idx, current_idx + n - 1)
-                    ends = starts + 1
-                    connect_blocks.append(np.column_stack((starts, ends)))
-                current_idx += n
-
-            final_connect = np.vstack(
-                connect_blocks) if connect_blocks else np.empty((0, 2))
-
-            self.lines_visual.set_data(pos=stacked_pos, connect=final_connect)
+    def set_live_vectors(self, pos, connect):
+        """Injects pre-computed numpy arrays directly into the GPU."""
+        if len(pos) > 0:
+            self.lines_visual.set_data(pos=pos, connect=connect)
             self.lines_visual.visible = True
 
             if self.show_vertices:
-                self.vertices_visual.set_data(pos=stacked_pos,
+                self.vertices_visual.set_data(pos=pos,
                                               face_color='red',
                                               edge_color=None,
                                               size=10)
@@ -990,6 +970,33 @@ class PipelineViewer(scene.SceneCanvas):
         else:
             self.lines_visual.visible = False
             self.vertices_visual.visible = False
+
+    def set_live_lines(self, lines):
+        """
+        Used by local step-scrubbing. Converts Shapely objects on the fly,
+        then routes them to the vectorized renderer.
+        """
+        if not lines:
+            self.set_live_vectors(np.empty((0, 2)), np.empty((0, 2)))
+            return
+
+        coords_list = [np.array(line.coords, dtype=np.float32) for line in lines]
+        stacked_pos = np.vstack(coords_list)
+        
+        lengths = [len(c) for c in coords_list]
+        connect_blocks = []
+        current_idx = 0
+        
+        for n in lengths:
+            if n > 1:
+                starts = np.arange(current_idx, current_idx + n - 1, dtype=np.uint32)
+                ends = starts + 1
+                connect_blocks.append(np.column_stack((starts, ends)))
+            current_idx += n
+            
+        final_connect = np.vstack(connect_blocks) if connect_blocks else np.empty((0, 2), dtype=np.uint32)
+        
+        self.set_live_vectors(stacked_pos, final_connect)
 
     def update_view(self):
         target_step = len(self.engine.runner.operations
