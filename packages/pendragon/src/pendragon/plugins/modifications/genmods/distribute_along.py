@@ -1,4 +1,6 @@
 from typing import Any, Dict, Optional
+from pydantic import Field
+
 
 from nodeweaver.models import PipelineContext
 from pendragon.state import GeometryState

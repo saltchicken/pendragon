@@ -1,6 +1,8 @@
 from typing import List, Optional
 
 from loguru import logger
+from pydantic import Field
+
 from nodeweaver.models import PipelineContext
 from pendragon.state import GeometryState
 from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
