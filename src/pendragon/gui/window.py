@@ -5,8 +5,9 @@ import yaml
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, 
-    QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMainWindow, 
-    QProgressBar, QPushButton, QSlider, QSpinBox, QVBoxLayout, QWidget
+    QFormLayout, QFrame, QGridLayout, QGroupBox, QHBoxLayout, QLabel, 
+    QLineEdit, QMainWindow, QProgressBar, QPushButton, QSlider, QSpinBox, 
+    QVBoxLayout, QWidget
 )
 
 from pendragon.engine.registry import OPERATION_REGISTRY
@@ -436,6 +437,28 @@ class LiveEditorWindow(QMainWindow):
 
                 self.form_layout.addRow(field_name, container)
 
+            elif origin is list or origin is List:
+                inner_args = get_args(field_info.annotation)
+                # Check if this list holds our IFSTransform models
+                if inner_args and hasattr(inner_args[0], "__name__") and inner_args[0].__name__ == "IFSTransform":
+                    list_group = QGroupBox("Fractal Branches (IFS Transforms)")
+                    list_group.setStyleSheet("QGroupBox { border: 1px solid #444; border-radius: 4px; padding-top: 15px; }")
+                    list_layout = QVBoxLayout(list_group)
+                    list_layout.setSpacing(10)
+
+                    # 1. Render an editor block for each item currently in the list
+                    for item_idx, item_val in enumerate(current_value):
+                        item_widget = self._build_ifs_transform_widget(op_index, field_name, item_idx, item_val)
+                        list_layout.addWidget(item_widget)
+
+                    # 2. Add a button to append new transforms
+                    btn_add = QPushButton("+ Add Transform Branch")
+                    btn_add.setStyleSheet("background-color: #2a2d32; color: #4CAF50; font-weight: bold; border: 1px dashed #555;")
+                    btn_add.clicked.connect(lambda checked, idx=op_index, fn=field_name: self._add_ifs_transform(idx, fn))
+                    list_layout.addWidget(btn_add)
+
+                    self.form_layout.addRow(list_group)
+
             elif isinstance(current_value,
                             dict) or field_info.annotation == dict or getattr(
                                 field_info.annotation, '__origin__',
@@ -725,3 +748,106 @@ class LiveEditorWindow(QMainWindow):
 
         # Accept the event so the window actually closes
         event.accept()
+
+    def _build_ifs_transform_widget(self, op_index, field_name, item_idx, item_val):
+        """Constructs a visual block containing 6 spinboxes and a combobox for a single IFS transform."""
+        container = QFrame()
+        container.setStyleSheet("QFrame { background-color: #252526; border: 1px solid #333; border-radius: 4px; }")
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(8, 8, 8, 8)
+
+        # --- Top Row: Label and Remove Button ---
+        header_layout = QHBoxLayout()
+        header_layout.addWidget(QLabel(f"<b>Branch {item_idx + 1}</b>"))
+        
+        btn_remove = QPushButton("Remove")
+        btn_remove.setStyleSheet("background-color: #5a1c1c; border: none; padding: 4px; border-radius: 2px;")
+        btn_remove.setFixedWidth(60)
+        btn_remove.clicked.connect(lambda checked, idx=op_index, fn=field_name, i=item_idx: self._remove_ifs_transform(idx, fn, i))
+        header_layout.addWidget(btn_remove, alignment=Qt.AlignRight)
+        layout.addLayout(header_layout)
+
+        # --- Matrix Spin Boxes (2x3 Grid) ---
+        grid = QGridLayout()
+        grid.setContentsMargins(0, 0, 0, 0)
+        
+        labels = ["a (scale X)", "b (shear Y)", "d (shear X)", "e (scale Y)", "X Offset", "Y Offset"]
+        
+        for i in range(6):
+            # Create a localized callback to capture the specific matrix index 'i'
+            def update_matrix(val, mat_idx=i, target_idx=item_idx, op_idx=op_index, fn=field_name):
+                operation = self.engine.runner.operations[op_idx]
+                target_list = getattr(operation.config, fn)
+                target_list[target_idx].matrix[mat_idx] = val
+                
+                # Trigger the debounce timer for live updating
+                self._pending_op_index = min(self._pending_op_index if self._pending_op_index is not None else op_idx, op_idx)
+                self.debounce_timer.start()
+
+            spin = QDoubleSpinBox()
+            spin.setRange(-1000.0, 1000.0)
+            spin.setDecimals(3)
+            spin.setSingleStep(0.1)
+            spin.setValue(item_val.matrix[i])
+            spin.setKeyboardTracking(False)
+            spin.valueChanged.connect(update_matrix)
+            
+            row, col = divmod(i, 2)
+            lbl = QLabel(labels[i])
+            lbl.setStyleSheet("color: #888; font-size: 10px;")
+            
+            box_layout = QVBoxLayout()
+            box_layout.addWidget(lbl)
+            box_layout.addWidget(spin)
+            box_layout.setSpacing(2)
+            
+            grid.addLayout(box_layout, row, col)
+
+        layout.addLayout(grid)
+
+        # --- Variation Selector ---
+        var_layout = QHBoxLayout()
+        var_layout.addWidget(QLabel("Variation:"))
+        combo = QComboBox()
+        combo.addItems(["linear", "sinusoidal", "spherical", "swirl"])
+        combo.setCurrentText(item_val.variation)
+        
+        def update_variation(text, target_idx=item_idx, op_idx=op_index, fn=field_name):
+            operation = self.engine.runner.operations[op_idx]
+            getattr(operation.config, fn)[target_idx].variation = text
+            self._pending_op_index = min(self._pending_op_index if self._pending_op_index is not None else op_idx, op_idx)
+            self.debounce_timer.start()
+
+        combo.currentTextChanged.connect(update_variation)
+        var_layout.addWidget(combo)
+        layout.addLayout(var_layout)
+
+        return container
+
+    def _add_ifs_transform(self, op_index, field_name):
+        """Appends a new identity transform to the list and rebuilds the UI."""
+        from pendragon.plugins.modifications.ifs.ifs import IFSTransform
+        
+        operation = self.engine.runner.operations[op_index]
+        target_list = getattr(operation.config, field_name)
+        
+        # Default Identity Matrix: [scaleX, shearY, shearX, scaleY, offsetX, offsetY]
+        new_transform = IFSTransform(matrix=[1.0, 0.0, 0.0, 1.0, 0.0, 0.0], variation="linear")
+        target_list.append(new_transform)
+        
+        # Rebuild UI to show the new item, then trigger engine computation
+        self.build_ui_for_current_step()
+        self._pending_op_index = min(self._pending_op_index if self._pending_op_index is not None else op_index, op_index)
+        self._trigger_computation()
+
+    def _remove_ifs_transform(self, op_index, field_name, item_idx):
+        """Removes a specific transform and rebuilds the UI."""
+        operation = self.engine.runner.operations[op_index]
+        target_list = getattr(operation.config, field_name)
+        
+        if 0 <= item_idx < len(target_list):
+            target_list.pop(item_idx)
+            
+            self.build_ui_for_current_step()
+            self._pending_op_index = min(self._pending_op_index if self._pending_op_index is not None else op_index, op_index)
+            self._trigger_computation()
