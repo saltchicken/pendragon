@@ -5,8 +5,9 @@ from loguru import logger
 from shapely.geometry import Polygon
 import yaml
 
-from pendragon.core import load_plugins
+from pendragon.core.discovery import load_plugins
 from pendragon.utils import load_dxf_boundary
+from pendragon.pen import PenConfig, PenTool
 
 from .engine import PendragonEngine
 
@@ -114,8 +115,15 @@ def main():
     logger.success(
         f"Pipeline complete. Generated {len(final_lines)} final lines.")
 
-    # 6. Export
-    engine.export_gcode(lines=final_lines, output_path=args.output)
+    # 6. Export G-Code (Now handled outside the pure engine)
+    if final_lines:
+        logger.info(f"Generating G-code to {args.output}...")
+        config = PenConfig()
+        with PenTool(config=config, output_filename=args.output) as pen:
+            for line in final_lines:
+                pen.draw_path(list(line.coords))
+    else:
+        logger.warning("No lines to export!")
 
     # 7. Visualize (Optional)
     if not args.no_vis:
