@@ -4,22 +4,26 @@ from pathlib import Path
 from loguru import logger
 from nodeweaver.registry import OperationRegistry
 from nodeweaver.registry import PipelineOperation
-from pydantic import BaseModel
-from pydantic import Field
-
+from pydantic import BaseModel, Field
 from .state import GeometryState
 
-# 1. Instantiate the Pendragon-specific registry
+# 1. Instantiate the Pendragon-specific registry using the generic from nodeweaver
 dxf_registry = OperationRegistry[GeometryState]()
 
-
-# 2. Base Configuration for geometric plugins
+# 2. Base Configuration
 class PendragonBaseConfig(BaseModel):
     overscan: float = Field(
         default=0.0,
-        description=
-        "Distance to expand (positive) or shrink (negative) the operation's clipping boundary."
+        description="Distance to expand/shrink the clipping boundary."
     )
+
+# 3. Geometric-specific operations base class
+class PendragonOperation(PipelineOperation[GeometryState]):
+    def get_effective_boundary(self, state: GeometryState):
+        overscan = getattr(self.config, 'overscan', 0.0)
+        if overscan != 0.0 and state.boundary:
+            return state.boundary.buffer(overscan, join_style=2)
+        return state.boundary
 
 
 # 3. Geometric-specific operations base class

@@ -1,13 +1,12 @@
 from typing import List, Optional
-
 from loguru import logger
-import numpy as np
-from pendragon.engine import CenteredPluginConfig
-from pendragon.engine import PipelineContext
-from pendragon.engine import PipelineOperation
-from pendragon.engine import PipelineState
-from pendragon.engine import register_operation
 from pydantic import Field
+
+import numpy as np
+
+from nodeweaver.models import PipelineContext
+from pendragon.registry import CenteredPluginConfig, PendragonOperation, dxf_registry
+from pendragon.state import GeometryState
 from scipy.spatial import cKDTree
 from shapely.geometry import LineString
 from shapely.geometry import MultiLineString
@@ -40,13 +39,13 @@ class VenationConfig(CenteredPluginConfig):
         description="Safety limit to prevent infinite generation loops.")
 
 
-@register_operation("venation", config_class=VenationConfig)
-class VenationGen(PipelineOperation):
+@dxf_registry.register("venation", config_class=VenationConfig)
+class VenationGen(PendragonOperation):
     """Generates organic branching structures using the Space Colonization Algorithm."""
 
     def process(self,
-                state: PipelineState,
-                context: Optional[PipelineContext] = None) -> PipelineState:
+                state: GeometryState,
+                context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or VenationConfig()
         ctx = context or PipelineContext()
         boundary = self.get_effective_boundary(state)
@@ -159,6 +158,6 @@ class VenationGen(PipelineOperation):
         logger.success(
             f"Venation complete. Yielded {len(clipped_lines)} final toolpaths.")
 
-        return PipelineState(boundary=state.boundary,
+        return GeometryState(boundary=state.boundary,
                              lines=state.lines + clipped_lines,
                              operation_name="venation")
