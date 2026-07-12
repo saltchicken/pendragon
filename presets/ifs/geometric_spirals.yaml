@@ -1,9 +1,0 @@
-- operation: add_boundary
-- operation: ifs
-  settings:
-    iterations: 6
-    transforms:
-      # T1: The spiral arm (Shrink to 85%, rotate slightly, move forward)
-      - [0.8, -0.15, 0.15, 0.8, 10.0, 10.0]
-      # T2: The core stamp (Shrink to 20%, place near origin)
-      - [0.2, 0.0, 0.0, 0.2, 0.0, 0.0]
