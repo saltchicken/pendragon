@@ -4,7 +4,6 @@ import uvicorn
 
 from loguru import logger
 from shapely.geometry import Polygon
-import yaml
 
 from pendragon.engine import generate_recipe_schema
 
@@ -29,7 +28,7 @@ def main():
                         type=str,
                         nargs="?",
                         default=None,
-                        help="Path to the YAML recipe file (optional).")
+                        help="Path to the JSON recipe file (optional).")
     parser.add_argument("--output",
                         type=str,
                         default="output.nc",
@@ -74,23 +73,21 @@ def main():
     if args.recipe:
         try:
             with open(args.recipe, 'r') as f:
-                # Fallback to empty list if file is completely empty
-                raw_user_recipe = yaml.safe_load(f) or []
+                raw_user_recipe = json.load(f) or []
         except FileNotFoundError:
             logger.error(f"Recipe file not found: {args.recipe}")
             sys.exit(1)
-        except yaml.YAMLError as e:
-            logger.error(f"Error parsing YAML file: {e}")
+        except json.JSONDecodeError as e:
+            logger.error(f"Error parsing JSON file: {e}")
             sys.exit(1)
 
         if not isinstance(raw_user_recipe, list):
             logger.error(
-                "Invalid recipe format: The YAML file must contain a list of operations."
+                "Invalid recipe format: The JSON file must contain a list of operations."
             )
             sys.exit(1)
     else:
-        logger.info(
-            "No recipe specified. Starting an empty pipeline for the GUI.")
+        logger.info("No recipe specified. Starting an empty pipeline for the GUI.")
 
     boundary = None
     if args.dxf:

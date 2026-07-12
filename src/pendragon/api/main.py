@@ -12,7 +12,7 @@ from pendragon.pen import PenConfig, PenTool
 app = FastAPI(title="Pendragon API")
 
 # Mount the frontend directory to serve the web app
-app.mount("/app", StaticFiles(directory="frontend", html=True), name="frontend")
+app.mount("/app", StaticFiles(directory="frontend/dist", html=True), name="frontend")
 
 class GenerateRequest(BaseModel):
     recipe: List[dict]

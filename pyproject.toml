@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "A Python tool for generating CNC G-code using a pen/drag tool."
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["ezdxf", "gscrib", "shapely", "Pillow", "numpy", "scikit-image", "scipy", "PyYAML", "pydantic", "loguru", "vispy", "PyQt5", "fastapi", "uvicorn", "python-multipart"]
+dependencies = ["ezdxf", "gscrib", "shapely", "Pillow", "numpy", "scikit-image", "scipy", "pydantic", "loguru", "vispy", "PyQt5", "fastapi", "uvicorn", "python-multipart"]
 
 [project.scripts]
 pendragon = "pendragon.__main__:main"

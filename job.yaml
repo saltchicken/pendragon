@@ -1,7 +1,0 @@
-# yaml-language-server: $schema=./recipe-schema.json
-
-- operation: grid_lines
-  settings:
-    overscan: 0
-    spacing: 5
-    orientation: horizontal
