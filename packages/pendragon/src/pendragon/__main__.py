@@ -1,16 +1,17 @@
 import argparse
 import sys
-import yaml
-from loguru import logger
-from shapely.geometry import Polygon
 
+from loguru import logger
 from nodeweaver.core import CoreEngine
 from nodeweaver.schema import generate_recipe_schema
-
+from pendragon.pen import PenConfig
+from pendragon.pen import PenTool
+from pendragon.registry import dxf_registry
+from pendragon.registry import load_batteries
 from pendragon.state import GeometryState
-from pendragon.registry import dxf_registry, load_batteries
 from pendragon.utils import load_dxf_boundary
-from pendragon.pen import PenConfig, PenTool
+from shapely.geometry import Polygon
+import yaml
 
 logger.remove()
 logger.add(sys.stderr,
@@ -18,6 +19,7 @@ logger.add(sys.stderr,
                    "<green>{function: <20}</green> | "
                    "<level>{level: <8}</level> | "
                    "{message}"))
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -70,10 +72,13 @@ def main():
             sys.exit(1)
 
         if not isinstance(raw_user_recipe, list):
-            logger.error("Invalid recipe format: The YAML file must contain a list of operations.")
+            logger.error(
+                "Invalid recipe format: The YAML file must contain a list of operations."
+            )
             sys.exit(1)
     else:
-        logger.info("No recipe specified. Starting an empty pipeline for the GUI.")
+        logger.info(
+            "No recipe specified. Starting an empty pipeline for the GUI.")
 
     boundary = None
     if args.dxf:
@@ -84,14 +89,17 @@ def main():
             logger.error(f"Failed to load DXF boundary: {e}")
             sys.exit(1)
     elif args.width is not None and args.height is not None:
-        logger.info(f"Using defined rectangular boundary: {args.width}x{args.height}")
-        boundary = Polygon([(0, 0), (args.width, 0), (args.width, args.height), (0, args.height), (0, 0)])
+        logger.info(
+            f"Using defined rectangular boundary: {args.width}x{args.height}")
+        boundary = Polygon([(0, 0), (args.width, 0), (args.width, args.height),
+                            (0, args.height), (0, 0)])
     else:
         logger.info("Using default 200x200 boundary.")
         boundary = Polygon([(0, 0), (200, 0), (200, 200), (0, 200), (0, 0)])
 
     # 3. Initialize Domain State
-    initial_state = GeometryState(boundary=boundary, operation_name="base_geometry")
+    initial_state = GeometryState(boundary=boundary,
+                                  operation_name="base_geometry")
 
     # 4. Initialize Orchestrator
     is_interactive = not args.no_vis
@@ -102,13 +110,15 @@ def main():
 
     # 5. Build Pipeline
     if not engine.build_pipeline():
-        logger.error("Pipeline construction failed due to validation errors. Exiting.")
+        logger.error(
+            "Pipeline construction failed due to validation errors. Exiting.")
         sys.exit(1)
 
     # 6. Execute
     final_state = engine.run()
     final_lines = final_state.lines
-    logger.success(f"Pipeline complete. Generated {len(final_lines)} final lines.")
+    logger.success(
+        f"Pipeline complete. Generated {len(final_lines)} final lines.")
 
     # 7. Export G-Code
     if final_lines:
@@ -124,8 +134,8 @@ def main():
     if not args.no_vis:
         logger.info("Opening live editor visualization window...")
         try:
-            from PyQt5.QtWidgets import QApplication
             from pendragon.gui import LiveEditorWindow
+            from PyQt5.QtWidgets import QApplication
 
             qt_app = QApplication.instance() or QApplication([])
             editor = LiveEditorWindow(engine)
@@ -133,7 +143,10 @@ def main():
             editor.show()
             qt_app.exec_()
         except ImportError as e:
-            logger.error(f"Failed to launch GUI: {e}. Ensure PyQt5 and vispy are installed, or run with --no-vis.")
+            logger.error(
+                f"Failed to launch GUI: {e}. Ensure PyQt5 and vispy are installed, or run with --no-vis."
+            )
+
 
 if __name__ == "__main__":
     main()

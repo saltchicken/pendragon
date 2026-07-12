@@ -2,18 +2,17 @@ from typing import List, Optional
 
 from loguru import logger
 import numpy as np
+from pendragon.engine import CenteredPluginConfig
+from pendragon.engine import PipelineContext
+from pendragon.engine import PipelineOperation
+from pendragon.engine import PipelineState
+from pendragon.engine import register_operation
 from pydantic import Field
 from scipy.spatial import cKDTree
 from shapely.geometry import LineString
 from shapely.geometry import MultiLineString
 from shapely.geometry import Point
 from shapely.ops import linemerge
-
-from pendragon.engine import CenteredPluginConfig
-from pendragon.engine import PipelineContext
-from pendragon.engine import PipelineOperation
-from pendragon.engine import PipelineState
-from pendragon.engine import register_operation
 
 
 class VenationConfig(CenteredPluginConfig):

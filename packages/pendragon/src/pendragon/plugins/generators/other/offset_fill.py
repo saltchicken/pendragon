@@ -1,13 +1,14 @@
 from typing import List, Optional
 
 from loguru import logger
+from nodeweaver.models import PipelineContext
+from pendragon.registry import dxf_registry
+from pendragon.registry import PendragonBaseConfig
+from pendragon.registry import PendragonOperation
+from pendragon.state import GeometryState
 from pydantic import Field
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
-
-from nodeweaver.models import PipelineContext
-from pendragon.state import GeometryState
-from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
 
 
 class OffsetFillConfig(PendragonBaseConfig):
@@ -42,8 +43,8 @@ class OffsetFillGen(PendragonOperation):
 
         while not current_geom.is_empty and current_geom.area > 0:
             polygons = [current_geom
-                        ] if current_geom.geom_type == 'Polygon' else list(
-                            current_geom.geoms)
+                       ] if current_geom.geom_type == 'Polygon' else list(
+                           current_geom.geoms)
             for p in polygons:
                 if p.exterior:
                     new_lines.append(LineString(p.exterior.coords))

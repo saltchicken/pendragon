@@ -1,6 +1,10 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from dataclasses import field
 from typing import List
-from shapely.geometry import LineString, Polygon
+
+from shapely.geometry import LineString
+from shapely.geometry import Polygon
+
 
 @dataclass(frozen=True)
 class GeometryState:

@@ -1,18 +1,22 @@
 from typing import List, Optional, Tuple
+
 from loguru import logger
+from nodeweaver.models import PipelineContext
 import numpy as np
-from pydantic import BaseModel, Field
+from pendragon.registry import dxf_registry
+from pendragon.registry import PendragonOperation
+from pendragon.state import GeometryState
+from pydantic import BaseModel
+from pydantic import Field
 from scipy.spatial import cKDTree
 from shapely.geometry import LineString
 
-from nodeweaver.models import PipelineContext
-from pendragon.state import GeometryState
-from pendragon.registry import PendragonOperation, dxf_registry
-
 
 class OptimizeConfig(BaseModel):
-    start_x: float = Field(default=0.0, description="X coordinate to start optimizing from.")
-    start_y: float = Field(default=0.0, description="Y coordinate to start optimizing from.")
+    start_x: float = Field(default=0.0,
+                           description="X coordinate to start optimizing from.")
+    start_y: float = Field(default=0.0,
+                           description="Y coordinate to start optimizing from.")
 
 
 def optimize_paths_nearest_neighbor(
@@ -69,7 +73,9 @@ def optimize_paths_nearest_neighbor(
 @dxf_registry.register("optimize", config_class=OptimizeConfig)
 class OptimizeMod(PendragonOperation):
 
-    def process(self, state: GeometryState, context: Optional[PipelineContext] = None) -> GeometryState:
+    def process(self,
+                state: GeometryState,
+                context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or OptimizeConfig()
         ctx = context or PipelineContext()
         current_lines = state.lines
@@ -78,17 +84,21 @@ class OptimizeMod(PendragonOperation):
             return state
 
         raw_paths = [list(line.coords) for line in current_lines]
-        
+
         # Handle dynamic variable extraction
         lc_x = ctx.get("local_center_x")
         lc_y = ctx.get("local_center_y")
-        
+
         start_x = ctx.get("start_x", lc_x if lc_x is not None else cfg.start_x)
         start_y = ctx.get("start_y", lc_y if lc_y is not None else cfg.start_y)
 
-        logger.info(f"Optimizing {len(raw_paths)} paths starting near ({start_x}, {start_y})...")
+        logger.info(
+            f"Optimizing {len(raw_paths)} paths starting near ({start_x}, {start_y})..."
+        )
 
-        optimized_paths = optimize_paths_nearest_neighbor(raw_paths, start_pt=(start_x, start_y))
+        optimized_paths = optimize_paths_nearest_neighbor(raw_paths,
+                                                          start_pt=(start_x,
+                                                                    start_y))
         optimized_lines = [LineString(path) for path in optimized_paths]
 
         logger.success("Path optimization complete.")

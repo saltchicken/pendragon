@@ -1,25 +1,35 @@
 import math
 from typing import List, Optional
-from loguru import logger
-from pydantic import BaseModel, Field
-from shapely.geometry import LineString
 
+from loguru import logger
 from nodeweaver.models import PipelineContext
+from pendragon.registry import dxf_registry
+from pendragon.registry import PendragonOperation
 from pendragon.state import GeometryState
-from pendragon.registry import PendragonOperation, dxf_registry
 from pendragon.utils import ImageSampler
+from pydantic import BaseModel
+from pydantic import Field
+from shapely.geometry import LineString
 
 
 class ImageMaskConfig(BaseModel):
-    mask_image: str = Field(default="", description="Source image.", json_schema_extra={"widget": "file_picker"})
-    threshold: float = Field(default=0.5, ge=0.0, le=1.0, description="Darkness threshold to keep lines.")
-    sample_step: float = Field(default=0.5, description="Resolution step size for sampling.")
+    mask_image: str = Field(default="",
+                            description="Source image.",
+                            json_schema_extra={"widget": "file_picker"})
+    threshold: float = Field(default=0.5,
+                             ge=0.0,
+                             le=1.0,
+                             description="Darkness threshold to keep lines.")
+    sample_step: float = Field(default=0.5,
+                               description="Resolution step size for sampling.")
 
 
 @dxf_registry.register("image_mask", config_class=ImageMaskConfig)
 class ImageMaskMod(PendragonOperation):
 
-    def process(self, state: GeometryState, context: Optional[PipelineContext] = None) -> GeometryState:
+    def process(self,
+                state: GeometryState,
+                context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or ImageMaskConfig()
         ctx = context or PipelineContext()
 
@@ -58,7 +68,9 @@ class ImageMaskMod(PendragonOperation):
             if len(current_segment_coords) >= 2:
                 new_lines.append(LineString(current_segment_coords))
 
-        logger.success(f"Mask filtering complete. Retained {len(new_lines)} segmented lines.")
+        logger.success(
+            f"Mask filtering complete. Retained {len(new_lines)} segmented lines."
+        )
         return GeometryState(boundary=current_boundary,
                              lines=new_lines,
                              operation_name="image_mask")

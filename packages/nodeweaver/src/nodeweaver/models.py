@@ -1,8 +1,10 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from dataclasses import field
 from typing import Any, Dict, TypeVar
 
 # A generic type representing the state of any downstream domain
 T_State = TypeVar("T_State")
+
 
 @dataclass
 class PipelineContext:

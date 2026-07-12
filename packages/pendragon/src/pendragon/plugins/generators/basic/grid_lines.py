@@ -1,24 +1,32 @@
 import math
 from typing import List, Literal, Optional
-from loguru import logger
-from pydantic import Field
-from shapely.geometry import LineString, MultiLineString
 
+from loguru import logger
 from nodeweaver.models import PipelineContext
+from pendragon.registry import dxf_registry
+from pendragon.registry import PendragonBaseConfig
+from pendragon.registry import PendragonOperation
 from pendragon.state import GeometryState
-from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
+from pydantic import Field
+from shapely.geometry import LineString
+from shapely.geometry import MultiLineString
 
 
 class GridLinesConfig(PendragonBaseConfig):
-    spacing: float = Field(default=5, description="Distance between consecutive lines.")
+    spacing: float = Field(default=5,
+                           description="Distance between consecutive lines.")
     orientation: Literal["horizontal", "vertical", "crosshatch"] = Field(
         default="horizontal",
-        description="Orientation of lines: 'horizontal', 'vertical', or 'crosshatch'.")
+        description=
+        "Orientation of lines: 'horizontal', 'vertical', or 'crosshatch'.")
+
 
 @dxf_registry.register("grid_lines", config_class=GridLinesConfig)
 class GridLinesGen(PendragonOperation):
 
-    def process(self, state: GeometryState, context: Optional[PipelineContext] = None) -> GeometryState:
+    def process(self,
+                state: GeometryState,
+                context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or GridLinesConfig()
         ctx = context or PipelineContext()
 
@@ -40,9 +48,11 @@ class GridLinesGen(PendragonOperation):
 
             for k in range(start_k, end_k + 1):
                 current_y = phase_y + k * spacing
-                if abs(current_y - eff_miny) < 1e-7 or abs(current_y - eff_maxy) < 1e-7:
+                if abs(current_y - eff_miny) < 1e-7 or abs(current_y -
+                                                           eff_maxy) < 1e-7:
                     continue
-                lines.append(LineString([(eff_minx, current_y), (eff_maxx, current_y)]))
+                lines.append(
+                    LineString([(eff_minx, current_y), (eff_maxx, current_y)]))
             return lines
 
         def make_vertical():
@@ -53,9 +63,11 @@ class GridLinesGen(PendragonOperation):
 
             for k in range(start_k, end_k + 1):
                 current_x = phase_x + k * spacing
-                if abs(current_x - eff_minx) < 1e-7 or abs(current_x - eff_maxx) < 1e-7:
+                if abs(current_x - eff_minx) < 1e-7 or abs(current_x -
+                                                           eff_maxx) < 1e-7:
                     continue
-                lines.append(LineString([(current_x, eff_miny), (current_x, eff_maxy)]))
+                lines.append(
+                    LineString([(current_x, eff_miny), (current_x, eff_maxy)]))
             return lines
 
         if orientation in ("horizontal", "crosshatch"):
@@ -74,7 +86,8 @@ class GridLinesGen(PendragonOperation):
                         if not sub_line.is_empty:
                             clipped_lines.append(sub_line)
 
-        logger.success(f"Generated and clipped {len(clipped_lines)} pattern lines.")
+        logger.success(
+            f"Generated and clipped {len(clipped_lines)} pattern lines.")
         return GeometryState(boundary=state.boundary,
                              lines=state.lines + clipped_lines,
                              operation_name="grid_lines")

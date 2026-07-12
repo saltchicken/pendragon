@@ -1,10 +1,13 @@
 from typing import List, Optional
+
 from loguru import logger
-from shapely.geometry import LineString, Polygon
+from shapely.geometry import LineString
+from shapely.geometry import Polygon
 
 from .models import PipelineState
 from .registry import OPERATION_REGISTRY
-from .runner import InteractiveRunner, PipelineRunner
+from .runner import InteractiveRunner
+from .runner import PipelineRunner
 
 
 class PendragonEngine:
@@ -18,10 +21,12 @@ class PendragonEngine:
                  boundary: Optional[Polygon] = None,
                  interactive: bool = False):
         self.recipe = recipe
-        self.boundary = boundary or Polygon([(0, 0), (200, 0), (200, 200), (0, 200), (0, 0)])
+        self.boundary = boundary or Polygon([(0, 0), (200, 0), (200, 200),
+                                             (0, 200), (0, 0)])
         self.interactive = interactive
 
-        initial_state = PipelineState(boundary=self.boundary, operation_name="base_geometry")
+        initial_state = PipelineState(boundary=self.boundary,
+                                      operation_name="base_geometry")
 
         if self.interactive:
             self.runner = InteractiveRunner(initial_state)
@@ -31,7 +36,8 @@ class PendragonEngine:
     def load_recipe(self, new_recipe: list) -> bool:
         """Resets the engine's runner and loads a new recipe dynamically."""
         self.recipe = new_recipe
-        initial_state = PipelineState(boundary=self.boundary, operation_name="base_geometry")
+        initial_state = PipelineState(boundary=self.boundary,
+                                      operation_name="base_geometry")
 
         if self.interactive:
             self.runner = InteractiveRunner(initial_state)
@@ -52,7 +58,9 @@ class PendragonEngine:
         for step in self.recipe:
             op_name = step.get("operation")
             if not op_name:
-                logger.error(f"Invalid step configuration, missing 'operation' key: {step}")
+                logger.error(
+                    f"Invalid step configuration, missing 'operation' key: {step}"
+                )
                 return False
 
             op_info = OPERATION_REGISTRY.get(op_name)
@@ -67,7 +75,8 @@ class PendragonEngine:
             if ConfigClass:
                 try:
                     validated_config = ConfigClass(**step.get("settings", {}))
-                    logger.success(f"Successfully validated config for {op_name}")
+                    logger.success(
+                        f"Successfully validated config for {op_name}")
                 except Exception as e:
                     logger.error(f"Configuration error for '{op_name}': {e}")
                     return False

@@ -1,9 +1,12 @@
 import inspect
 from typing import Generic, Optional
+
 from loguru import logger
 
-from .models import PipelineContext, T_State
+from .models import PipelineContext
+from .models import T_State
 from .registry import PipelineOperation
+
 
 class PipelineRunner(Generic[T_State]):
     """Core headless runner. Memory-efficient, executes linearly, no history tracking."""
@@ -23,7 +26,7 @@ class PipelineRunner(Generic[T_State]):
         for i, op in enumerate(self.operations):
             logger.info(f"Running operation {i}: {op.__class__.__name__}")
             context.current_step = i
-            
+
             sig = inspect.signature(op.process)
             if 'context' in sig.parameters:
                 current_state = op.process(current_state, context=context)
@@ -66,10 +69,13 @@ class InteractiveRunner(PipelineRunner[T_State]):
         try:
             return self.history[step_index]
         except IndexError:
-            logger.error(f"Step {step_index} does not exist. Returning latest state.")
+            logger.error(
+                f"Step {step_index} does not exist. Returning latest state.")
             return self.history[-1]
 
-    def recompute_from(self, step_index: int, target_step: Optional[int] = None):
+    def recompute_from(self,
+                       step_index: int,
+                       target_step: Optional[int] = None):
         if step_index < 0 or step_index >= len(self.operations):
             return
 

@@ -1,9 +1,11 @@
 from typing import Generic, Optional
+
 from loguru import logger
 
 from .models import T_State
 from .registry import OperationRegistry
-from .runner import InteractiveRunner, PipelineRunner
+from .runner import InteractiveRunner
+from .runner import PipelineRunner
 
 
 class CoreEngine(Generic[T_State]):
@@ -49,7 +51,9 @@ class CoreEngine(Generic[T_State]):
         for step in self.recipe:
             op_name = step.get("operation")
             if not op_name:
-                logger.error(f"Invalid step configuration, missing 'operation' key: {step}")
+                logger.error(
+                    f"Invalid step configuration, missing 'operation' key: {step}"
+                )
                 return False
 
             op_info = self.registry.get(op_name)
@@ -64,7 +68,8 @@ class CoreEngine(Generic[T_State]):
             if ConfigClass:
                 try:
                     validated_config = ConfigClass(**step.get("settings", {}))
-                    logger.success(f"Successfully validated config for {op_name}")
+                    logger.success(
+                        f"Successfully validated config for {op_name}")
                 except Exception as e:
                     logger.error(f"Configuration error for '{op_name}': {e}")
                     return False

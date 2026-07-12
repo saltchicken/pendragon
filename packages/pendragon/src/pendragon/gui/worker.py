@@ -2,13 +2,14 @@ import inspect
 import multiprocessing
 import queue as standard_queue
 import time
-import numpy as np
-
-from PyQt5.QtCore import pyqtSignal, QThread
 
 from nodeweaver.models import PipelineContext
+import numpy as np
+from pendragon.registry import dxf_registry
+from pendragon.registry import load_batteries
 from pendragon.state import GeometryState
-from pendragon.registry import dxf_registry, load_batteries
+from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore import QThread
 
 
 def _vectorize_lines(lines):
@@ -17,7 +18,8 @@ def _vectorize_lines(lines):
     ready for direct injection into Vispy visuals.
     """
     if not lines:
-        return np.empty((0, 2), dtype=np.float32), np.empty((0, 2), dtype=np.uint32)
+        return np.empty((0, 2), dtype=np.float32), np.empty((0, 2),
+                                                            dtype=np.uint32)
 
     # Extract all coordinates into a list of arrays
     coords_list = [np.array(line.coords, dtype=np.float32) for line in lines]
@@ -31,16 +33,23 @@ def _vectorize_lines(lines):
     for n in lengths:
         if n > 1:
             # Rapidly generate [0,1], [1,2], [2,3] index pairs for the GPU
-            starts = np.arange(current_idx, current_idx + n - 1, dtype=np.uint32)
+            starts = np.arange(current_idx,
+                               current_idx + n - 1,
+                               dtype=np.uint32)
             ends = starts + 1
             connect_blocks.append(np.column_stack((starts, ends)))
         current_idx += n
 
-    final_connect = np.vstack(connect_blocks) if connect_blocks else np.empty((0, 2), dtype=np.uint32)
+    final_connect = np.vstack(connect_blocks) if connect_blocks else np.empty(
+        (0, 2), dtype=np.uint32)
     return stacked_pos, final_connect
 
 
-def run_pipeline_process(recipe, boundary, progress_queue, prior_history=None, start_index=0):
+def run_pipeline_process(recipe,
+                         boundary,
+                         progress_queue,
+                         prior_history=None,
+                         start_index=0):
     """
     Executes the pipeline in a background process, pushing intermediate states.
     Pushes the final history array to the queue at the end.
@@ -50,7 +59,8 @@ def run_pipeline_process(recipe, boundary, progress_queue, prior_history=None, s
     if prior_history:
         history = prior_history
     else:
-        initial_state = GeometryState(boundary=boundary, operation_name="base_geometry")
+        initial_state = GeometryState(boundary=boundary,
+                                      operation_name="base_geometry")
         history = [initial_state]
 
     operations = []
@@ -61,7 +71,8 @@ def run_pipeline_process(recipe, boundary, progress_queue, prior_history=None, s
             continue
 
         PluginClass, ConfigClass = op_info["class"], op_info["config"]
-        config = ConfigClass(**step.get("settings", {})) if ConfigClass else None
+        config = ConfigClass(
+            **step.get("settings", {})) if ConfigClass else None
         operations.append(PluginClass(config=config))
 
     empty_context = PipelineContext()

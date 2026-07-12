@@ -1,14 +1,13 @@
 from typing import List, Optional
 
 from loguru import logger
-from pydantic import BaseModel
-from shapely.geometry import LineString
-from shapely.ops import polygonize
-
 from pendragon.engine import PipelineContext
 from pendragon.engine import PipelineOperation
 from pendragon.engine import PipelineState
 from pendragon.engine import register_operation
+from pydantic import BaseModel
+from shapely.geometry import LineString
+from shapely.ops import polygonize
 
 
 class PolygonizeConfig(BaseModel):

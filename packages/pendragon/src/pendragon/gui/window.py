@@ -1,18 +1,27 @@
 from typing import get_origin
-from loguru import logger
-import yaml
-from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtWidgets import (
-    QApplication, QCheckBox, QComboBox, QFileDialog, 
-    QFormLayout, QGroupBox, QHBoxLayout, QLabel, QMainWindow, 
-    QProgressBar, QPushButton, QVBoxLayout, QWidget
-)
 
-from pendragon.registry import dxf_registry
+from loguru import logger
 from pendragon.gui.constants import DARK_THEME_STYLESHEET
 from pendragon.gui.viewer import PipelineViewer
-from pendragon.gui.worker import PipelineStreamingThread
 from pendragon.gui.widgets import WidgetFactory
+from pendragon.gui.worker import PipelineStreamingThread
+from pendragon.registry import dxf_registry
+from PyQt5.QtCore import Qt
+from PyQt5.QtCore import QTimer
+from PyQt5.QtWidgets import QApplication
+from PyQt5.QtWidgets import QCheckBox
+from PyQt5.QtWidgets import QComboBox
+from PyQt5.QtWidgets import QFileDialog
+from PyQt5.QtWidgets import QFormLayout
+from PyQt5.QtWidgets import QGroupBox
+from PyQt5.QtWidgets import QHBoxLayout
+from PyQt5.QtWidgets import QLabel
+from PyQt5.QtWidgets import QMainWindow
+from PyQt5.QtWidgets import QProgressBar
+from PyQt5.QtWidgets import QPushButton
+from PyQt5.QtWidgets import QVBoxLayout
+from PyQt5.QtWidgets import QWidget
+import yaml
 
 
 class LiveEditorWindow(QMainWindow):
@@ -248,9 +257,12 @@ class LiveEditorWindow(QMainWindow):
 
         for field_name, field_info in operation.config.model_fields.items():
             current_value = getattr(operation.config, field_name)
-            
+
             # 1. Handle Nested Configs (Dictionaries)
-            if isinstance(current_value, dict) or field_info.annotation == dict or getattr(field_info.annotation, '__origin__', None) is dict:
+            if isinstance(current_value,
+                          dict) or field_info.annotation == dict or getattr(
+                              field_info.annotation, '__origin__',
+                              None) is dict:
                 registry_key = None
                 prefix = field_name.split('_')[0] if '_' in field_name else ""
                 if prefix and hasattr(operation.config, prefix):
@@ -258,24 +270,38 @@ class LiveEditorWindow(QMainWindow):
                 elif hasattr(operation.config, "generator"):
                     registry_key = getattr(operation.config, "generator")
 
-                op_info = dxf_registry.get(registry_key) if registry_key else None
+                op_info = dxf_registry.get(
+                    registry_key) if registry_key else None
 
                 if op_info and op_info["config"]:
                     sub_config_class = op_info["config"]
-                    self.form_layout.addRow(QLabel(f"<br><i>Nested Context: {registry_key} ({field_name})</i>"))
+                    self.form_layout.addRow(
+                        QLabel(
+                            f"<br><i>Nested Context: {registry_key} ({field_name})</i>"
+                        ))
 
-                    for sub_field_name, sub_field_info in sub_config_class.model_fields.items():
+                    for sub_field_name, sub_field_info in sub_config_class.model_fields.items(
+                    ):
                         sub_current_value = current_value.get(
-                            sub_field_name, sub_field_info.default if sub_field_info.default is not None else 0.0)
+                            sub_field_name, sub_field_info.default
+                            if sub_field_info.default is not None else 0.0)
 
-                        def nested_update_callback(val, parent_dict=field_name, fname=sub_field_name, idx=op_index):
-                            self.update_nested_parameter(idx, parent_dict, fname, val)
+                        def nested_update_callback(val,
+                                                   parent_dict=field_name,
+                                                   fname=sub_field_name,
+                                                   idx=op_index):
+                            self.update_nested_parameter(
+                                idx, parent_dict, fname, val)
 
                         sub_container = WidgetFactory.build_field_widget(
-                            sub_field_name, sub_field_info, sub_current_value, nested_update_callback, parent=self
-                        )
+                            sub_field_name,
+                            sub_field_info,
+                            sub_current_value,
+                            nested_update_callback,
+                            parent=self)
                         if sub_container:
-                            self.form_layout.addRow(f"↳ {sub_field_name}", sub_container)
+                            self.form_layout.addRow(f"↳ {sub_field_name}",
+                                                    sub_container)
                 continue
 
             # 2. Handle Standard Config Fields via WidgetFactory
@@ -283,24 +309,31 @@ class LiveEditorWindow(QMainWindow):
             widget_type = schema_extra.get("widget")
 
             if field_info.annotation == str:
-                def root_update_callback(text, fname=field_name, idx=op_index, wtype=widget_type):
+
+                def root_update_callback(text,
+                                         fname=field_name,
+                                         idx=op_index,
+                                         wtype=widget_type):
                     op = self.engine.runner.operations[idx]
                     if getattr(op.config, fname) == text:
                         return
                     self.update_parameter(idx, fname, text)
-                    
+
                     if wtype == "operation_selector":
                         settings_key = f"{fname}_settings"
                         if hasattr(op.config, settings_key):
                             setattr(op.config, settings_key, {})
                         QTimer.singleShot(0, self.build_ui_for_current_step)
             else:
+
                 def root_update_callback(val, fname=field_name, idx=op_index):
                     self.update_parameter(idx, fname, val)
 
-            container = WidgetFactory.build_field_widget(
-                field_name, field_info, current_value, root_update_callback, parent=self
-            )
+            container = WidgetFactory.build_field_widget(field_name,
+                                                         field_info,
+                                                         current_value,
+                                                         root_update_callback,
+                                                         parent=self)
             if container:
                 self.form_layout.addRow(field_name, container)
 
@@ -487,7 +520,8 @@ class LiveEditorWindow(QMainWindow):
 
         if file_path:
             final_lines = self.engine.runner.history[-1].lines
-            from pendragon.pen import PenConfig, PenTool
+            from pendragon.pen import PenConfig
+            from pendragon.pen import PenTool
             config = PenConfig()
             with PenTool(config=config, output_filename=file_path) as pen:
                 for line in final_lines:

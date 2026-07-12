@@ -1,6 +1,8 @@
 import numpy as np
+from shapely.geometry import MultiPolygon
+from shapely.geometry import Polygon
 from vispy import scene
-from shapely.geometry import MultiPolygon, Polygon
+
 
 class PipelineViewer(scene.SceneCanvas):
 
@@ -187,4 +189,3 @@ class PipelineViewer(scene.SceneCanvas):
             self.boundary_visual.visible = False
 
         self.set_live_lines(state.lines)
-

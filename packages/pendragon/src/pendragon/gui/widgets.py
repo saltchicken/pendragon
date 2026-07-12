@@ -1,35 +1,48 @@
 from typing import get_args, get_origin, Literal
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (
-    QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog,
-    QHBoxLayout, QLabel, QLineEdit, QPushButton,
-    QSlider, QSpinBox, QWidget
-)
-
 from pendragon.registry import dxf_registry
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QCheckBox
+from PyQt5.QtWidgets import QComboBox
+from PyQt5.QtWidgets import QDoubleSpinBox
+from PyQt5.QtWidgets import QFileDialog
+from PyQt5.QtWidgets import QHBoxLayout
+from PyQt5.QtWidgets import QLabel
+from PyQt5.QtWidgets import QLineEdit
+from PyQt5.QtWidgets import QPushButton
+from PyQt5.QtWidgets import QSlider
+from PyQt5.QtWidgets import QSpinBox
+from PyQt5.QtWidgets import QWidget
 
 
 class WidgetFactory:
     """A factory for creating standardized PyQt UI widgets from Pydantic fields."""
 
     @classmethod
-    def build_field_widget(cls, field_name, field_info, current_value, update_callback, parent=None):
+    def build_field_widget(cls,
+                           field_name,
+                           field_info,
+                           current_value,
+                           update_callback,
+                           parent=None):
         """Routes the field to the appropriate widget builder based on its annotation."""
         origin = get_origin(field_info.annotation)
         annotation = field_info.annotation
 
         if annotation == float:
-            return cls.build_float_widget(current_value, field_info, update_callback)
+            return cls.build_float_widget(current_value, field_info,
+                                          update_callback)
         elif annotation == int:
             return cls.build_int_widget(current_value, update_callback)
         elif annotation == bool:
             return cls.build_bool_widget(current_value, update_callback)
         elif origin is Literal:
-            return cls.build_literal_widget(current_value, field_info, update_callback)
+            return cls.build_literal_widget(current_value, field_info,
+                                            update_callback)
         elif annotation == str:
-            return cls.build_str_widget(field_name, field_info, current_value, update_callback, parent)
-        
+            return cls.build_str_widget(field_name, field_info, current_value,
+                                        update_callback, parent)
+
         return None
 
     @staticmethod
@@ -64,11 +77,18 @@ class WidgetFactory:
             value_label.setMinimumWidth(35)
             value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
-            def update_label_only(val, lbl=value_label, v_min=val_min, r_span=range_span):
+            def update_label_only(val,
+                                  lbl=value_label,
+                                  v_min=val_min,
+                                  r_span=range_span):
                 real_val = v_min + (val / 100.0) * r_span
                 lbl.setText(f"{real_val:.2f}")
 
-            def update_value_wrapper(val, lbl=value_label, v_min=val_min, r_span=range_span, cb=update_callback):
+            def update_value_wrapper(val,
+                                     lbl=value_label,
+                                     v_min=val_min,
+                                     r_span=range_span,
+                                     cb=update_callback):
                 real_val = v_min + (val / 100.0) * r_span
                 lbl.setText(f"{real_val:.2f}")
                 cb(real_val)  # Emit back to caller
@@ -102,7 +122,8 @@ class WidgetFactory:
 
         spin_box = QSpinBox()
         spin_box.setRange(0, 10000)
-        spin_box.setValue(int(current_value) if current_value is not None else 0)
+        spin_box.setValue(
+            int(current_value) if current_value is not None else 0)
 
         def update_int_wrapper(val, cb=update_callback):
             cb(val)
@@ -157,7 +178,11 @@ class WidgetFactory:
         return container
 
     @staticmethod
-    def build_str_widget(field_name, field_info, current_value, update_callback, parent=None):
+    def build_str_widget(field_name,
+                         field_info,
+                         current_value,
+                         update_callback,
+                         parent=None):
         container = QWidget()
         h_layout = QHBoxLayout(container)
         h_layout.setContentsMargins(0, 0, 0, 0)

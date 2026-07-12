@@ -1,23 +1,30 @@
 import importlib
 from pathlib import Path
-from loguru import logger
-from pydantic import BaseModel, Field
 
-from nodeweaver.registry import OperationRegistry, PipelineOperation
+from loguru import logger
+from nodeweaver.registry import OperationRegistry
+from nodeweaver.registry import PipelineOperation
+from pydantic import BaseModel
+from pydantic import Field
+
 from .state import GeometryState
 
 # 1. Instantiate the Pendragon-specific registry
 dxf_registry = OperationRegistry[GeometryState]()
 
+
 # 2. Base Configuration for geometric plugins
 class PendragonBaseConfig(BaseModel):
     overscan: float = Field(
         default=0.0,
-        description="Distance to expand (positive) or shrink (negative) the operation's clipping boundary."
+        description=
+        "Distance to expand (positive) or shrink (negative) the operation's clipping boundary."
     )
+
 
 # 3. Geometric-specific operations base class
 class PendragonOperation(PipelineOperation[GeometryState]):
+
     def get_effective_boundary(self, state: GeometryState):
         """
         Returns the boundary, buffered by the overscan setting if applicable.
@@ -28,20 +35,21 @@ class PendragonOperation(PipelineOperation[GeometryState]):
             return state.boundary.buffer(overscan, join_style=2)
         return state.boundary
 
+
 # 4. Mixins
 class CenteredPluginConfig(PendragonBaseConfig):
     center_x: float | None = Field(
         default=None,
-        description="X coordinate of the pattern center. Defaults to centroid."
-    )
+        description="X coordinate of the pattern center. Defaults to centroid.")
     center_y: float | None = Field(
         default=None,
-        description="Y coordinate of the pattern center. Defaults to centroid."
-    )
+        description="Y coordinate of the pattern center. Defaults to centroid.")
     group_boundaries: bool = Field(
         default=False,
-        description="If true, generates a single pattern globally centered across all boundaries."
+        description=
+        "If true, generates a single pattern globally centered across all boundaries."
     )
+
 
 # 5. Battery Loader
 def load_batteries():

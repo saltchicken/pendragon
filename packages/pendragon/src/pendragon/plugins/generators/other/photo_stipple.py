@@ -1,15 +1,16 @@
 from typing import List, Optional
 
 from loguru import logger
+from nodeweaver.models import PipelineContext
 import numpy as np
+from pendragon.registry import dxf_registry
+from pendragon.registry import PendragonBaseConfig
+from pendragon.registry import PendragonOperation
+from pendragon.state import GeometryState
+from pendragon.utils import ImageSampler
 from pydantic import Field
 from shapely.geometry import LineString
 from shapely.geometry import Point
-
-from nodeweaver.models import PipelineContext
-from pendragon.state import GeometryState
-from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
-from pendragon.utils import ImageSampler
 
 
 class PhotoStippleConfig(PendragonBaseConfig):

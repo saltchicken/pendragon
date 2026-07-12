@@ -2,12 +2,13 @@ import math
 from typing import Optional
 
 from loguru import logger
-from pydantic import Field
-
 from nodeweaver.models import PipelineContext
+from pendragon.registry import dxf_registry
+from pendragon.registry import PendragonBaseConfig
+from pendragon.registry import PendragonOperation
 from pendragon.state import GeometryState
-from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
 from pendragon.utils import ImageSampler
+from pydantic import Field
 
 
 class ImageHalftoneConfig(PendragonBaseConfig):
@@ -104,8 +105,8 @@ class ImageHalftoneGen(PendragonOperation):
                 # 6. Create a distinct boundary box for this specific cell to allow local clipping
                 cell_poly = box(current_x - half_space, current_y - half_space,
                                 current_x + half_space, current_y + half_space)
-                local_state = GeometryState(boundary=cell_poly,
-                                            operation_name=f"cell_{cfg.generator}")
+                local_state = GeometryState(
+                    boundary=cell_poly, operation_name=f"cell_{cfg.generator}")
 
                 # 7. Execute the sub-generator and collect its lines
                 result_state = sub_gen.process(local_state, context=local_ctx)
