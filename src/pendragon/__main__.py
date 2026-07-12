@@ -1,9 +1,13 @@
 import argparse
 import sys
+import uvicorn
 
 from loguru import logger
 from shapely.geometry import Polygon
 import yaml
+
+from pendragon.engine import generate_recipe_schema
+
 
 # Cleanly import from our new consolidated engine package
 from pendragon.engine import PendragonEngine, load_plugins
@@ -47,12 +51,19 @@ def main():
                         type=str,
                         metavar="PATH",
                         help="Generate JSON schema for recipes and exit.")
+    parser.add_argument("--serve", action="store_true", help="Launch the web API and frontend.")
+    parser.add_argument("--port", type=int, default=8000, help="Port for the web server.")
     args = parser.parse_args()
 
     if args.generate_schema:
         # Schema generator is now also housed in the engine package
-        from pendragon.engine import generate_recipe_schema
         generate_recipe_schema(args.generate_schema)
+        sys.exit(0)
+
+    if args.serve or not args.recipe:
+        logger.info(f"Starting Pendragon Web Server on port {args.port}...")
+        # Start the FastAPI app via Uvicorn
+        uvicorn.run("pendragon.api.main:app", host="127.0.0.1", port=args.port, reload=True)
         sys.exit(0)
 
     # 1. Discover and load plugins
