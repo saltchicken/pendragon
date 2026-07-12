@@ -1,16 +1,17 @@
-from typing import List, Optional
+import inspect
+from typing import Generator, List, Optional
+
 from loguru import logger
 from shapely.geometry import LineString, Polygon
 
-from .models import PipelineState
-from .registry import OPERATION_REGISTRY
-from .runner import InteractiveRunner, PipelineRunner
+from .models import PipelineContext, PipelineState
+from .registry import OPERATION_REGISTRY, PipelineOperation
 
 
 class PendragonEngine:
     """
     Core pipeline orchestrator.
-    Pure geometry processing engine. No UI, no threading, no I/O.
+    Manages its own history, caching, and intelligent recalculation.
     """
 
     def __init__(self,
@@ -21,34 +22,29 @@ class PendragonEngine:
         self.boundary = boundary or Polygon([(0, 0), (200, 0), (200, 200), (0, 200), (0, 0)])
         self.interactive = interactive
 
-        initial_state = PipelineState(boundary=self.boundary, operation_name="base_geometry")
-
-        if self.interactive:
-            self.runner = InteractiveRunner(initial_state)
-        else:
-            self.runner = PipelineRunner(initial_state)
+        self.operations: List[PipelineOperation] = []
+        
+        # The engine holds its own state history natively, starting with the base boundary
+        self.history: List[PipelineState] = [
+            PipelineState(boundary=self.boundary, operation_name="base_geometry")
+        ]
 
     def load_recipe(self, new_recipe: list) -> bool:
-        """Resets the engine's runner and loads a new recipe dynamically."""
+        """Resets the engine and loads a new recipe dynamically."""
         self.recipe = new_recipe
-        initial_state = PipelineState(boundary=self.boundary, operation_name="base_geometry")
-
-        if self.interactive:
-            self.runner = InteractiveRunner(initial_state)
-        else:
-            self.runner = PipelineRunner(initial_state)
-
+        self.history = [PipelineState(boundary=self.boundary, operation_name="base_geometry")]
+        
         success = self.build_pipeline()
-
         if success:
             logger.info("Successfully loaded and built new pipeline recipe.")
         else:
             logger.error("Failed to build pipeline from new recipe.")
-
         return success
 
     def build_pipeline(self) -> bool:
-        """Validates the recipe and queues up the configured plugin operations."""
+        """Instantiates operations based on the current recipe."""
+        self.operations.clear()
+        
         for step in self.recipe:
             op_name = step.get("operation")
             if not op_name:
@@ -67,17 +63,61 @@ class PendragonEngine:
             if ConfigClass:
                 try:
                     validated_config = ConfigClass(**step.get("settings", {}))
-                    logger.success(f"Successfully validated config for {op_name}")
                 except Exception as e:
                     logger.error(f"Configuration error for '{op_name}': {e}")
                     return False
 
-            plugin_instance = PluginClass(config=validated_config)
-            self.runner.add_operation(plugin_instance)
-
+            self.operations.append(PluginClass(config=validated_config))
         return True
 
+    def invalidate_from(self, step_index: int):
+        """
+        Clears cached history from this step index onwards.
+        This forces a recalculation of subsequent steps when next requested.
+        """
+        valid_length = step_index + 1
+        if len(self.history) > valid_length:
+            logger.debug(f"Invalidating history from step {step_index} onwards.")
+            self.history = self.history[:valid_length]
+
+    def go_to_step(self, target_step: int) -> PipelineState:
+        """
+        Intelligently calculates up to the target step and returns the state.
+        If the history already exists, it skips computation and returns instantly.
+        """
+        for _ in self.compute_to_generator(target_step):
+            pass
+        
+        target = min(target_step, len(self.history) - 1)
+        return self.history[target]
+
+    def compute_to_generator(self, target_step: int) -> Generator[PipelineState, None, None]:
+        """
+        Generator that intelligently computes missing states up to target_step.
+        Skips recalculation for steps already cached in self.history.
+        """
+        target_step = min(target_step, len(self.operations))
+        empty_context = PipelineContext()
+
+        # Start computing from the end of our valid cached history
+        start_idx = len(self.history) - 1
+
+        for i in range(start_idx, target_step):
+            op = self.operations[i]
+            current_state = self.history[-1]
+            logger.info(f"Computing operation {i}: {op.__class__.__name__}")
+
+            sig = inspect.signature(op.process)
+            if 'context' in sig.parameters:
+                new_state = op.process(current_state, context=empty_context)
+            else:
+                new_state = op.process(current_state)
+
+            self.history.append(new_state)
+            yield new_state
+
     def run(self) -> List[LineString]:
-        """Executes the pipeline sequentially and returns the final geometries."""
-        self.runner.execute_all()
-        return self.runner.get_final_lines()
+        """Executes the entire pipeline and returns the final geometries."""
+        for _ in self.compute_to_generator(len(self.operations)):
+            pass
+        return self.history[-1].lines if self.history else []

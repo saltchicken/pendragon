@@ -156,11 +156,7 @@ class LiveEditorWindow(QMainWindow):
         start_index = self._pending_op_index if self._pending_op_index is not None else 0
         self._pending_op_index = None
 
-        prior_history = None
-        if start_index > 0 and len(self.engine.runner.history) > start_index:
-            prior_history = self.engine.runner.history[:start_index + 1]
-        else:
-            start_index = 0
+        prior_history = list(self.engine.history)
 
         self.btn_cancel.setEnabled(True)
         self.btn_cancel.setStyleSheet(
@@ -227,12 +223,12 @@ class LiveEditorWindow(QMainWindow):
         self.control_layout.addWidget(self.dynamic_form_widget)
 
         op_index = self.viewer.current_step - 1
-        if op_index < 0 or op_index >= len(self.engine.runner.operations):
+        if op_index < 0 or op_index >= len(self.engine.operations):
             self.form_layout.addRow(
                 QLabel("No configurable parameters for this state."))
             return
 
-        operation = self.engine.runner.operations[op_index]
+        operation = self.engine.operations[op_index]
         if not operation.config:
             self.form_layout.addRow(
                 QLabel(f"{operation.__class__.__name__} has no config."))
@@ -287,7 +283,7 @@ class LiveEditorWindow(QMainWindow):
 
             if field_info.annotation == str:
                 def root_update_callback(text, fname=field_name, idx=op_index, wtype=widget_type):
-                    op = self.engine.runner.operations[idx]
+                    op = self.engine.operations[idx]
                     if getattr(op.config, fname) == text:
                         return
                     self.update_parameter(idx, fname, text)
@@ -308,8 +304,12 @@ class LiveEditorWindow(QMainWindow):
                 self.form_layout.addRow(field_name, container)
 
     def update_parameter(self, op_index, field_name, new_value):
-        operation = self.engine.runner.operations[op_index]
+        operation = self.engine.operations[op_index]
         setattr(operation.config, field_name, new_value)
+        
+        # Instantly drop dirty cache from this step onward!
+        self.engine.invalidate_from(op_index) 
+        
         if self._pending_op_index is None:
             self._pending_op_index = op_index
         else:
@@ -318,11 +318,15 @@ class LiveEditorWindow(QMainWindow):
 
     def update_nested_parameter(self, op_index, parent_dict_name,
                                 sub_field_name, new_value):
-        operation = self.engine.runner.operations[op_index]
+        operation = self.engine.operations[op_index]
         if hasattr(operation.config, parent_dict_name):
             target_dict = getattr(operation.config, parent_dict_name)
             if isinstance(target_dict, dict):
                 target_dict[sub_field_name] = new_value
+                
+                # Instantly drop dirty cache from this step onward!
+                self.engine.invalidate_from(op_index)
+                
                 if self._pending_op_index is None:
                     self._pending_op_index = op_index
                 else:
@@ -370,10 +374,10 @@ class LiveEditorWindow(QMainWindow):
         self.progress_bar.setFormat("Finalizing Display...")
         QApplication.processEvents()
 
-        self.engine.runner.history = history
+        self.engine.history = history
 
         target = len(
-            self.engine.runner.operations
+            self.engine.operations
         ) if self.viewer.show_final_view else self.viewer.current_step
         self.viewer.current_step = min(target, len(history) - 1)
 
@@ -397,7 +401,7 @@ class LiveEditorWindow(QMainWindow):
 
     def _get_current_recipe(self) -> list:
         current_recipe = []
-        for op in self.engine.runner.operations:
+        for op in self.engine.operations:
             op_name = next((name for name, info in OPERATION_REGISTRY.items()
                             if isinstance(op, info["class"])), None)
             if not op_name:
@@ -416,18 +420,18 @@ class LiveEditorWindow(QMainWindow):
                          valid_history_idx: int = 0):
         valid_history = []
         if valid_history_idx > 0 and len(
-                self.engine.runner.history) > valid_history_idx:
-            valid_history = self.engine.runner.history[:valid_history_idx + 1]
+                self.engine.history) > valid_history_idx:
+            valid_history = self.engine.history[:valid_history_idx + 1]
 
         success = self.engine.load_recipe(new_recipe)
 
         if success:
             if valid_history:
-                self.engine.runner.history = valid_history
+                self.engine.history = valid_history
 
             self._pending_op_index = valid_history_idx
 
-            max_step = len(self.engine.runner.operations)
+            max_step = len(self.engine.operations)
             self.viewer.current_step = max(0, min(target_step, max_step))
             self.build_ui_for_current_step()
             self._trigger_computation()
@@ -476,7 +480,7 @@ class LiveEditorWindow(QMainWindow):
             success = self.engine.load_recipe(new_recipe)
 
             if success:
-                self.viewer.current_step = len(self.engine.runner.operations)
+                self.viewer.current_step = len(self.engine.operations)
                 self.build_ui_for_current_step()
                 self._trigger_computation()
 
@@ -489,7 +493,7 @@ class LiveEditorWindow(QMainWindow):
             "G-Code Files (*.nc *.gcode);;All Files (*)")
 
         if file_path:
-            final_lines = self.engine.runner.history[-1].lines
+            final_lines = self.engine.history[-1].lines
             from pendragon.pen import PenConfig, PenTool
             config = PenConfig()
             with PenTool(config=config, output_filename=file_path) as pen:

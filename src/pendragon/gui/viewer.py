@@ -11,7 +11,7 @@ class PipelineViewer(scene.SceneCanvas):
                          show=True)
         self.unfreeze()
         self.engine = engine
-        self.current_step = min(1, len(self.engine.runner.operations))
+        self.current_step = min(1, len(self.engine.operations))
         self.show_vertices = False
         self.show_final_view = False
 
@@ -41,7 +41,7 @@ class PipelineViewer(scene.SceneCanvas):
         self.freeze()
         self.update_view()
 
-        history = self.engine.runner.history
+        history = self.engine.history
         if history and history[0].boundary:
             minx, miny, maxx, maxy = history[0].boundary.bounds
             self.view.camera.set_range(x=(minx, maxx), y=(miny, maxy))
@@ -52,7 +52,7 @@ class PipelineViewer(scene.SceneCanvas):
                 pass
 
     def step_forward(self):
-        max_step = len(self.engine.runner.operations)
+        max_step = len(self.engine.operations)
         if self.current_step < max_step:
             self.current_step += 1
             self.update_view()
@@ -131,15 +131,15 @@ class PipelineViewer(scene.SceneCanvas):
         self.set_live_vectors(stacked_pos, final_connect)
 
     def update_view(self):
-        target_step = len(self.engine.runner.operations
+        target_step = len(self.engine.operations
                          ) if self.show_final_view else self.current_step
 
         # Safely cap the display step to whatever history currently exists
-        display_step = min(target_step, len(self.engine.runner.history) - 1)
-        state = self.engine.runner.history[display_step]
+        display_step = min(target_step, len(self.engine.history) - 1)
+        state = self.engine.history[display_step]
 
         total_vertices = sum(len(line.coords) for line in state.lines)
-        total_ops = len(self.engine.runner.operations)
+        total_ops = len(self.engine.operations)
 
         if self.on_stats_updated:
             self.on_stats_updated(self.current_step,

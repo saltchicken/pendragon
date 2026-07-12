@@ -1,4 +1,3 @@
-import inspect
 import multiprocessing
 import queue as standard_queue
 import time
@@ -6,9 +5,8 @@ import time
 import numpy as np
 from PyQt5.QtCore import pyqtSignal, QThread
 
+from pendragon.engine import PendragonEngine
 from pendragon.engine.discovery import load_plugins
-from pendragon.engine.models import PipelineContext, PipelineState
-from pendragon.engine.registry import OPERATION_REGISTRY
 
 
 def _vectorize_lines(lines):
@@ -42,61 +40,44 @@ def _vectorize_lines(lines):
 
 def run_pipeline_process(recipe, boundary, progress_queue, prior_history=None, start_index=0):
     """
-    Executes the pipeline in a background process, pushing intermediate states.
-    Pushes the final history array to the queue at the end.
+    Executes the pipeline in a background process using the engine's native generator.
     """
     load_plugins()
 
+    # 1. Spin up a headless engine inside this background process
+    engine = PendragonEngine(recipe=recipe, boundary=boundary)
+    engine.build_pipeline()
+
+    # 2. Prime the engine's cache with our valid history so it skips recalculating
     if prior_history:
-        history = prior_history
-    else:
-        initial_state = PipelineState(boundary=boundary, operation_name="base_geometry")
-        history = [initial_state]
+        engine.history = prior_history
 
-    operations = []
-    for step in recipe:
-        op_name = step.get("operation")
-        op_info = OPERATION_REGISTRY.get(op_name)
-        if not op_info:
-            continue
+    total_ops = len(engine.operations)
 
-        PluginClass, ConfigClass = op_info["class"], op_info["config"]
-        config = ConfigClass(**step.get("settings", {})) if ConfigClass else None
-        operations.append(PluginClass(config=config))
-
-    empty_context = PipelineContext()
-    total_ops = len(operations)
-
-    if start_index == 0:
-        stacked_pos, final_connect = _vectorize_lines(history[-1].lines)
+    # 3. Stream the 0th frame if we are starting completely fresh
+    if start_index == 0 and engine.history:
+        stacked_pos, final_connect = _vectorize_lines(engine.history[0].lines)
         progress_queue.put({
             "type": "FRAME",
             "step": 0,
             "total": total_ops,
-            "op_name": history[-1].operation_name,
-            "line_count": len(history[-1].lines),
+            "op_name": engine.history[0].operation_name,
+            "line_count": len(engine.history[0].lines),
             "pos": stacked_pos,
             "connect": final_connect
         })
 
-    for i in range(start_index, total_ops):
-        op = operations[i]
-        current_state = history[-1]
-
-        sig = inspect.signature(op.process)
-        if 'context' in sig.parameters:
-            new_state = op.process(current_state, context=empty_context)
-        else:
-            new_state = op.process(current_state)
-
-        history.append(new_state)
-
+    # 4. Let the generator intelligently compute ONLY the missing steps
+    for new_state in engine.compute_to_generator(total_ops):
+        # We use len(engine.history) - 1 because the generator already appended it
+        step_idx = len(engine.history) - 1 
+        
         # Offload the heavy coordinate extraction to this background process
         stacked_pos, final_connect = _vectorize_lines(new_state.lines)
 
         progress_queue.put({
             "type": "FRAME",
-            "step": i + 1,
+            "step": step_idx,
             "total": total_ops,
             "op_name": new_state.operation_name,
             "line_count": len(new_state.lines),
@@ -104,7 +85,7 @@ def run_pipeline_process(recipe, boundary, progress_queue, prior_history=None, s
             "connect": final_connect
         })
 
-    progress_queue.put({"type": "DONE", "history": history})
+    progress_queue.put({"type": "DONE", "history": engine.history})
 
 
 class PipelineStreamingThread(QThread):
