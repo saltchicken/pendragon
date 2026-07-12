@@ -1,117 +1,47 @@
-.sidebar {
-  width: 400px;
-  overflow-y: auto;
-}
-
-.sidebar-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-}
-
-.status {
-  font-size: 0.8em;
-  color: #888;
-}
-
-.recipe-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  flex-grow: 1;
-  overflow-y: auto;
-  padding-right: 5px;
-}
-
-.operation-card {
-  background-color: #1e1e1e;
-  border: 1px solid #3c3c3c;
-  border-radius: 6px;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.op-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid #333;
-  padding-bottom: 8px;
-}
-
-.op-title-input {
-  background: transparent;
-  border: none;
+/* Update op-title since it's no longer an input */
+.op-title {
   color: #aa3bff;
   font-weight: bold;
   font-size: 1.1em;
+}
+
+/* Style for the Add Operation dropdown */
+.add-op-dropdown {
+  background-color: transparent;
+  border: 1px dashed #555;
+  color: #888;
+  padding: 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: center;
+  appearance: none;
+  font-weight: bold;
+}
+
+.add-op-dropdown:hover, .add-op-dropdown:focus {
+  background-color: rgba(255,255,255,0.05);
+  border-color: #aa3bff;
+  color: #aa3bff;
   outline: none;
-  width: 100%;
 }
 
-.op-settings {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.setting-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.setting-row label {
-  font-size: 0.9em;
-  color: #aaa;
-}
-
-.setting-row input {
-  width: 120px;
+/* Style for parameter dropdowns (like orientation) */
+.setting-row select {
+  width: 138px; /* Match input width + padding */
   background-color: #252526;
   border: 1px solid #444;
   color: #ddd;
   border-radius: 4px;
   padding: 4px 8px;
+  cursor: pointer;
 }
 
-.icon-btn.delete {
-  background: transparent;
-  color: #ff5555;
-  padding: 4px;
-}
-
-.icon-btn.delete:hover {
-  background: rgba(255, 85, 85, 0.2);
-}
-
-.add-op-btn {
-  background-color: transparent;
-  border: 1px dashed #555;
-  color: #888;
-}
-
-.add-op-btn:hover {
-  background-color: rgba(255,255,255,0.05);
+.setting-row select:focus, .setting-row input:focus {
+  outline: none;
   border-color: #aa3bff;
-  color: #aa3bff;
 }
 
-.viewer {
-  cursor: grab;
-}
-
-.viewer:active {
-  cursor: grabbing;
-}
-
-.canvas-hints {
-  position: absolute;
-  bottom: 20px;
-  right: 20px;
-  color: rgba(255, 255, 255, 0.3);
-  pointer-events: none;
-  font-size: 0.85em;
+.setting-row input[type="checkbox"] {
+  width: auto;
+  cursor: pointer;
 }

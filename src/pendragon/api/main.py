@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from typing import List
 
 from pendragon.engine import PendragonEngine, load_plugins
+from pendragon.engine.registry import OPERATION_REGISTRY
 from pendragon.pen import PenConfig, PenTool
 
 app = FastAPI(title="Pendragon API")
@@ -13,6 +14,22 @@ app.mount("/app", StaticFiles(directory="frontend/dist", html=True), name="front
 
 class GenerateRequest(BaseModel):
     recipe: List[dict]
+
+@app.get("/api/schema")
+async def get_schema():
+    """Returns the JSON schema for all registered operations."""
+    load_plugins()
+    schema_data = {}
+    
+    for op_name, op_info in OPERATION_REGISTRY.items():
+        ConfigClass = op_info["config"]
+        if ConfigClass:
+            # Pydantic v2 schema generation
+            schema_data[op_name] = ConfigClass.model_json_schema()
+        else:
+            schema_data[op_name] = {"properties": {}}
+            
+    return schema_data
 
 @app.post("/api/generate")
 async def generate_toolpath(req: GenerateRequest):
