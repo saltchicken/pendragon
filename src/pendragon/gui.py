@@ -114,7 +114,12 @@ class PipelineStreamingThread(QThread):
     error = pyqtSignal(str)
     cancelled = pyqtSignal()
 
-    def __init__(self, recipe, boundary, prior_history=None, start_index=0, target_fps=30):
+    def __init__(self,
+                 recipe,
+                 boundary,
+                 prior_history=None,
+                 start_index=0,
+                 target_fps=30):
         super().__init__()
         self.recipe = recipe
         self.boundary = boundary
@@ -135,7 +140,8 @@ class PipelineStreamingThread(QThread):
             self.progress_queue = multiprocessing.Queue()
             self.process = multiprocessing.Process(
                 target=run_pipeline_streaming,
-                args=(self.recipe, self.boundary, self.progress_queue, self.prior_history, self.start_index))
+                args=(self.recipe, self.boundary, self.progress_queue,
+                      self.prior_history, self.start_index))
             self.process.start()
 
             last_emit_time = 0.0
@@ -319,10 +325,11 @@ class LiveEditorWindow(QMainWindow):
 
         # Reset UI for computation
         self.btn_cancel.setEnabled(True)
-        self.btn_cancel.setStyleSheet("background-color: #ff4444; color: white; font-weight: bold;")
-        
+        self.btn_cancel.setStyleSheet(
+            "background-color: #ff4444; color: white; font-weight: bold;")
+
         # Visually jump the progress bar to the starting step
-        self.progress_bar.setValue(start_index) 
+        self.progress_bar.setValue(start_index)
         self.progress_bar.setFormat("Initializing...")
 
         current_recipe = self._get_current_recipe()
@@ -332,8 +339,7 @@ class LiveEditorWindow(QMainWindow):
             current_recipe,
             self.engine.boundary,
             prior_history=prior_history,
-            start_index=start_index
-        )
+            start_index=start_index)
         self.worker_thread.step_completed.connect(self._on_step_streamed)
         self.worker_thread.finished.connect(self._on_calculation_finished)
         self.worker_thread.error.connect(self._on_calculation_error)
@@ -646,7 +652,8 @@ class LiveEditorWindow(QMainWindow):
             self._pending_op_index = min(self._pending_op_index, op_index)
         self.debounce_timer.start()
 
-    def update_nested_parameter(self, op_index, parent_dict_name, sub_field_name, new_value):
+    def update_nested_parameter(self, op_index, parent_dict_name,
+                                sub_field_name, new_value):
         operation = self.engine.runner.operations[op_index]
         if hasattr(operation.config, parent_dict_name):
             target_dict = getattr(operation.config, parent_dict_name)
@@ -656,7 +663,8 @@ class LiveEditorWindow(QMainWindow):
                 if self._pending_op_index is None:
                     self._pending_op_index = op_index
                 else:
-                    self._pending_op_index = min(self._pending_op_index, op_index)
+                    self._pending_op_index = min(self._pending_op_index,
+                                                 op_index)
                 self.debounce_timer.start()
 
     def _execute_recalculation(self):
@@ -667,26 +675,30 @@ class LiveEditorWindow(QMainWindow):
         step = state_data["step"]
         total = state_data["total"]
         op_name = state_data["op_name"]
-        
+
         # We now receive pre-computed numpy arrays
         line_count = state_data["line_count"]
         pos = state_data["pos"]
         connect = state_data["connect"]
-        vertices = len(pos)  # The total number of points is just the length of the position array
-        
+        vertices = len(
+            pos
+        )  # The total number of points is just the length of the position array
+
         # --- 1. PRE-RENDER UI UPDATE ---
-        safe_total = max(1, total) 
+        safe_total = max(1, total)
         self.progress_bar.setMaximum(safe_total)
         self.progress_bar.setValue(step)
-        
-        self.progress_bar.setFormat(f"{step} / {total} ({op_name}) - Rendering...")
+
+        self.progress_bar.setFormat(
+            f"{step} / {total} ({op_name}) - Rendering...")
         QApplication.processEvents()
-        
+
         # --- 2. INSTANT GPU INJECTION ---
-        # ONLY update the visuals if we are actively tracking the final view, 
+        # ONLY update the visuals if we are actively tracking the final view,
         # or if the pipeline is streaming the exact step we are currently inspecting.
         if self.viewer.show_final_view or step == self.viewer.current_step:
-            self.update_stats_ui(step, total, op_name, line_count, vertices, False)
+            self.update_stats_ui(step, total, op_name, line_count, vertices,
+                                 False)
             self.viewer.set_live_vectors(pos, connect)
 
         # --- 3. POST-RENDER CLEANUP ---
@@ -694,33 +706,36 @@ class LiveEditorWindow(QMainWindow):
 
     def _on_calculation_finished(self, history):
         self._is_computing = False
-        
+
         # Cleanup UI buttons
         self.btn_cancel.setEnabled(False)
-        self.btn_cancel.setStyleSheet("background-color: #8b0000; color: #aaaaaa; font-weight: bold;")
-        
+        self.btn_cancel.setStyleSheet(
+            "background-color: #8b0000; color: #aaaaaa; font-weight: bold;")
+
         # Lock bar at 100% and show finalization status
         self.progress_bar.setValue(self.progress_bar.maximum())
         self.progress_bar.setFormat("Finalizing Display...")
-        QApplication.processEvents() 
+        QApplication.processEvents()
 
         # Sync the engine's runner history for localized scrubbing
         self.engine.runner.history = history
-        
-        target = len(self.engine.runner.operations) if self.viewer.show_final_view else self.viewer.current_step
-        self.viewer.current_step = min(target, len(history) - 1)
-        
-        # Update view (now blazingly fast due to numpy)
-        self.viewer.update_view() 
 
-        # Give Vispy's OpenGL backend 150ms to push the final frame to the monitor 
+        target = len(
+            self.engine.runner.operations
+        ) if self.viewer.show_final_view else self.viewer.current_step
+        self.viewer.current_step = min(target, len(history) - 1)
+
+        # Update view (now blazingly fast due to numpy)
+        self.viewer.update_view()
+
+        # Give Vispy's OpenGL backend 150ms to push the final frame to the monitor
         # before we declare the UI perfectly "Ready".
         QTimer.singleShot(150, self._set_ready_state)
 
     def _set_ready_state(self):
         """Clears the progress bar and queues the next run if needed."""
         self.progress_bar.setFormat("Ready")
-        
+
         # Automatically start the next computation if the user kept sliding the bar
         if self._computation_queued:
             self._computation_queued = False
@@ -749,23 +764,27 @@ class LiveEditorWindow(QMainWindow):
 
         return current_recipe
 
-    def _reload_pipeline(self, new_recipe: list, target_step: int, valid_history_idx: int = 0):
+    def _reload_pipeline(self,
+                         new_recipe: list,
+                         target_step: int,
+                         valid_history_idx: int = 0):
         # 1. Rescue the valid portion of the history BEFORE the engine wipes it
         valid_history = []
-        if valid_history_idx > 0 and len(self.engine.runner.history) > valid_history_idx:
+        if valid_history_idx > 0 and len(
+                self.engine.runner.history) > valid_history_idx:
             valid_history = self.engine.runner.history[:valid_history_idx + 1]
 
         # 2. Load the new recipe (this creates a brand new PipelineRunner)
         success = self.engine.load_recipe(new_recipe)
-        
+
         if success:
             # 3. Inject the rescued history back into the new runner
             if valid_history:
                 self.engine.runner.history = valid_history
 
             # 4. Tell the trigger to start calculating from the insertion point
-            self._pending_op_index = valid_history_idx 
-            
+            self._pending_op_index = valid_history_idx
+
             max_step = len(self.engine.runner.operations)
             self.viewer.current_step = max(0, min(target_step, max_step))
             self.build_ui_for_current_step()
@@ -780,13 +799,11 @@ class LiveEditorWindow(QMainWindow):
         insert_idx = self.viewer.current_step
 
         recipe.insert(insert_idx, {"operation": op_name, "settings": {}})
-        
+
         # History is perfectly valid up to the insertion point
-        self._reload_pipeline(
-            recipe, 
-            target_step=insert_idx + 1, 
-            valid_history_idx=insert_idx
-        )
+        self._reload_pipeline(recipe,
+                              target_step=insert_idx + 1,
+                              valid_history_idx=insert_idx)
 
     def _remove_operation(self):
         recipe = self._get_current_recipe()
@@ -794,13 +811,11 @@ class LiveEditorWindow(QMainWindow):
 
         if 0 <= remove_idx < len(recipe):
             recipe.pop(remove_idx)
-            
+
             # History is perfectly valid up to the step right before the one we deleted
-            self._reload_pipeline(
-                recipe, 
-                target_step=max(0, remove_idx), 
-                valid_history_idx=remove_idx
-            )
+            self._reload_pipeline(recipe,
+                                  target_step=max(0, remove_idx),
+                                  valid_history_idx=remove_idx)
 
     def _load_live_recipe(self):
         file_path, _ = QFileDialog.getOpenFileName(
@@ -981,22 +996,28 @@ class PipelineViewer(scene.SceneCanvas):
             self.set_live_vectors(np.empty((0, 2)), np.empty((0, 2)))
             return
 
-        coords_list = [np.array(line.coords, dtype=np.float32) for line in lines]
+        coords_list = [
+            np.array(line.coords, dtype=np.float32) for line in lines
+        ]
         stacked_pos = np.vstack(coords_list)
-        
+
         lengths = [len(c) for c in coords_list]
         connect_blocks = []
         current_idx = 0
-        
+
         for n in lengths:
             if n > 1:
-                starts = np.arange(current_idx, current_idx + n - 1, dtype=np.uint32)
+                starts = np.arange(current_idx,
+                                   current_idx + n - 1,
+                                   dtype=np.uint32)
                 ends = starts + 1
                 connect_blocks.append(np.column_stack((starts, ends)))
             current_idx += n
-            
-        final_connect = np.vstack(connect_blocks) if connect_blocks else np.empty((0, 2), dtype=np.uint32)
-        
+
+        final_connect = np.vstack(
+            connect_blocks) if connect_blocks else np.empty(
+                (0, 2), dtype=np.uint32)
+
         self.set_live_vectors(stacked_pos, final_connect)
 
     def update_view(self):
@@ -1035,7 +1056,7 @@ class PipelineViewer(scene.SceneCanvas):
                 lengths = [len(c) for c in coords_list]
                 connect_blocks = []
                 current_idx = 0
-                
+
                 for n in lengths:
                     if n > 1:
                         # Rapidly generate [0,1], [1,2], [2,3] index pairs
@@ -1043,10 +1064,12 @@ class PipelineViewer(scene.SceneCanvas):
                         ends = starts + 1
                         connect_blocks.append(np.column_stack((starts, ends)))
                     current_idx += n
-                    
-                b_connect = np.vstack(connect_blocks) if connect_blocks else np.empty((0, 2))
-                
-                self.boundary_visual.set_data(pos=stacked_b_pos, connect=b_connect)
+
+                b_connect = np.vstack(
+                    connect_blocks) if connect_blocks else np.empty((0, 2))
+
+                self.boundary_visual.set_data(pos=stacked_b_pos,
+                                              connect=b_connect)
                 self.boundary_visual.visible = True
             else:
                 self.boundary_visual.visible = False
