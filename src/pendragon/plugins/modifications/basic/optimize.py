@@ -1,4 +1,3 @@
-# src/pendragon/plugins/modifications/basic/optimize.py
 from typing import List, Optional, Tuple
 
 from loguru import logger

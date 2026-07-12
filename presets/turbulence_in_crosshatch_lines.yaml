@@ -1,0 +1,38 @@
+- operation: grid_lines
+  settings:
+    overscan: 10.0
+    spacing: 3.0
+    orientation: crosshatch
+- operation: subdivide_lines
+  settings:
+    overscan: 0.0
+    max_segment_length: 1.0
+- operation: turbulence
+  settings:
+    amplitude: 4.5
+    frequency: 0.08
+    asymmetry: 1.618
+    phase: 0.0
+- operation: add_boundary
+  settings:
+    overscan: 0.0
+- operation: clip
+  settings: {}
+- operation: connect_continuous
+  settings:
+    snap_distance: 0.1
+- operation: optimize
+  settings:
+    start_x: 0.0
+    start_y: 0.0
+- operation: simplify
+  settings:
+    tolerance: 0.1
+    preserve_topology: false
+- operation: connect_continuous
+  settings:
+    snap_distance: 0.05
+- operation: optimize
+  settings:
+    start_x: 0.0
+    start_y: 0.0

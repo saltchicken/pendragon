@@ -1,0 +1,44 @@
+# yaml-language-server: $schema=../recipe-schema.json
+
+# 1. Create a chaotic, asymmetric web in the background
+- operation: clifford
+  settings:
+    a: 1.7
+    b: -1.3
+    c: 1.4
+    d: -1.2
+    iterations: 500
+    scale: 30.0
+
+# 2. Add a structured but slightly wavy grid over the top
+- operation: grid_lines
+  settings:
+    spacing: 3.0
+    orientation: vertical
+
+# 3. CRITICAL: Break the long straight grid lines into smaller segments
+# so the turbulence modifier has vertices to push around!
+- operation: subdivide_lines
+  settings:
+    max_length: 1.0
+
+# 4. Warp the grid lines to break their rigid symmetry
+- operation: turbulence
+  settings:
+    amplitude: 4.5
+    frequency: 0.08
+    asymmetry: 1.618 # Golden ratio for nice organic mismatch
+
+# 5. Add a boundary and clip any warped lines that bled outside
+- operation: add_boundary
+- operation: clip
+
+# 6. Standard cleanup and G-code prep
+- operation: connect_continuous
+  settings:
+    snap_distance: 0.1
+
+- operation: optimize
+  settings:
+    start_x: 0.0
+    start_y: 0.0
