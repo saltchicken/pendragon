@@ -3,7 +3,7 @@ from typing import List, Optional
 from loguru import logger
 from pydantic import BaseModel, Field
 from shapely.affinity import rotate, scale, translate
-from shapely.geometry import LineString
+from shapely.geometry import LineString, MultiLineString
 
 from pendragon.engine import PipelineContext
 from pendragon.engine import PipelineOperation
@@ -51,10 +51,11 @@ class TransformMod(PipelineOperation):
         ctx = context or PipelineContext()
         current_lines = state.lines
 
-        if not current_lines:
+        valid_lines = [line for line in current_lines if not line.is_empty]
+        if not valid_lines:
             return state
 
-        # 1. Resolve variables (context overrides config to allow for dynamic iteration)
+        # 1. Resolve variables
         tx = ctx.variables.get("translate_x", cfg.translate_x)
         ty = ctx.variables.get("translate_y", cfg.translate_y)
         rot = ctx.variables.get("rotation", cfg.rotation)
@@ -63,7 +64,7 @@ class TransformMod(PipelineOperation):
         sy = ctx.variables.get("scale_y", cfg.scale_y)
         s_orig = ctx.variables.get("scale_origin", cfg.scale_origin)
 
-        # 2. Resolve dynamic origins (especially useful if running inside dynamic cells)
+        # 2. Resolve dynamic origins
         def resolve_origin(origin_pref: str):
             if origin_pref == "center" and ctx.local_center_x is not None and ctx.local_center_y is not None:
                 return (ctx.local_center_x, ctx.local_center_y)
@@ -76,27 +77,23 @@ class TransformMod(PipelineOperation):
             f"Applying transforms - Translate: ({tx}, {ty}), Rotate: {rot}°, Scale: ({sx}, {sy})"
         )
 
-        # 3. Apply Transformations
-        transformed_lines: List[LineString] = []
-        for line in current_lines:
-            if line.is_empty:
-                continue
-
-            geom = line
+        # 3. Pack lines into a single geometry to preserve relative coordinates
+        geom = MultiLineString(valid_lines)
             
-            # Scale
-            if sx != 1.0 or sy != 1.0:
-                geom = scale(geom, xfact=sx, yfact=sy, origin=final_scale_orig)
+        # Scale
+        if sx != 1.0 or sy != 1.0:
+            geom = scale(geom, xfact=sx, yfact=sy, origin=final_scale_orig)
 
-            # Rotate
-            if rot != 0.0:
-                geom = rotate(geom, angle=rot, origin=final_rot_orig)
+        # Rotate
+        if rot != 0.0:
+            geom = rotate(geom, angle=rot, origin=final_rot_orig)
 
-            # Translate
-            if tx != 0.0 or ty != 0.0:
-                geom = translate(geom, xoff=tx, yoff=ty)
+        # Translate
+        if tx != 0.0 or ty != 0.0:
+            geom = translate(geom, xoff=tx, yoff=ty)
 
-            transformed_lines.append(geom)
+        # Unpack back to a list
+        transformed_lines = list(geom.geoms)
 
         logger.success("Transformation complete.")
         return PipelineState(boundary=state.boundary,
