@@ -3,6 +3,7 @@ from .discovery import load_plugins
 from .mixins import CenteredPluginConfig
 from .models import PipelineContext, PipelineState
 from .registry import BasePluginConfig, OPERATION_REGISTRY, PipelineOperation, register_operation
+from .runner import PipelineRunner
 from .schema import generate_recipe_schema
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "PipelineOperation",
     "register_operation",
     "generate_recipe_schema",
+    "PipelineRunner",
 ]
