@@ -20,7 +20,7 @@ class ScaleConfig(BaseModel):
         description="Origin point for scaling ('center', 'centroid', etc).")
 
 
-@register_operation("scale", config_class=ScaleConfig)
+@register_operation("vertex_burst", config_class=ScaleConfig)
 class ScaleMod(PipelineOperation):
 
     def process(self,
