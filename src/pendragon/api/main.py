@@ -2,16 +2,13 @@ import os
 import tempfile
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Any
+from typing import List
 
 from pendragon.engine import PendragonEngine, load_plugins
 from pendragon.pen import PenConfig, PenTool
 
 app = FastAPI(title="Pendragon API")
-
-# Mount the frontend directory to serve the web app
 app.mount("/app", StaticFiles(directory="frontend/dist", html=True), name="frontend")
 
 class GenerateRequest(BaseModel):
@@ -21,22 +18,23 @@ class GenerateRequest(BaseModel):
 async def generate_toolpath(req: GenerateRequest):
     load_plugins()
     
-    # Initialize engine (headless mode)
     engine = PendragonEngine(recipe=req.recipe, interactive=False)
     
     if not engine.build_pipeline():
-        raise HTTPException(status_code=400, detail="Failed to build pipeline. Check recipe schema.")
+        raise HTTPException(status_code=400, detail="Failed to build pipeline.")
     
-    # Run the engine
     final_lines = engine.run()
     
-    # Format coordinate data for the frontend canvas to render
-    # Converting Shapely LineStrings to simple nested lists: [ [x, y], [x, y] ]
-    vector_data = []
-    for line in final_lines:
-        vector_data.append(list(line.coords))
-        
-    # Generate the G-Code into a temporary string/file
+    # Extract Vector Data
+    vector_data = [list(line.coords) for line in final_lines]
+    
+    # Extract Boundary Data from the initial state
+    boundary_coords = []
+    if engine.runner.initial_state.boundary:
+        # Get the exterior ring coordinates of the boundary polygon
+        boundary_coords = list(engine.runner.initial_state.boundary.exterior.coords)
+
+    # Generate G-Code
     gcode_str = ""
     if final_lines:
         config = PenConfig()
@@ -49,11 +47,11 @@ async def generate_toolpath(req: GenerateRequest):
                 
         with open(tmp_name, 'r') as tmp:
             gcode_str = tmp.read()
-            
         os.remove(tmp_name)
 
     return {
         "status": "success",
+        "boundary": boundary_coords,
         "vectors": vector_data,
         "gcode": gcode_str
     }
