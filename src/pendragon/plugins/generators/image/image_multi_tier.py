@@ -1,5 +1,5 @@
-from typing import Dict, Optional
 import math
+from typing import Dict, Optional
 
 from loguru import logger
 from pydantic import Field
@@ -22,19 +22,19 @@ class ImageMultiTierConfig(BasePluginConfig):
     )
     
     # Tier 1 (Darkest)
-    tier_1_op: str = Field(default="spiral", json_schema_extra={"widget": "operation_selector"})
+    tier_1_op: str = Field(default="spiral")
     tier_1_settings: dict = Field(default_factory=dict)
     
     # Tier 2 (Mid-Dark)
-    tier_2_op: str = Field(default="concentric", json_schema_extra={"widget": "operation_selector"})
+    tier_2_op: str = Field(default="concentric")
     tier_2_settings: dict = Field(default_factory=dict)
     
     # Tier 3 (Mid-Light)
-    tier_3_op: str = Field(default="grid_lines", json_schema_extra={"widget": "operation_selector"})
+    tier_3_op: str = Field(default="grid_lines")
     tier_3_settings: dict = Field(default_factory=dict)
     
     # Tier 4 (Lightest)
-    tier_4_op: str = Field(default="", json_schema_extra={"widget": "operation_selector"})
+    tier_4_op: str = Field(default="")
     tier_4_settings: dict = Field(default_factory=dict)
 
 
@@ -139,18 +139,22 @@ class ImageMultiTierGen(PipelineOperation):
                              operation_name="image_multi_tier")
 
     def build_custom_ui(self, window, op_index):
-        """Builds a dynamic custom GUI to handle nested tier configurations."""
+        """
+        Builds a custom GUI for the Image Multi-Tier plugin. 
+        PyQt5 is imported locally to ensure headless CLI compatibility.
+        """
         from PyQt5.QtWidgets import (
             QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, 
-            QDoubleSpinBox, QComboBox, QGroupBox, QLineEdit, QFileDialog, QFormLayout
+            QDoubleSpinBox, QComboBox, QLineEdit, QFileDialog, QGroupBox, QFormLayout
         )
+        from pendragon.engine.registry import OPERATION_REGISTRY
         from pendragon.gui.widgets import WidgetFactory
 
         container = QWidget()
         layout = QVBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        # Triggers the pipeline recalculation timer
+        # --- Helper Callbacks to sync with the main window ---
         def trigger_recalc():
             if window._pending_op_index is None:
                 window._pending_op_index = op_index
@@ -158,107 +162,108 @@ class ImageMultiTierGen(PipelineOperation):
                 window._pending_op_index = min(window._pending_op_index, op_index)
             window.debounce_timer.start()
 
-        # --- 1. Base Image & Grid Settings ---
-        base_group = QGroupBox("Base Settings")
-        base_group.setStyleSheet("QGroupBox { font-weight: bold; border: 1px solid #444; border-radius: 4px; padding-top: 15px; }")
-        base_layout = QFormLayout(base_group)
-        
+        # --- 1. Source Image Selection ---
         img_layout = QHBoxLayout()
-        img_edit = QLineEdit(self.config.source_image)
-        img_btn = QPushButton("Browse...")
+        img_layout.addWidget(QLabel("Source Image:"))
+        img_line = QLineEdit(self.config.source_image)
         
         def update_img(text):
             self.config.source_image = text
             trigger_recalc()
             
-        def browse_img():
-            path, _ = QFileDialog.getOpenFileName(window, "Select Source Image", "", "Images (*.png *.jpg *.jpeg);;All Files (*)")
-            if path:
-                img_edit.setText(path)
-                
-        img_edit.textChanged.connect(update_img)
-        img_btn.clicked.connect(browse_img)
-        img_layout.addWidget(img_edit)
-        img_layout.addWidget(img_btn)
-        base_layout.addRow("Source Image:", img_layout)
+        img_line.textChanged.connect(update_img)
+        img_layout.addWidget(img_line)
 
-        cell_spin = QDoubleSpinBox()
-        cell_spin.setRange(0.1, 1000.0)
-        cell_spin.setSingleStep(0.5)
-        cell_spin.setValue(self.config.cell_size)
+        btn_browse = QPushButton("Browse...")
+        def browse_file():
+            path, _ = QFileDialog.getOpenFileName(window, "Select Image", "", "Images (*.png *.jpg *.jpeg);;All Files (*)")
+            if path:
+                img_line.setText(path)
+                
+        btn_browse.clicked.connect(browse_file)
+        img_layout.addWidget(btn_browse)
+        layout.addLayout(img_layout)
+
+        # --- 2. Global Cell Size ---
+        cs_layout = QHBoxLayout()
+        cs_layout.addWidget(QLabel("Grid Cell Size:"))
+        cs_spin = QDoubleSpinBox()
+        cs_spin.setRange(0.1, 1000.0)
+        cs_spin.setSingleStep(0.5)
+        cs_spin.setValue(self.config.cell_size)
         
-        def update_cell_size(val):
+        def update_cs(val):
             self.config.cell_size = val
             trigger_recalc()
             
-        cell_spin.valueChanged.connect(update_cell_size)
-        base_layout.addRow("Cell Size:", cell_spin)
-        
-        layout.addWidget(base_group)
+        cs_spin.valueChanged.connect(update_cs)
+        cs_layout.addWidget(cs_spin)
+        layout.addLayout(cs_layout)
 
-        # --- 2. Dynamic Tiers 1 through 4 ---
-        tier_names = ["Tier 1 (Darkest, >75%)", "Tier 2 (Mid-Dark, >50%)", "Tier 3 (Mid-Light, >25%)", "Tier 4 (Lightest, <25%)"]
-        op_keys = [""] + sorted(list(OPERATION_REGISTRY.keys()))
+        # --- 3. Dynamic Tier Layouts ---
+        tier_names = [
+            "Tier 1 (Darkest: 75%-100%)", 
+            "Tier 2 (Mid-Dark: 50%-75%)",
+            "Tier 3 (Mid-Light: 25%-50%)", 
+            "Tier 4 (Lightest: 0%-25%)"
+        ]
+
+        # Standardize the available operations mapping
+        available_ops = ["None"] + sorted(OPERATION_REGISTRY.keys())
 
         for i in range(1, 5):
-            tier_group = QGroupBox(tier_names[i-1])
-            tier_group.setStyleSheet("QGroupBox { font-weight: bold; border: 1px solid #444; border-radius: 4px; padding-top: 15px; margin-top: 5px; }")
-            tier_layout = QVBoxLayout(tier_group)
-            
             op_attr = f"tier_{i}_op"
-            set_attr = f"tier_{i}_settings"
-            
-            # Sub-generator Combobox
-            combo_layout = QHBoxLayout()
-            combo_layout.addWidget(QLabel("Generator:"))
+            settings_attr = f"tier_{i}_settings"
+
+            group = QGroupBox(tier_names[i-1])
+            group.setStyleSheet("QGroupBox { border: 1px solid #444; border-radius: 4px; padding-top: 15px; margin-top: 10px; }")
+            group_layout = QFormLayout(group)
+
             combo = QComboBox()
-            combo.addItems(op_keys)
-            
+            combo.addItems(available_ops)
+
             current_op = getattr(self.config, op_attr)
-            if current_op in op_keys:
+            if current_op in available_ops:
                 combo.setCurrentText(current_op)
-                
-            def on_op_changed(text, op_a=op_attr, set_a=set_attr):
-                setattr(self.config, op_a, text)
-                setattr(self.config, set_a, {})  # Clear out old settings
-                # Force the entire property panel to rebuild so the new config widgets appear
-                window.build_ui_for_current_step()
-                trigger_recalc()
-                
-            combo.currentTextChanged.connect(on_op_changed)
-            combo_layout.addWidget(combo)
-            tier_layout.addLayout(combo_layout)
+            else:
+                combo.setCurrentText("None")
 
-            # Retrieve and build widgets for the selected operation's specific Pydantic Config
+            # Callback factory to trap the correct tier variables
+            def make_combo_cb(op_key, set_key):
+                def on_change(text):
+                    new_val = "" if text == "None" else text
+                    setattr(self.config, op_key, new_val)
+                    setattr(self.config, set_key, {})  # Clear out old settings
+                    window.build_ui_for_current_step() # Redraw the whole UI panel
+                    trigger_recalc()
+                return on_change
+
+            combo.currentTextChanged.connect(make_combo_cb(op_attr, settings_attr))
+            group_layout.addRow("Generator:", combo)
+
+            # Delegate standard setting fields back to Pendragon's WidgetFactory
             if current_op and current_op in OPERATION_REGISTRY:
-                op_info = OPERATION_REGISTRY[current_op]
-                ConfigClass = op_info["config"]
-                
-                if ConfigClass:
-                    settings_form = QFormLayout()
-                    current_settings = getattr(self.config, set_attr)
-                    
-                    for field_name, field_info in ConfigClass.model_fields.items():
-                        # Extract the existing value, or fallback to the model's default
-                        default_val = field_info.default if field_info.default is not None else 0.0
-                        val = current_settings.get(field_name, default_val)
-                        current_settings[field_name] = val  # Ensure dict is populated for saving
-                        
-                        # Closure callback to handle UI edits
-                        def update_nested(new_val, sa=set_attr, fn=field_name):
-                            getattr(self.config, sa)[fn] = new_val
-                            trigger_recalc()
-                            
-                        # Use Pendragon's native WidgetFactory for standard sliders/spinners
-                        widget = WidgetFactory.build_field_widget(
-                            field_name, field_info, val, update_nested, parent=window
-                        )
-                        if widget:
-                            settings_form.addRow(f"↳ {field_name}", widget)
-                    
-                    if settings_form.rowCount() > 0:
-                        tier_layout.addLayout(settings_form)
+                ConfigClass = OPERATION_REGISTRY[current_op]["config"]
+                current_settings = getattr(self.config, settings_attr)
 
-            layout.addWidget(tier_group)
+                if ConfigClass:
+                    for field_name, field_info in ConfigClass.model_fields.items():
+                        # Extract the existing value or fall back to the plugin's default
+                        val = current_settings.get(field_name, field_info.default if field_info.default is not None else 0.0)
+
+                        def make_setting_cb(t_idx, f_name):
+                            def cb(new_val):
+                                target_dict = getattr(self.config, f"tier_{t_idx}_settings")
+                                target_dict[f_name] = new_val
+                                trigger_recalc()
+                            return cb
+
+                        widget_container = WidgetFactory.build_field_widget(
+                            field_name, field_info, val, make_setting_cb(i, field_name), parent=window
+                        )
+                        if widget_container:
+                            group_layout.addRow(f"↳ {field_name}", widget_container)
+
+            layout.addWidget(group)
 
         return container
