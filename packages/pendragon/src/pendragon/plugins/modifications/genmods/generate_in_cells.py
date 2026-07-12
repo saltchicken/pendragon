@@ -9,12 +9,9 @@ from shapely import set_precision
 from shapely.ops import polygonize
 from shapely.ops import unary_union
 
-from pendragon.engine import BasePluginConfig
-from pendragon.engine import PipelineContext
-from pendragon.engine import PipelineOperation
-from pendragon.engine import PipelineState
-from pendragon.engine import register_operation
-from pendragon.engine.registry import OPERATION_REGISTRY
+from nodeweaver.models import PipelineContext
+from pendragon.state import GeometryState
+from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
 from pendragon.utils import ImageSampler
 
 
@@ -36,7 +33,7 @@ class ImageModulatorConfig(BaseModel):
         "The setting value when the image is pure black (100% darkness).")
 
 
-class GenerateInCellsConfig(BasePluginConfig):
+class GenerateInCellsConfig(PendragonBaseConfig):
     generator: str = Field(
         default="grid_lines",
         description="The registry name of the generator to run in each cell.",
@@ -83,12 +80,12 @@ class GenerateInCellsConfig(BasePluginConfig):
     )
 
 
-@register_operation("generate_in_cells", config_class=GenerateInCellsConfig)
-class GenerateInCellsOp(PipelineOperation):
+@dxf_registry.register("generate_in_cells", config_class=GenerateInCellsConfig)
+class GenerateInCellsOp(PendragonOperation):
 
     def process(self,
-                state: PipelineState,
-                context: Optional[PipelineContext] = None) -> PipelineState:
+                state: GeometryState,
+                context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or GenerateInCellsConfig()
         current_lines = state.lines
 
@@ -132,7 +129,7 @@ class GenerateInCellsOp(PipelineOperation):
                                        state.boundary.bounds)
 
         # 5. Look up the requested sub-generator in the registry
-        op_info = OPERATION_REGISTRY.get(cfg.generator)
+        op_info = dxf_registry.get(cfg.generator)
         if not op_info:
             logger.error(
                 f"Sub-generator '{cfg.generator}' not found in registry.")
@@ -152,6 +149,11 @@ class GenerateInCellsOp(PipelineOperation):
             ctx_center_y = centroid.y if cfg.auto_center else None
             ctx_rotation = None
             ctx_vars = {}
+
+            if ctx_center_x is not None:
+                ctx_vars["local_center_x"] = ctx_center_x
+            if ctx_center_y is not None:
+                ctx_vars["local_center_y"] = ctx_center_y
 
             # Apply Geometry-Aware Rotation logic
             if cfg.auto_rotate:
@@ -175,7 +177,9 @@ class GenerateInCellsOp(PipelineOperation):
                     ctx_rotation = math.degrees(math.atan2(dy, dx)) % 180.0
 
                 # Make the rotation available generally and strictly under the configured string
-                ctx_vars[cfg.rotation_setting] = ctx_rotation
+                if ctx_rotation is not None:
+                    ctx_vars["local_rotation"] = ctx_rotation
+                    ctx_vars[cfg.rotation_setting] = ctx_rotation
 
             # Apply Image Modulation logic
             if sampler and cfg.image_modulator:
@@ -185,10 +189,8 @@ class GenerateInCellsOp(PipelineOperation):
                                                                  val_range)
                 ctx_vars[cfg.image_modulator.target_setting] = modulated_value
 
-            cell_context = PipelineContext(local_center_x=ctx_center_x,
-                                           local_center_y=ctx_center_y,
-                                           local_rotation=ctx_rotation,
-                                           variables=ctx_vars)
+            # Load any local values into the nodeweaver standard PipelineContext variable dict
+            cell_context = PipelineContext(variables=ctx_vars)
 
             sub_config = None
             if SubConfigClass:
@@ -201,7 +203,7 @@ class GenerateInCellsOp(PipelineOperation):
 
             sub_gen = SubGenClass(config=sub_config)
 
-            temp_state = PipelineState(boundary=poly,
+            temp_state = GeometryState(boundary=poly,
                                        lines=[],
                                        operation_name=f"cell_{cfg.generator}")
 
@@ -223,6 +225,6 @@ class GenerateInCellsOp(PipelineOperation):
             logger.info("Keeping original scaffolding lines in the output.")
             final_lines = current_lines + all_new_lines
 
-        return PipelineState(boundary=state.boundary,
+        return GeometryState(boundary=state.boundary,
                              lines=final_lines,
                              operation_name="generate_in_cells")

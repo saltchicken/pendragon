@@ -7,15 +7,13 @@ from scipy.spatial import cKDTree
 from shapely.geometry import LineString
 from shapely.geometry import Point
 
-from pendragon.engine import BasePluginConfig
-from pendragon.engine import PipelineContext
-from pendragon.engine import PipelineOperation
-from pendragon.engine import PipelineState
-from pendragon.engine import register_operation
+from nodeweaver.models import PipelineContext
+from pendragon.state import GeometryState
+from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
 from pendragon.utils import ImageSampler
 
 
-class PhotoTSPConfig(BasePluginConfig):
+class PhotoTSPConfig(PendragonBaseConfig):
     nodes: int = Field(default=2000,
                        gt=1,
                        description="Number of points to connect.")
@@ -24,12 +22,12 @@ class PhotoTSPConfig(BasePluginConfig):
     seed: int = Field(default=42, description="Random seed.")
 
 
-@register_operation("photo_tsp", config_class=PhotoTSPConfig)
-class PhotoTSPGen(PipelineOperation):
+@dxf_registry.register("photo_tsp", config_class=PhotoTSPConfig)
+class PhotoTSPGen(PendragonOperation):
 
     def process(self,
-                state: PipelineState,
-                context: Optional[PipelineContext] = None) -> PipelineState:
+                state: GeometryState,
+                context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or PhotoTSPConfig()
         ctx = context or PipelineContext()
         effective_boundary = self.get_effective_boundary(state)
@@ -39,7 +37,7 @@ class PhotoTSPGen(PipelineOperation):
         if not cfg.image_path:
             return state
 
-        nodes = int(ctx.variables.get("nodes", cfg.nodes))
+        nodes = int(ctx.get("nodes", cfg.nodes))
         logger.info(
             f"Generating {nodes}-node TSP path from {cfg.image_path}...")
 
@@ -99,6 +97,6 @@ class PhotoTSPGen(PipelineOperation):
 
         final_path = LineString(route)
         logger.success("Photo TSP generation complete.")
-        return PipelineState(boundary=state.boundary,
+        return GeometryState(boundary=state.boundary,
                              lines=state.lines + [final_path],
                              operation_name="photo_tsp")

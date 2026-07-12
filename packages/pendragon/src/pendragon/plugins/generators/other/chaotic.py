@@ -7,14 +7,12 @@ from shapely import affinity
 from shapely.geometry import LineString
 from shapely.geometry import MultiLineString
 
-from pendragon.engine import BasePluginConfig
-from pendragon.engine import PipelineContext
-from pendragon.engine import PipelineOperation
-from pendragon.engine import PipelineState
-from pendragon.engine import register_operation
+from nodeweaver.models import PipelineContext
+from pendragon.state import GeometryState
+from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
 
 
-class ChaoticConfig(BasePluginConfig):
+class ChaoticConfig(PendragonBaseConfig):
     spacing: float = Field(
         default=2.0,
         gt=0.0,
@@ -30,12 +28,12 @@ class ChaoticConfig(BasePluginConfig):
                              description="Amplitude of the chaotic distortion.")
 
 
-@register_operation("chaotic", config_class=ChaoticConfig)
-class ChaoticFill(PipelineOperation):
+@dxf_registry.register("chaotic", config_class=ChaoticConfig)
+class ChaoticFill(PendragonOperation):
 
     def process(self,
-                state: PipelineState,
-                context: Optional[PipelineContext] = None) -> PipelineState:
+                state: GeometryState,
+                context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or ChaoticConfig()
         ctx = context or PipelineContext()
         effective_boundary = self.get_effective_boundary(state)
@@ -44,10 +42,10 @@ class ChaoticFill(PipelineOperation):
             logger.warning("No boundary available. Skipping chaotic fill.")
             return state
 
-        spacing = ctx.variables.get("spacing", cfg.spacing)
-        depth = int(ctx.variables.get("depth", cfg.depth))
-        chaos_freq = ctx.variables.get("chaos_freq", cfg.chaos_freq)
-        chaos_amp = ctx.variables.get("chaos_amp", cfg.chaos_amp)
+        spacing = ctx.get("spacing", cfg.spacing)
+        depth = int(ctx.get("depth", cfg.depth))
+        chaos_freq = ctx.get("chaos_freq", cfg.chaos_freq)
+        chaos_amp = ctx.get("chaos_amp", cfg.chaos_amp)
 
         logger.info(
             f"Generating chaotic fill (depth={depth}, spacing={spacing}) over the bounding area..."
@@ -141,6 +139,6 @@ class ChaoticFill(PipelineOperation):
                         clipped_lines.append(sub_line)
 
         logger.success(f"Generated {len(clipped_lines)} bounded chaotic paths.")
-        return PipelineState(boundary=state.boundary,
+        return GeometryState(boundary=state.boundary,
                              lines=state.lines + clipped_lines,
                              operation_name="chaotic")
