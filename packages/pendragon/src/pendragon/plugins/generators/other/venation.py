@@ -4,7 +4,7 @@ from pydantic import Field
 
 import numpy as np
 
-from nodeweaver.models import PipelineContext
+from pendragon.context import PendragonContext
 from pendragon.registry import CenteredPluginConfig, PendragonOperation, dxf_registry
 from pendragon.state import GeometryState
 from scipy.spatial import cKDTree
@@ -45,9 +45,9 @@ class VenationGen(PendragonOperation):
 
     def process(self,
                 state: GeometryState,
-                context: Optional[PipelineContext] = None) -> GeometryState:
+                context: Optional[PendragonContext] = None) -> GeometryState:
         cfg = self.config or VenationConfig()
-        ctx = context or PipelineContext()
+        ctx = context or PendragonContext()
         boundary = self.get_effective_boundary(state)
         minx, miny, maxx, maxy = boundary.bounds
 
