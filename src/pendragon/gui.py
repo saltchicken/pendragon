@@ -33,8 +33,9 @@ import yaml
 
 from pendragon.core.models import PipelineState
 from pendragon.core.registry import OPERATION_REGISTRY
-from pendragon.worker import run_pipeline_streaming
+from pendragon.engine import PendragonEngine  # <-- Added Import
 
+# ... DARK_THEME_STYLESHEET remains exactly the same ...
 DARK_THEME_STYLESHEET = """
 QWidget {
     background-color: #1e1e1e;
@@ -139,7 +140,7 @@ class PipelineStreamingThread(QThread):
         try:
             self.progress_queue = multiprocessing.Queue()
             self.process = multiprocessing.Process(
-                target=run_pipeline_streaming,
+                target=PendragonEngine.run_pipeline_process,  # <-- Point to the static method
                 args=(self.recipe, self.boundary, self.progress_queue,
                       self.prior_history, self.start_index))
             self.process.start()
