@@ -8,11 +8,11 @@ from scipy.spatial import Voronoi
 from shapely.geometry import LineString
 from shapely.geometry import MultiLineString
 
-from pendragon.core import BasePluginConfig
-from pendragon.core import PipelineContext
-from pendragon.core import PipelineOperation
-from pendragon.core import PipelineState
-from pendragon.core import register_operation
+from pendragon.engine import BasePluginConfig
+from pendragon.engine import PipelineContext
+from pendragon.engine import PipelineOperation
+from pendragon.engine import PipelineState
+from pendragon.engine import register_operation
 
 
 class VoronoiDualConfig(BasePluginConfig):

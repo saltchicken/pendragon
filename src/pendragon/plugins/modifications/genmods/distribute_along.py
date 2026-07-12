@@ -3,12 +3,12 @@ from typing import Any, Dict, Optional
 from loguru import logger
 from pydantic import Field
 
-from pendragon.core import BasePluginConfig
-from pendragon.core import PipelineContext
-from pendragon.core import PipelineOperation
-from pendragon.core import PipelineState
-from pendragon.core import register_operation
-from pendragon.core.registry import OPERATION_REGISTRY
+from pendragon.engine import BasePluginConfig
+from pendragon.engine import PipelineContext
+from pendragon.engine import PipelineOperation
+from pendragon.engine import PipelineState
+from pendragon.engine import register_operation
+from pendragon.engine.registry import OPERATION_REGISTRY
 
 
 class DistributeConfig(BasePluginConfig):

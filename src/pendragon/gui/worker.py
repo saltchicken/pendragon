@@ -6,9 +6,9 @@ import time
 import numpy as np
 from PyQt5.QtCore import pyqtSignal, QThread
 
-from pendragon.core.discovery import load_plugins
-from pendragon.core.models import PipelineContext, PipelineState
-from pendragon.core.registry import OPERATION_REGISTRY
+from pendragon.engine.discovery import load_plugins
+from pendragon.engine.models import PipelineContext, PipelineState
+from pendragon.engine.registry import OPERATION_REGISTRY
 
 
 def _vectorize_lines(lines):

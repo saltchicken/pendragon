@@ -9,11 +9,11 @@ from shapely.geometry import MultiLineString
 from shapely.geometry import Point
 from shapely.ops import linemerge
 
-from pendragon.core import CenteredPluginConfig
-from pendragon.core import PipelineContext
-from pendragon.core import PipelineOperation
-from pendragon.core import PipelineState
-from pendragon.core import register_operation
+from pendragon.engine import CenteredPluginConfig
+from pendragon.engine import PipelineContext
+from pendragon.engine import PipelineOperation
+from pendragon.engine import PipelineState
+from pendragon.engine import register_operation
 
 
 class VenationConfig(CenteredPluginConfig):

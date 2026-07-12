@@ -7,11 +7,11 @@ from pydantic import Field
 from shapely.geometry import box
 from shapely.geometry import LineString
 
-from pendragon.core import PipelineContext
-from pendragon.core import PipelineOperation
-from pendragon.core import PipelineState
-from pendragon.core import register_operation
-from pendragon.core.registry import OPERATION_REGISTRY
+from pendragon.engine import PipelineContext
+from pendragon.engine import PipelineOperation
+from pendragon.engine import PipelineState
+from pendragon.engine import register_operation
+from pendragon.engine.registry import OPERATION_REGISTRY
 from pendragon.utils import ImageSampler
 
 

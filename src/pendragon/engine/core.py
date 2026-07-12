@@ -1,11 +1,9 @@
 from typing import List, Optional
-
 from loguru import logger
 from shapely.geometry import LineString, Polygon
 
-from pendragon.core.models import PipelineState
-from pendragon.core.registry import OPERATION_REGISTRY
-
+from .models import PipelineState
+from .registry import OPERATION_REGISTRY
 from .runner import InteractiveRunner, PipelineRunner
 
 
@@ -19,16 +17,11 @@ class PendragonEngine:
                  recipe: list,
                  boundary: Optional[Polygon] = None,
                  interactive: bool = False):
-        """
-        Initializes the engine with a recipe and an optional boundary.
-        """
         self.recipe = recipe
-        self.boundary = boundary or Polygon([(0, 0), (200, 0), (200, 200),
-                                             (0, 200), (0, 0)])
+        self.boundary = boundary or Polygon([(0, 0), (200, 0), (200, 200), (0, 200), (0, 0)])
         self.interactive = interactive
 
-        initial_state = PipelineState(boundary=self.boundary,
-                                      operation_name="base_geometry")
+        initial_state = PipelineState(boundary=self.boundary, operation_name="base_geometry")
 
         if self.interactive:
             self.runner = InteractiveRunner(initial_state)
@@ -36,22 +29,15 @@ class PendragonEngine:
             self.runner = PipelineRunner(initial_state)
 
     def load_recipe(self, new_recipe: list) -> bool:
-        """
-        Resets the engine's runner and loads a new recipe dynamically.
-        """
+        """Resets the engine's runner and loads a new recipe dynamically."""
         self.recipe = new_recipe
+        initial_state = PipelineState(boundary=self.boundary, operation_name="base_geometry")
 
-        # 1. Re-initialize the base state
-        initial_state = PipelineState(boundary=self.boundary,
-                                      operation_name="base_geometry")
-
-        # 2. Create a brand new runner to clear the old history and operations
         if self.interactive:
             self.runner = InteractiveRunner(initial_state)
         else:
             self.runner = PipelineRunner(initial_state)
 
-        # 3. Rebuild the pipeline with the new recipe
         success = self.build_pipeline()
 
         if success:
@@ -62,16 +48,11 @@ class PendragonEngine:
         return success
 
     def build_pipeline(self) -> bool:
-        """
-        Validates the recipe and queues up the configured plugin operations.
-        Returns True if successful, False if validation fails.
-        """
+        """Validates the recipe and queues up the configured plugin operations."""
         for step in self.recipe:
             op_name = step.get("operation")
             if not op_name:
-                logger.error(
-                    f"Invalid step configuration, missing 'operation' key: {step}"
-                )
+                logger.error(f"Invalid step configuration, missing 'operation' key: {step}")
                 return False
 
             op_info = OPERATION_REGISTRY.get(op_name)
@@ -86,8 +67,7 @@ class PendragonEngine:
             if ConfigClass:
                 try:
                     validated_config = ConfigClass(**step.get("settings", {}))
-                    logger.success(
-                        f"Successfully validated config for {op_name}")
+                    logger.success(f"Successfully validated config for {op_name}")
                 except Exception as e:
                     logger.error(f"Configuration error for '{op_name}': {e}")
                     return False
@@ -98,8 +78,6 @@ class PendragonEngine:
         return True
 
     def run(self) -> List[LineString]:
-        """
-        Executes the pipeline sequentially and returns the final geometries.
-        """
+        """Executes the pipeline sequentially and returns the final geometries."""
         self.runner.execute_all()
         return self.runner.get_final_lines()

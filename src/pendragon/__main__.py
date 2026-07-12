@@ -5,11 +5,10 @@ from loguru import logger
 from shapely.geometry import Polygon
 import yaml
 
-from pendragon.core.discovery import load_plugins
+# Cleanly import from our new consolidated engine package
+from pendragon.engine import PendragonEngine, load_plugins
 from pendragon.utils import load_dxf_boundary
 from pendragon.pen import PenConfig, PenTool
-
-from .engine import PendragonEngine
 
 logger.remove()
 logger.add(sys.stderr,
@@ -51,7 +50,8 @@ def main():
     args = parser.parse_args()
 
     if args.generate_schema:
-        from pendragon.core.schema import generate_recipe_schema
+        # Schema generator is now also housed in the engine package
+        from pendragon.engine import generate_recipe_schema
         generate_recipe_schema(args.generate_schema)
         sys.exit(0)
 
@@ -115,7 +115,7 @@ def main():
     logger.success(
         f"Pipeline complete. Generated {len(final_lines)} final lines.")
 
-    # 6. Export G-Code (Now handled outside the pure engine)
+    # 6. Export G-Code (Delegated from the engine back to the CLI script)
     if final_lines:
         logger.info(f"Generating G-code to {args.output}...")
         config = PenConfig()

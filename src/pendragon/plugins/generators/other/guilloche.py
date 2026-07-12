@@ -10,11 +10,11 @@ from shapely.geometry import MultiLineString
 from shapely.geometry import MultiPolygon
 from shapely.geometry import Polygon
 
-from pendragon.core import CenteredPluginConfig
-from pendragon.core import PipelineContext
-from pendragon.core import PipelineOperation
-from pendragon.core import PipelineState
-from pendragon.core import register_operation
+from pendragon.engine import CenteredPluginConfig
+from pendragon.engine import PipelineContext
+from pendragon.engine import PipelineOperation
+from pendragon.engine import PipelineState
+from pendragon.engine import register_operation
 from pendragon.utils import extract_target_polygons
 
 

@@ -9,10 +9,9 @@ from PyQt5.QtWidgets import (
     QProgressBar, QPushButton, QSlider, QSpinBox, QVBoxLayout, QWidget
 )
 
-from pendragon.core.registry import OPERATION_REGISTRY
+from pendragon.engine.registry import OPERATION_REGISTRY
 from pendragon.engine import PendragonEngine
 
-# Import from our new module structure
 from pendragon.gui.constants import DARK_THEME_STYLESHEET
 from pendragon.gui.viewer import PipelineViewer
 from pendragon.gui.worker import PipelineStreamingThread
@@ -680,7 +679,13 @@ class LiveEditorWindow(QMainWindow):
 
         if file_path:
             final_lines = self.engine.runner.history[-1].lines
-            self.engine.export_gcode(lines=final_lines, output_path=file_path)
+            # Engine export removed - we now export using PenTool in __main__.py or locally here
+            # I will leave the UI hooked to the standalone PenTool logic to match decoupling.
+            from pendragon.pen import PenConfig, PenTool
+            config = PenConfig()
+            with PenTool(config=config, output_filename=file_path) as pen:
+                for line in final_lines:
+                    pen.draw_path(list(line.coords))
 
     def _save_live_recipe(self):
         file_path, _ = QFileDialog.getSaveFileName(
@@ -720,4 +725,3 @@ class LiveEditorWindow(QMainWindow):
 
         # Accept the event so the window actually closes
         event.accept()
-
