@@ -1,5 +1,5 @@
 import inspect
-from typing import List, Optional
+from typing import Optional
 
 from loguru import logger
 
@@ -13,7 +13,7 @@ class PipelineRunner:
 
     def __init__(self, initial_state: PipelineState):
         self.initial_state = initial_state
-        self.operations: List[PipelineOperation] = []
+        self.operations: list[PipelineOperation] = []
         self._final_state: Optional[PipelineState] = None
 
     def add_operation(self, operation: PipelineOperation):
@@ -45,7 +45,7 @@ class InteractiveRunner(PipelineRunner):
 
     def __init__(self, initial_state: PipelineState):
         super().__init__(initial_state)
-        self.history: List[PipelineState] = [initial_state]
+        self.history: list[PipelineState] = [initial_state]
 
     def execute_all(self):
         self.history = [self.initial_state]
