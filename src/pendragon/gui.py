@@ -382,6 +382,68 @@ class LiveEditorWindow(QMainWindow):
         self.lines_label.setText(str(lines))
         self.vertices_label.setText(str(vertices))
 
+    def _build_float_widget(self, current_value, field_info, update_callback):
+        """DRY helper to generate sliders or spinboxes based on Pydantic bounds."""
+        container = QWidget()
+        h_layout = QHBoxLayout(container)
+        h_layout.setContentsMargins(0, 0, 0, 0)
+
+        val_min = None
+        val_max = None
+        for m in field_info.metadata:
+            if hasattr(m, 'ge'):
+                val_min = m.ge
+            if hasattr(m, 'le'):
+                val_max = m.le
+
+        if val_min is not None and val_max is not None:
+            slider = QSlider(Qt.Horizontal)
+            slider.setMinimum(0)
+            slider.setMaximum(100)
+            slider.setTracking(False)
+
+            # Prevent division by zero if bounds are equal
+            range_span = val_max - val_min if val_max > val_min else 1.0
+
+            # Clamp the initial value to prevent UI mapping glitches
+            clamped_val = max(val_min, min(val_max, current_value))
+            current_percent = int(((clamped_val - val_min) / range_span) * 100)
+            slider.setValue(current_percent)
+
+            value_label = QLabel(f"{clamped_val:.2f}")
+            value_label.setMinimumWidth(35)
+            value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+            def update_label_only(val, lbl=value_label, v_min=val_min, r_span=range_span):
+                real_val = v_min + (val / 100.0) * r_span
+                lbl.setText(f"{real_val:.2f}")
+
+            def update_value_wrapper(val, lbl=value_label, v_min=val_min, r_span=range_span, cb=update_callback):
+                real_val = v_min + (val / 100.0) * r_span
+                lbl.setText(f"{real_val:.2f}")
+                cb(real_val)  # Emit back to caller
+
+            slider.sliderMoved.connect(update_label_only)
+            slider.valueChanged.connect(update_value_wrapper)
+            h_layout.addWidget(slider)
+            h_layout.addWidget(value_label)
+
+        else:
+            spin_box = QDoubleSpinBox()
+            spin_box.setRange(-10000.0, 10000.0)
+            spin_box.setDecimals(2)
+            spin_box.setSingleStep(0.1)
+            spin_box.setValue(current_value)
+            spin_box.setKeyboardTracking(False)
+
+            def update_spin_wrapper(val, cb=update_callback):
+                cb(val)  # Emit back to caller
+
+            spin_box.valueChanged.connect(update_spin_wrapper)
+            h_layout.addWidget(spin_box)
+
+        return container
+
     def build_ui_for_current_step(self):
         self.control_layout.removeWidget(self.dynamic_form_widget)
         self.dynamic_form_widget.deleteLater()
@@ -410,60 +472,11 @@ class LiveEditorWindow(QMainWindow):
             origin = get_origin(field_info.annotation)
 
             if field_info.annotation == float:
-                container = QWidget()
-                h_layout = QHBoxLayout(container)
-                h_layout.setContentsMargins(0, 0, 0, 0)
+                # Capture variables natively for the callback
+                def root_update_callback(val, fname=field_name, idx=op_index):
+                    self.update_parameter(idx, fname, val)
 
-                val_min = None
-                val_max = None
-                for m in field_info.metadata:
-                    if hasattr(m, 'ge'):
-                        val_min = m.ge
-                    if hasattr(m, 'le'):
-                        val_max = m.le
-
-                if val_min is not None and val_max is not None:
-                    slider = QSlider(Qt.Horizontal)
-                    slider.setMinimum(0)
-                    slider.setMaximum(100)
-
-                    current_percent = int(
-                        ((current_value - val_min) / (val_max - val_min)) * 100)
-                    slider.setValue(current_percent)
-
-                    value_label = QLabel(f"{current_value:.2f}")
-                    value_label.setMinimumWidth(35)
-                    value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-
-                    def update_bounded_float(val,
-                                             fname=field_name,
-                                             idx=op_index,
-                                             lbl=value_label,
-                                             v_min=val_min,
-                                             v_max=val_max):
-                        real_val = v_min + (val / 100.0) * (v_max - v_min)
-                        lbl.setText(f"{real_val:.2f}")
-                        self.update_parameter(idx, fname, real_val)
-
-                    slider.valueChanged.connect(update_bounded_float)
-                    h_layout.addWidget(slider)
-                    h_layout.addWidget(value_label)
-
-                else:
-                    spin_box = QDoubleSpinBox()
-                    spin_box.setRange(-10000.0, 10000.0)
-                    spin_box.setDecimals(2)
-                    spin_box.setSingleStep(0.1)
-                    spin_box.setValue(current_value)
-
-                    def update_unbounded_float(val,
-                                               fname=field_name,
-                                               idx=op_index):
-                        self.update_parameter(idx, fname, val)
-
-                    spin_box.valueChanged.connect(update_unbounded_float)
-                    h_layout.addWidget(spin_box)
-
+                container = self._build_float_widget(current_value, field_info, root_update_callback)
                 self.form_layout.addRow(field_name, container)
 
             elif field_info.annotation == int:
@@ -611,36 +624,12 @@ class LiveEditorWindow(QMainWindow):
                                 sub_field_name, sub_field_info.default
                                 if sub_field_info.default is not None else 0.0)
 
-                            sub_container = QWidget()
-                            sub_h_layout = QHBoxLayout(sub_container)
-                            sub_h_layout.setContentsMargins(0, 0, 0, 0)
+                            # Capture variables natively for the callback
+                            def nested_update_callback(val, parent_dict=field_name, fname=sub_field_name, idx=op_index):
+                                self.update_nested_parameter(idx, parent_dict, fname, val)
 
-                            sub_slider = QSlider(Qt.Horizontal)
-                            sub_slider.setMinimum(0)
-                            sub_slider.setMaximum(1000)
-                            sub_slider.setValue(int(sub_current_value * 10))
-
-                            sub_value_label = QLabel(f"{sub_current_value:.1f}")
-                            sub_value_label.setMinimumWidth(35)
-                            sub_value_label.setAlignment(Qt.AlignRight |
-                                                         Qt.AlignVCenter)
-
-                            sub_h_layout.addWidget(sub_slider)
-                            sub_h_layout.addWidget(sub_value_label)
-
-                            def sub_update_wrapper(val,
-                                                   parent_dict=field_name,
-                                                   fname=sub_field_name,
-                                                   idx=op_index,
-                                                   lbl=sub_value_label):
-                                real_val = val / 10.0
-                                lbl.setText(f"{real_val:.1f}")
-                                self.update_nested_parameter(
-                                    idx, parent_dict, fname, real_val)
-
-                            sub_slider.valueChanged.connect(sub_update_wrapper)
-                            self.form_layout.addRow(f"↳ {sub_field_name}",
-                                                    sub_container)
+                            sub_container = self._build_float_widget(sub_current_value, sub_field_info, nested_update_callback)
+                            self.form_layout.addRow(f"↳ {sub_field_name}", sub_container)
 
     def update_parameter(self, op_index, field_name, new_value):
         operation = self.engine.runner.operations[op_index]
