@@ -97,7 +97,6 @@ class ImageMultiTierGen(PipelineOperation):
                 cx, cy = x + (cell_size / 2), y + (cell_size / 2)
                 
                 # Check if cell center is inside the main boundary
-                # We do this fast check to avoid generating geometry outside non-square bounds
                 import shapely.geometry
                 if not effective_boundary.contains(shapely.geometry.Point(cx, cy)):
                     continue
@@ -138,3 +137,128 @@ class ImageMultiTierGen(PipelineOperation):
         return PipelineState(boundary=state.boundary,
                              lines=state.lines + new_lines,
                              operation_name="image_multi_tier")
+
+    def build_custom_ui(self, window, op_index):
+        """Builds a dynamic custom GUI to handle nested tier configurations."""
+        from PyQt5.QtWidgets import (
+            QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, 
+            QDoubleSpinBox, QComboBox, QGroupBox, QLineEdit, QFileDialog, QFormLayout
+        )
+        from pendragon.gui.widgets import WidgetFactory
+
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        # Triggers the pipeline recalculation timer
+        def trigger_recalc():
+            if window._pending_op_index is None:
+                window._pending_op_index = op_index
+            else:
+                window._pending_op_index = min(window._pending_op_index, op_index)
+            window.debounce_timer.start()
+
+        # --- 1. Base Image & Grid Settings ---
+        base_group = QGroupBox("Base Settings")
+        base_group.setStyleSheet("QGroupBox { font-weight: bold; border: 1px solid #444; border-radius: 4px; padding-top: 15px; }")
+        base_layout = QFormLayout(base_group)
+        
+        img_layout = QHBoxLayout()
+        img_edit = QLineEdit(self.config.source_image)
+        img_btn = QPushButton("Browse...")
+        
+        def update_img(text):
+            self.config.source_image = text
+            trigger_recalc()
+            
+        def browse_img():
+            path, _ = QFileDialog.getOpenFileName(window, "Select Source Image", "", "Images (*.png *.jpg *.jpeg);;All Files (*)")
+            if path:
+                img_edit.setText(path)
+                
+        img_edit.textChanged.connect(update_img)
+        img_btn.clicked.connect(browse_img)
+        img_layout.addWidget(img_edit)
+        img_layout.addWidget(img_btn)
+        base_layout.addRow("Source Image:", img_layout)
+
+        cell_spin = QDoubleSpinBox()
+        cell_spin.setRange(0.1, 1000.0)
+        cell_spin.setSingleStep(0.5)
+        cell_spin.setValue(self.config.cell_size)
+        
+        def update_cell_size(val):
+            self.config.cell_size = val
+            trigger_recalc()
+            
+        cell_spin.valueChanged.connect(update_cell_size)
+        base_layout.addRow("Cell Size:", cell_spin)
+        
+        layout.addWidget(base_group)
+
+        # --- 2. Dynamic Tiers 1 through 4 ---
+        tier_names = ["Tier 1 (Darkest, >75%)", "Tier 2 (Mid-Dark, >50%)", "Tier 3 (Mid-Light, >25%)", "Tier 4 (Lightest, <25%)"]
+        op_keys = [""] + sorted(list(OPERATION_REGISTRY.keys()))
+
+        for i in range(1, 5):
+            tier_group = QGroupBox(tier_names[i-1])
+            tier_group.setStyleSheet("QGroupBox { font-weight: bold; border: 1px solid #444; border-radius: 4px; padding-top: 15px; margin-top: 5px; }")
+            tier_layout = QVBoxLayout(tier_group)
+            
+            op_attr = f"tier_{i}_op"
+            set_attr = f"tier_{i}_settings"
+            
+            # Sub-generator Combobox
+            combo_layout = QHBoxLayout()
+            combo_layout.addWidget(QLabel("Generator:"))
+            combo = QComboBox()
+            combo.addItems(op_keys)
+            
+            current_op = getattr(self.config, op_attr)
+            if current_op in op_keys:
+                combo.setCurrentText(current_op)
+                
+            def on_op_changed(text, op_a=op_attr, set_a=set_attr):
+                setattr(self.config, op_a, text)
+                setattr(self.config, set_a, {})  # Clear out old settings
+                # Force the entire property panel to rebuild so the new config widgets appear
+                window.build_ui_for_current_step()
+                trigger_recalc()
+                
+            combo.currentTextChanged.connect(on_op_changed)
+            combo_layout.addWidget(combo)
+            tier_layout.addLayout(combo_layout)
+
+            # Retrieve and build widgets for the selected operation's specific Pydantic Config
+            if current_op and current_op in OPERATION_REGISTRY:
+                op_info = OPERATION_REGISTRY[current_op]
+                ConfigClass = op_info["config"]
+                
+                if ConfigClass:
+                    settings_form = QFormLayout()
+                    current_settings = getattr(self.config, set_attr)
+                    
+                    for field_name, field_info in ConfigClass.model_fields.items():
+                        # Extract the existing value, or fallback to the model's default
+                        default_val = field_info.default if field_info.default is not None else 0.0
+                        val = current_settings.get(field_name, default_val)
+                        current_settings[field_name] = val  # Ensure dict is populated for saving
+                        
+                        # Closure callback to handle UI edits
+                        def update_nested(new_val, sa=set_attr, fn=field_name):
+                            getattr(self.config, sa)[fn] = new_val
+                            trigger_recalc()
+                            
+                        # Use Pendragon's native WidgetFactory for standard sliders/spinners
+                        widget = WidgetFactory.build_field_widget(
+                            field_name, field_info, val, update_nested, parent=window
+                        )
+                        if widget:
+                            settings_form.addRow(f"↳ {field_name}", widget)
+                    
+                    if settings_form.rowCount() > 0:
+                        tier_layout.addLayout(settings_form)
+
+            layout.addWidget(tier_group)
+
+        return container
