@@ -6,25 +6,23 @@ from pydantic import Field
 from shapely.geometry import LineString
 from shapely.geometry import MultiLineString
 
-from pendragon.engine import BasePluginConfig
-from pendragon.engine import PipelineContext
-from pendragon.engine import PipelineOperation
-from pendragon.engine import PipelineState
-from pendragon.engine import register_operation
+from nodeweaver.models import PipelineContext
+from pendragon.state import GeometryState
+from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
 
 
-class HexagonConfig(BasePluginConfig):
+class HexagonConfig(PendragonBaseConfig):
     radius: float = Field(default=3.0,
                           gt=0.0,
                           description="Outer radius of a single hexagon cell.")
 
 
-@register_operation("hexagon", config_class=HexagonConfig)
-class HexagonGen(PipelineOperation):
+@dxf_registry.register("hexagon", config_class=HexagonConfig)
+class HexagonGen(PendragonOperation):
 
     def process(self,
-                state: PipelineState,
-                context: Optional[PipelineContext] = None) -> PipelineState:
+                state: GeometryState,
+                context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or HexagonConfig()
         ctx = context or PipelineContext()
         effective_boundary = self.get_effective_boundary(state)
@@ -32,7 +30,7 @@ class HexagonGen(PipelineOperation):
         if not effective_boundary or effective_boundary.is_empty:
             return state
 
-        radius = ctx.variables.get("radius", cfg.radius)
+        radius = ctx.get("radius", cfg.radius)
         if radius <= 0:
             return state
 
@@ -136,6 +134,6 @@ class HexagonGen(PipelineOperation):
         logger.success(
             f"Generated Hexagon fill. Retained {len(clipped_lines)} continuous paths."
         )
-        return PipelineState(boundary=state.boundary,
+        return GeometryState(boundary=state.boundary,
                              lines=state.lines + clipped_lines,
                              operation_name="hexagon")

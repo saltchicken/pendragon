@@ -2,16 +2,12 @@ import math
 from typing import List, Optional, Tuple
 
 from loguru import logger
-from pydantic import BaseModel, Field
-from shapely.geometry import LineString
-
-from pendragon.engine import PipelineContext
-from pendragon.engine import PipelineOperation
-from pendragon.engine import PipelineState
-from pendragon.engine import register_operation
+from nodeweaver.models import PipelineContext
+from pendragon.state import GeometryState
+from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
 
 
-class FisheyeConfig(BaseModel):
+class FisheyeConfig(PendragonBaseConfig):
     strength: float = Field(
         default=0.5,
         description="Distortion strength. Positive for barrel (fisheye), negative for pincushion."
@@ -31,13 +27,13 @@ class FisheyeConfig(BaseModel):
     )
 
 
-@register_operation("fisheye", config_class=FisheyeConfig)
-class FisheyeMod(PipelineOperation):
+@dxf_registry.register("fisheye", config_class=FisheyeConfig)
+class FisheyeMod(PendragonOperation):
     """Applies a non-linear barrel or pincushion spatial distortion to the geometry."""
 
     def process(self,
-                state: PipelineState,
-                context: Optional[PipelineContext] = None) -> PipelineState:
+                state: GeometryState,
+                context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or FisheyeConfig()
         ctx = context or PipelineContext()
         current_lines = state.lines
@@ -46,8 +42,8 @@ class FisheyeMod(PipelineOperation):
             return state
 
         # Determine center coordinates
-        cx = ctx.variables.get("center_x", cfg.center_x)
-        cy = ctx.variables.get("center_y", cfg.center_y)
+        cx = ctx.get("center_x", cfg.center_x)
+        cy = ctx.get("center_y", cfg.center_y)
         
         if cx is None or cy is None:
             centroid = state.boundary.centroid
@@ -55,7 +51,7 @@ class FisheyeMod(PipelineOperation):
             cy = centroid.y if cy is None else cy
 
         # Determine effect radius
-        max_r = ctx.variables.get("radius", cfg.radius)
+        max_r = ctx.get("radius", cfg.radius)
         if max_r is None:
             minx, miny, maxx, maxy = state.boundary.bounds
             # Max distance from centroid to the furthest corner
@@ -64,7 +60,7 @@ class FisheyeMod(PipelineOperation):
                 math.hypot(maxx - cx, maxy - cy)
             )
 
-        strength = ctx.variables.get("strength", cfg.strength)
+        strength = ctx.get("strength", cfg.strength)
 
         if max_r <= 0 or strength == 0.0:
             logger.info("Fisheye skipped: radius is 0 or strength is 0.0.")

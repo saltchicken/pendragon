@@ -6,25 +6,23 @@ from pydantic import Field
 from shapely.geometry import LineString
 from shapely.geometry import MultiLineString
 
-from pendragon.engine import BasePluginConfig
-from pendragon.engine import PipelineContext
-from pendragon.engine import PipelineOperation
-from pendragon.engine import PipelineState
-from pendragon.engine import register_operation
+from nodeweaver.models import PipelineContext
+from pendragon.state import GeometryState
+from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
 
 
-class PeanoConfig(BasePluginConfig):
+class PeanoConfig(PendragonBaseConfig):
     spacing: float = Field(default=2.0,
                            gt=0.0,
                            description="Target spacing between lines.")
 
 
-@register_operation("peano", config_class=PeanoConfig)
-class PeanoGen(PipelineOperation):
+@dxf_registry.register("peano", config_class=PeanoConfig)
+class PeanoGen(PendragonOperation):
 
     def process(self,
-                state: PipelineState,
-                context: Optional[PipelineContext] = None) -> PipelineState:
+                state: GeometryState,
+                context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or PeanoConfig()
         ctx = context or PipelineContext()
         effective_boundary = self.get_effective_boundary(state)
@@ -32,7 +30,7 @@ class PeanoGen(PipelineOperation):
         if not effective_boundary or effective_boundary.is_empty:
             return state
 
-        spacing = ctx.variables.get("spacing", cfg.spacing)
+        spacing = ctx.get("spacing", cfg.spacing)
         safe_spacing = max(spacing, 0.1)
 
         minx, miny, maxx, maxy = effective_boundary.bounds

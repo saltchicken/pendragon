@@ -5,24 +5,25 @@ import numpy as np
 from pydantic import Field
 from shapely.geometry import LineString
 
-from pendragon.engine import BasePluginConfig
-from pendragon.engine import PipelineOperation
-from pendragon.engine import PipelineState
-from pendragon.engine import register_operation
+from nodeweaver.models import PipelineContext
+from pendragon.state import GeometryState
+from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
 
 
-class JitterLinesConfig(BasePluginConfig):
+class JitterLinesConfig(PendragonBaseConfig):
     amount: float = Field(default=1.0,
                           description="Maximum displacement distance.")
     seed: int = Field(default=42,
                       description="Random seed for reproducibility.")
 
 
-@register_operation("jitter_lines", config_class=JitterLinesConfig)
-class JitterLinesMod(PipelineOperation):
+@dxf_registry.register("jitter_lines", config_class=JitterLinesConfig)
+class JitterLinesMod(PendragonOperation):
     """Applies random vertex displacement to all current lines."""
 
-    def process(self, state: PipelineState, context=None) -> PipelineState:
+    def process(self,
+                state: GeometryState,
+                context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or JitterLinesConfig()
         if not state.lines:
             return state
@@ -40,6 +41,6 @@ class JitterLinesMod(PipelineOperation):
             jittered_coords = coords + noise
             jittered_lines.append(LineString(jittered_coords))
 
-        return PipelineState(boundary=state.boundary,
+        return GeometryState(boundary=state.boundary,
                              lines=jittered_lines,
                              operation_name="jitter_lines")

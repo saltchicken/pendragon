@@ -8,15 +8,13 @@ from shapely.geometry import LineString
 from shapely.geometry import MultiLineString
 from skimage import measure
 
-from pendragon.engine import BasePluginConfig
-from pendragon.engine import PipelineContext
-from pendragon.engine import PipelineOperation
-from pendragon.engine import PipelineState
-from pendragon.engine import register_operation
+from nodeweaver.models import PipelineContext
+from pendragon.state import GeometryState
+from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
 from pendragon.utils import ImageSampler
 
 
-class PhotoConcentricConfig(BasePluginConfig):
+class PhotoConcentricConfig(PendragonBaseConfig):
     spacing: float = Field(default=2.0,
                            gt=0.0,
                            description="Distance between contour lines.")
@@ -32,12 +30,12 @@ class PhotoConcentricConfig(BasePluginConfig):
                                    description="File path to the source image.")
 
 
-@register_operation("photo_concentric", config_class=PhotoConcentricConfig)
-class PhotoConcentricGen(PipelineOperation):
+@dxf_registry.register("photo_concentric", config_class=PhotoConcentricConfig)
+class PhotoConcentricGen(PendragonOperation):
 
     def process(self,
-                state: PipelineState,
-                context: Optional[PipelineContext] = None) -> PipelineState:
+                state: GeometryState,
+                context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or PhotoConcentricConfig()
         ctx = context or PipelineContext()
         effective_boundary = self.get_effective_boundary(state)
@@ -48,9 +46,9 @@ class PhotoConcentricGen(PipelineOperation):
         if not cfg.image_path:
             return state
 
-        spacing = ctx.variables.get("spacing", cfg.spacing)
-        threshold = ctx.variables.get("threshold", cfg.threshold)
-        resolution = ctx.variables.get("resolution", cfg.resolution)
+        spacing = ctx.get("spacing", cfg.spacing)
+        threshold = ctx.get("threshold", cfg.threshold)
+        resolution = ctx.get("resolution", cfg.resolution)
 
         logger.info(
             f"Generating photo concentric fills from {cfg.image_path} with spacing {spacing} and threshold {threshold}..."
@@ -107,6 +105,6 @@ class PhotoConcentricGen(PipelineOperation):
 
         logger.success(
             f"Generated {len(clipped_lines)} bounded concentric fill lines.")
-        return PipelineState(boundary=state.boundary,
+        return GeometryState(boundary=state.boundary,
                              lines=state.lines + clipped_lines,
                              operation_name="photo_concentric")

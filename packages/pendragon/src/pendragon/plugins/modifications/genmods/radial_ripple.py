@@ -6,23 +6,27 @@ import numpy as np
 from pydantic import Field
 from shapely.geometry import LineString
 
-from pendragon.engine import CenteredPluginConfig
-from pendragon.engine import PipelineOperation
-from pendragon.engine import PipelineState
-from pendragon.engine import register_operation
+from nodeweaver.models import PipelineContext
+from pendragon.state import GeometryState
+from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
 
 
-class RadialRippleConfig(CenteredPluginConfig):
+class RadialRippleConfig(PendragonBaseConfig):
+    center_x: float | None = Field(default=None)
+    center_y: float | None = Field(default=None)
+    group_boundaries: bool = Field(default=False)
     frequency: float = Field(default=0.2,
                              description="How many ripples per unit.")
     amplitude: float = Field(default=2.0, description="Height of the ripples.")
 
 
-@register_operation("radial_ripple", config_class=RadialRippleConfig)
-class RadialRippleMod(PipelineOperation):
+@dxf_registry.register("radial_ripple", config_class=RadialRippleConfig)
+class RadialRippleMod(PendragonOperation):
     """Displaces vertices in a sine wave based on their distance from center."""
 
-    def process(self, state: PipelineState, context=None) -> PipelineState:
+    def process(self,
+                state: GeometryState,
+                context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or RadialRippleConfig()
         ctx = context or PipelineContext()
 
@@ -30,10 +34,10 @@ class RadialRippleMod(PipelineOperation):
             return state
 
         # Use the context's center if provided, otherwise default to boundary center
-        cx = ctx.local_center_x if ctx.local_center_x is not None else (
+        cx = ctx.get("center_x") if ctx.get("center_x") is not None else (
             cfg.center_x
             if cfg.center_x is not None else state.boundary.centroid.x)
-        cy = ctx.local_center_y if ctx.local_center_y is not None else (
+        cy = ctx.get("center_y") if ctx.get("center_y") is not None else (
             cfg.center_y
             if cfg.center_y is not None else state.boundary.centroid.y)
 
@@ -54,7 +58,6 @@ class RadialRippleMod(PipelineOperation):
                     continue
 
                 # Calculate wave displacement
-                angle = math.atan2(dy, dx)
                 offset = math.sin(dist * cfg.frequency) * cfg.amplitude
 
                 # Apply displacement along the radial vector
@@ -64,6 +67,6 @@ class RadialRippleMod(PipelineOperation):
 
             rippled_lines.append(LineString(new_coords))
 
-        return PipelineState(boundary=state.boundary,
+        return GeometryState(boundary=state.boundary,
                              lines=rippled_lines,
                              operation_name="radial_ripple")

@@ -8,14 +8,12 @@ from scipy.spatial import Voronoi
 from shapely.geometry import LineString
 from shapely.geometry import MultiLineString
 
-from pendragon.engine import BasePluginConfig
-from pendragon.engine import PipelineContext
-from pendragon.engine import PipelineOperation
-from pendragon.engine import PipelineState
-from pendragon.engine import register_operation
+from nodeweaver.models import PipelineContext
+from pendragon.state import GeometryState
+from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
 
 
-class VoronoiDualConfig(BasePluginConfig):
+class VoronoiDualConfig(PendragonBaseConfig):
     spacing: float = Field(default=2.0,
                            gt=0.0,
                            description="Target spacing between points.")
@@ -27,12 +25,12 @@ class VoronoiDualConfig(BasePluginConfig):
                       description="Mode: 'voronoi', 'delaunay', or 'dual'.")
 
 
-@register_operation("voronoi_dual", config_class=VoronoiDualConfig)
-class VoronoiDualGen(PipelineOperation):
+@dxf_registry.register("voronoi_dual", config_class=VoronoiDualConfig)
+class VoronoiDualGen(PendragonOperation):
 
     def process(self,
-                state: PipelineState,
-                context: Optional[PipelineContext] = None) -> PipelineState:
+                state: GeometryState,
+                context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or VoronoiDualConfig()
         ctx = context or PipelineContext()
         effective_boundary = self.get_effective_boundary(state)
@@ -43,9 +41,9 @@ class VoronoiDualGen(PipelineOperation):
         if width <= 0 or height <= 0:
             return state
 
-        mode = ctx.variables.get("mode", cfg.mode)
-        num_points = int(ctx.variables.get("num_points", cfg.num_points))
-        spacing = ctx.variables.get("spacing", cfg.spacing)
+        mode = ctx.get("mode", cfg.mode)
+        num_points = int(ctx.get("num_points", cfg.num_points))
+        spacing = ctx.get("spacing", cfg.spacing)
 
         logger.info(f"Generating {mode} diagram...")
 

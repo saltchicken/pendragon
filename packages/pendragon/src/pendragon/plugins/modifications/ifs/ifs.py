@@ -6,7 +6,9 @@ from pydantic import BaseModel, Field
 from shapely.affinity import affine_transform
 from shapely.geometry import LineString
 
-from pendragon.engine import PipelineContext, PipelineOperation, PipelineState, register_operation
+from nodeweaver.models import PipelineContext
+from pendragon.state import GeometryState
+from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
 
 
 class IFSTransform(BaseModel):
@@ -23,13 +25,13 @@ class IFSTransform(BaseModel):
     )
 
 
-class IFSConfig(BaseModel):
+class IFSConfig(PendragonBaseConfig):
     iterations: int = Field(default=3, ge=1, le=8)
     transforms: List[IFSTransform] = Field(default_factory=list)
 
 
-@register_operation("ifs", config_class=IFSConfig)
-class IFSMod(PipelineOperation):
+@dxf_registry.register("ifs", config_class=IFSConfig)
+class IFSMod(PendragonOperation):
 
     def apply_variation(self, x: float, y: float, var_type: str) -> Tuple[float, float]:
         """
@@ -63,8 +65,8 @@ class IFSMod(PipelineOperation):
         return x, y
 
     def process(self,
-                state: PipelineState,
-                context: Optional[PipelineContext] = None) -> PipelineState:
+                state: GeometryState,
+                context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or IFSConfig()
         ctx = context or PipelineContext()
         
@@ -72,7 +74,7 @@ class IFSMod(PipelineOperation):
         if not current_lines:
             return state
 
-        iterations = ctx.variables.get("iterations", cfg.iterations)
+        iterations = ctx.get("iterations", cfg.iterations)
         
         logger.info(f"Applying Advanced IFS ({len(cfg.transforms)} transforms, {iterations} iterations)...")
         
@@ -106,7 +108,7 @@ class IFSMod(PipelineOperation):
             logger.debug(f"IFS Iteration {i+1} complete: {len(working_lines)} paths.")
             
         logger.success(f"IFS generation complete. Yielded {len(working_lines)} lines.")
-        return PipelineState(
+        return GeometryState(
             boundary=state.boundary,
             lines=working_lines,
             operation_name="ifs"

@@ -7,15 +7,16 @@ from pydantic import Field
 from shapely.geometry import LineString
 from shapely.geometry import MultiLineString
 
-from pendragon.engine import CenteredPluginConfig
-from pendragon.engine import PipelineContext
-from pendragon.engine import PipelineOperation
-from pendragon.engine import PipelineState
-from pendragon.engine import register_operation
+from nodeweaver.models import PipelineContext
+from pendragon.state import GeometryState
+from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
 from pendragon.utils import extract_target_polygons
 
 
-class ConcentricConfig(CenteredPluginConfig):
+class ConcentricConfig(PendragonBaseConfig):
+    center_x: float | None = Field(default=None)
+    center_y: float | None = Field(default=None)
+    group_boundaries: bool = Field(default=False)
     min_radius: float = Field(default=5.0,
                               description="Radius of the innermost shape.")
     max_radius: float = Field(default=100.0,
@@ -34,13 +35,13 @@ class ConcentricConfig(CenteredPluginConfig):
         description="Rotation angle in degrees for the generated shapes.")
 
 
-@register_operation("concentric", config_class=ConcentricConfig)
-class ConcentricGen(PipelineOperation):
+@dxf_registry.register("concentric", config_class=ConcentricConfig)
+class ConcentricGen(PendragonOperation):
     """Generates concentric rings or polygons clipped to the boundary."""
 
     def process(self,
-                state: PipelineState,
-                context: Optional[PipelineContext] = None) -> PipelineState:
+                state: GeometryState,
+                context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or ConcentricConfig()
         ctx = context or PipelineContext()
         boundary = self.get_effective_boundary(state)
@@ -51,7 +52,7 @@ class ConcentricGen(PipelineOperation):
         logger.info(f"Generating concentric shapes with {cfg.sides} sides "
                     f"across {len(polygons)} boundary region(s).")
 
-        spacing = ctx.variables.get("spacing", cfg.spacing)
+        spacing = ctx.get("spacing", cfg.spacing)
         if spacing <= 0:
             logger.error("Spacing must be greater than 0.")
             return state
@@ -60,13 +61,11 @@ class ConcentricGen(PipelineOperation):
 
         for poly in polygons:
             # Fallback hierarchy: Context -> YAML Config -> Geometry Centroid
-            cx = ctx.local_center_x if ctx.local_center_x is not None else (
+            cx = ctx.get("center_x") if ctx.get("center_x") is not None else (
                 cfg.center_x if cfg.center_x is not None else poly.centroid.x)
-            cy = ctx.local_center_y if ctx.local_center_y is not None else (
+            cy = ctx.get("center_y") if ctx.get("center_y") is not None else (
                 cfg.center_y if cfg.center_y is not None else poly.centroid.y)
-            rot = ctx.variables.get(
-                "rotation", ctx.local_rotation
-                if ctx.local_rotation is not None else cfg.rotation)
+            rot = ctx.get("rotation", cfg.rotation)
 
             theta = np.linspace(0, 2 * math.pi,
                                 cfg.sides + 1) + math.radians(rot)
@@ -97,6 +96,6 @@ class ConcentricGen(PipelineOperation):
             f"Generated concentric shapes. Retained {len(clipped_lines)} continuous paths."
         )
 
-        return PipelineState(boundary=state.boundary,
+        return GeometryState(boundary=state.boundary,
                              lines=state.lines + clipped_lines,
                              operation_name="concentric")

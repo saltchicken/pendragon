@@ -9,15 +9,16 @@ from shapely.geometry import MultiLineString
 from shapely.geometry import Point
 from shapely.ops import linemerge
 
-from pendragon.engine import CenteredPluginConfig
-from pendragon.engine import PipelineContext
-from pendragon.engine import PipelineOperation
-from pendragon.engine import PipelineState
-from pendragon.engine import register_operation
+from nodeweaver.models import PipelineContext
+from pendragon.state import GeometryState
+from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
 from pendragon.utils import extract_target_polygons
 
 
-class LichtenbergConfig(CenteredPluginConfig):
+class LichtenbergConfig(PendragonBaseConfig):
+    center_x: float | None = Field(default=None)
+    center_y: float | None = Field(default=None)
+    group_boundaries: bool = Field(default=False)
     nodes: int = Field(
         default=1500,
         gt=0,
@@ -28,18 +29,21 @@ class LichtenbergConfig(CenteredPluginConfig):
     seed: int = Field(
         default=42,
         description="Random seed for reproducible fractal generation.")
+    max_iterations: int = Field(
+        default=1000,
+        description="Safety limit to prevent infinite generation loops.")
 
 
-@register_operation("lichtenberg", config_class=LichtenbergConfig)
-class LichtenbergGen(PipelineOperation):
+@dxf_registry.register("lichtenberg", config_class=LichtenbergConfig)
+class LichtenbergGen(PendragonOperation):
     """
     Generates a Lichtenberg-style (branching fractal) fill using an RRT
     (Rapidly-exploring Random Tree) algorithm confined to the boundary.
     """
 
     def process(self,
-                state: PipelineState,
-                context: Optional[PipelineContext] = None) -> PipelineState:
+                state: GeometryState,
+                context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or LichtenbergConfig()
         ctx = context or PipelineContext()
         effective_boundary = self.get_effective_boundary(state)
@@ -60,9 +64,9 @@ class LichtenbergGen(PipelineOperation):
             minx, miny, maxx, maxy = poly.bounds
 
             # Fallback hierarchy: Context -> YAML Config -> Geometry Centroid
-            cx = ctx.local_center_x if ctx.local_center_x is not None else (
+            cx = ctx.get("center_x") if ctx.get("center_x") is not None else (
                 cfg.center_x if cfg.center_x is not None else poly.centroid.x)
-            cy = ctx.local_center_y if ctx.local_center_y is not None else (
+            cy = ctx.get("center_y") if ctx.get("center_y") is not None else (
                 cfg.center_y if cfg.center_y is not None else poly.centroid.y)
             root_pt = Point(cx, cy)
 
@@ -122,6 +126,6 @@ class LichtenbergGen(PipelineOperation):
         logger.success(
             f"Generated {len(all_fractal_lines)} continuous fractal paths.")
 
-        return PipelineState(boundary=state.boundary,
+        return GeometryState(boundary=state.boundary,
                              lines=state.lines + all_fractal_lines,
                              operation_name="lichtenberg")

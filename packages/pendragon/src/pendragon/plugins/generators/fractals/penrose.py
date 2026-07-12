@@ -6,17 +6,18 @@ from pydantic import Field
 from shapely.geometry import LineString
 from shapely.geometry import MultiLineString
 
-from pendragon.engine import CenteredPluginConfig
-from pendragon.engine import PipelineContext
-from pendragon.engine import PipelineOperation
-from pendragon.engine import PipelineState
-from pendragon.engine import register_operation
+from nodeweaver.models import PipelineContext
+from pendragon.state import GeometryState
+from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
 from pendragon.utils import extract_target_polygons
 
 PHI = (1.0 + math.sqrt(5.0)) / 2.0
 
 
-class PenroseConfig(CenteredPluginConfig):
+class PenroseConfig(PendragonBaseConfig):
+    center_x: float | None = Field(default=None)
+    center_y: float | None = Field(default=None)
+    group_boundaries: bool = Field(default=False)
     depth: int = Field(
         default=5,
         ge=1,
@@ -25,16 +26,16 @@ class PenroseConfig(CenteredPluginConfig):
     )
 
 
-@register_operation("penrose", config_class=PenroseConfig)
-class PenroseGen(PipelineOperation):
+@dxf_registry.register("penrose", config_class=PenroseConfig)
+class PenroseGen(PendragonOperation):
     """
     Generates an aperiodic Penrose P3 (rhombus-like) tiling pattern
     using recursive Robinson triangle deflation.
     """
 
     def process(self,
-                state: PipelineState,
-                context: Optional[PipelineContext] = None) -> PipelineState:
+                state: GeometryState,
+                context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or PenroseConfig()
         ctx = context or PipelineContext()
         effective_boundary = self.get_effective_boundary(state)
@@ -52,9 +53,9 @@ class PenroseGen(PipelineOperation):
 
         for poly in polygons:
             # Fallback hierarchy: Context -> YAML Config -> Geometry Centroid
-            cx = ctx.local_center_x if ctx.local_center_x is not None else (
+            cx = ctx.get("center_x") if ctx.get("center_x") is not None else (
                 cfg.center_x if cfg.center_x is not None else poly.centroid.x)
-            cy = ctx.local_center_y if ctx.local_center_y is not None else (
+            cy = ctx.get("center_y") if ctx.get("center_y") is not None else (
                 cfg.center_y if cfg.center_y is not None else poly.centroid.y)
 
             minx, miny, maxx, maxy = poly.bounds
@@ -133,6 +134,6 @@ class PenroseGen(PipelineOperation):
             f"Generated Penrose tiling. Retained {len(clipped_lines)} continuous paths."
         )
 
-        return PipelineState(boundary=state.boundary,
+        return GeometryState(boundary=state.boundary,
                              lines=state.lines + clipped_lines,
                              operation_name="penrose")

@@ -8,15 +8,16 @@ from shapely.geometry import MultiLineString
 from shapely.geometry import MultiPolygon
 from shapely.geometry import Polygon
 
-from pendragon.engine import CenteredPluginConfig
-from pendragon.engine import PipelineContext
-from pendragon.engine import PipelineOperation
-from pendragon.engine import PipelineState
-from pendragon.engine import register_operation
+from nodeweaver.models import PipelineContext
+from pendragon.state import GeometryState
+from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
 from pendragon.utils import extract_target_polygons
 
 
-class SpiralConfig(CenteredPluginConfig):
+class SpiralConfig(PendragonBaseConfig):
+    center_x: float | None = Field(default=None)
+    center_y: float | None = Field(default=None)
+    group_boundaries: bool = Field(default=False)
     start_radius: float = Field(
         default=0.0,
         description="Starting radius (can be > 0 for a hollow center).")
@@ -29,12 +30,12 @@ class SpiralConfig(CenteredPluginConfig):
         description="Total number of linear segments used to draw the curve.")
 
 
-@register_operation("spiral", config_class=SpiralConfig)
-class SpiralGen(PipelineOperation):
+@dxf_registry.register("spiral", config_class=SpiralConfig)
+class SpiralGen(PendragonOperation):
 
     def process(self,
-                state: PipelineState,
-                context: Optional[PipelineContext] = None) -> PipelineState:
+                state: GeometryState,
+                context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or SpiralConfig()
         ctx = context or PipelineContext()
         boundary = self.get_effective_boundary(state)
@@ -42,16 +43,16 @@ class SpiralGen(PipelineOperation):
         polygons = extract_target_polygons(boundary, cfg.group_boundaries)
         clipped_lines: List[LineString] = []
 
-        revolutions = ctx.variables.get("revolutions", cfg.revolutions)
+        revolutions = ctx.get("revolutions", cfg.revolutions)
 
         logger.info(f"Generating spiral with {revolutions} revolutions "
                     f"across {len(polygons)} boundary region(s).")
 
         for poly in polygons:
             # Fallback hierarchy: Context -> YAML Config -> Geometry Centroid
-            cx = ctx.local_center_x if ctx.local_center_x is not None else (
+            cx = ctx.get("center_x") if ctx.get("center_x") is not None else (
                 cfg.center_x if cfg.center_x is not None else poly.centroid.x)
-            cy = ctx.local_center_y if ctx.local_center_y is not None else (
+            cy = ctx.get("center_y") if ctx.get("center_y") is not None else (
                 cfg.center_y if cfg.center_y is not None else poly.centroid.y)
 
             theta = np.linspace(0, revolutions * 2 * np.pi, cfg.steps)
@@ -77,6 +78,6 @@ class SpiralGen(PipelineOperation):
             f"Generated spiral segments. Retained {len(clipped_lines)} continuous paths."
         )
 
-        return PipelineState(boundary=state.boundary,
+        return GeometryState(boundary=state.boundary,
                              lines=state.lines + clipped_lines,
                              operation_name="spiral")

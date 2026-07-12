@@ -7,15 +7,13 @@ from shapely.geometry import LineString
 from shapely.geometry import MultiLineString
 from shapely.ops import linemerge
 
-from pendragon.engine import BasePluginConfig
-from pendragon.engine import PipelineContext
-from pendragon.engine import PipelineOperation
-from pendragon.engine import PipelineState
-from pendragon.engine import register_operation
+from nodeweaver.models import PipelineContext
+from pendragon.state import GeometryState
+from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
 from pendragon.utils import ImageSampler
 
 
-class ChladniConfig(BasePluginConfig):
+class ChladniConfig(PendragonBaseConfig):
     n: float = Field(default=3.0, description="Horizontal resonant mode.")
     m: float = Field(default=5.0, description="Vertical resonant mode.")
     sign: float = Field(default=-1.0,
@@ -30,12 +28,12 @@ class ChladniConfig(BasePluginConfig):
                                    description="Optional image modulator.")
 
 
-@register_operation("chladni", config_class=ChladniConfig)
-class ChladniGen(PipelineOperation):
+@dxf_registry.register("chladni", config_class=ChladniConfig)
+class ChladniGen(PendragonOperation):
 
     def process(self,
-                state: PipelineState,
-                context: Optional[PipelineContext] = None) -> PipelineState:
+                state: GeometryState,
+                context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or ChladniConfig()
         ctx = context or PipelineContext()
         effective_boundary = self.get_effective_boundary(state)
@@ -48,9 +46,9 @@ class ChladniGen(PipelineOperation):
         if width <= 0 or height <= 0:
             return state
 
-        n_mode = ctx.variables.get("n", cfg.n)
-        m_mode = ctx.variables.get("m", cfg.m)
-        res = ctx.variables.get("res", cfg.res)
+        n_mode = ctx.get("n", cfg.n)
+        m_mode = ctx.get("m", cfg.m)
+        res = ctx.get("res", cfg.res)
 
         logger.info(
             f"Generating Chladni pattern (n={n_mode}, m={m_mode}) at resolution {res}..."
@@ -143,6 +141,6 @@ class ChladniGen(PipelineOperation):
         logger.success(
             f"Generated Chladni fill. Retained {len(clipped_lines)} continuous bounded paths."
         )
-        return PipelineState(boundary=state.boundary,
+        return GeometryState(boundary=state.boundary,
                              lines=state.lines + clipped_lines,
                              operation_name="chladni")

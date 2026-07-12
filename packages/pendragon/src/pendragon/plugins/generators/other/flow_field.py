@@ -7,14 +7,12 @@ from pydantic import Field
 from shapely.geometry import LineString
 from shapely.geometry import MultiLineString
 
-from pendragon.engine import BasePluginConfig
-from pendragon.engine import PipelineContext
-from pendragon.engine import PipelineOperation
-from pendragon.engine import PipelineState
-from pendragon.engine import register_operation
+from nodeweaver.models import PipelineContext
+from pendragon.state import GeometryState
+from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
 
 
-class FlowFieldConfig(BasePluginConfig):
+class FlowFieldConfig(PendragonBaseConfig):
     spacing: float = Field(default=3.0,
                            gt=0.0,
                            description="Distance between initial seed points.")
@@ -30,12 +28,12 @@ class FlowFieldConfig(BasePluginConfig):
     seed: int = Field(default=42, description="Random seed.")
 
 
-@register_operation("flow_field", config_class=FlowFieldConfig)
-class FlowFieldGen(PipelineOperation):
+@dxf_registry.register("flow_field", config_class=FlowFieldConfig)
+class FlowFieldGen(PendragonOperation):
 
     def process(self,
-                state: PipelineState,
-                context: Optional[PipelineContext] = None) -> PipelineState:
+                state: GeometryState,
+                context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or FlowFieldConfig()
         ctx = context or PipelineContext()
         effective_boundary = self.get_effective_boundary(state)
@@ -43,9 +41,9 @@ class FlowFieldGen(PipelineOperation):
         if not effective_boundary or effective_boundary.is_empty:
             return state
 
-        spacing = ctx.variables.get("spacing", cfg.spacing)
-        scale = ctx.variables.get("scale", cfg.scale)
-        max_steps = int(ctx.variables.get("max_steps", cfg.max_steps))
+        spacing = ctx.get("spacing", cfg.spacing)
+        scale = ctx.get("scale", cfg.scale)
+        max_steps = int(ctx.get("max_steps", cfg.max_steps))
 
         logger.info(
             f"Generating flow field (spacing={spacing}, steps={max_steps}) using scale {scale}..."
@@ -69,8 +67,8 @@ class FlowFieldGen(PipelineOperation):
                 y += spacing
             x += spacing
 
-        cx = ctx.local_center_x if ctx.local_center_x is not None else effective_boundary.centroid.x
-        cy = ctx.local_center_y if ctx.local_center_y is not None else effective_boundary.centroid.y
+        cx = effective_boundary.centroid.x
+        cy = effective_boundary.centroid.y
 
         def get_field_angle(px: float, py: float) -> float:
             nx, ny = (px - cx) * scale, (py - cy) * scale
@@ -109,6 +107,6 @@ class FlowFieldGen(PipelineOperation):
 
         logger.success(
             f"Generated {len(clipped_lines)} bounded flow field paths.")
-        return PipelineState(boundary=state.boundary,
+        return GeometryState(boundary=state.boundary,
                              lines=state.lines + clipped_lines,
                              operation_name="flow_field")

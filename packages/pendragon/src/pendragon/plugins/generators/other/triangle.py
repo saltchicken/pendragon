@@ -6,26 +6,24 @@ from pydantic import Field
 from shapely.geometry import LineString
 from shapely.geometry import MultiLineString
 
-from pendragon.engine import BasePluginConfig
-from pendragon.engine import PipelineContext
-from pendragon.engine import PipelineOperation
-from pendragon.engine import PipelineState
-from pendragon.engine import register_operation
+from nodeweaver.models import PipelineContext
+from pendragon.state import GeometryState
+from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
 
 
-class TriangleConfig(BasePluginConfig):
+class TriangleConfig(PendragonBaseConfig):
     cell_size: float = Field(
         default=5.0,
         gt=0.0,
         description="Side length of equilateral triangles.")
 
 
-@register_operation("triangle", config_class=TriangleConfig)
-class TriangleGen(PipelineOperation):
+@dxf_registry.register("triangle", config_class=TriangleConfig)
+class TriangleGen(PendragonOperation):
 
     def process(self,
-                state: PipelineState,
-                context: Optional[PipelineContext] = None) -> PipelineState:
+                state: GeometryState,
+                context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or TriangleConfig()
         ctx = context or PipelineContext()
         effective_boundary = self.get_effective_boundary(state)
@@ -33,12 +31,12 @@ class TriangleGen(PipelineOperation):
         if not effective_boundary or effective_boundary.is_empty:
             return state
 
-        cell_size = ctx.variables.get("cell_size", cfg.cell_size)
+        cell_size = ctx.get("cell_size", cfg.cell_size)
         logger.info(f"Generating triangle grid with cell size {cell_size}...")
 
         minx, miny, maxx, maxy = effective_boundary.bounds
-        cx = ctx.local_center_x if ctx.local_center_x is not None else effective_boundary.centroid.x
-        cy = ctx.local_center_y if ctx.local_center_y is not None else effective_boundary.centroid.y
+        cx = effective_boundary.centroid.x
+        cy = effective_boundary.centroid.y
 
         diag = math.hypot(maxx - minx, maxy - miny)
         r = diag / 2.0 + cell_size

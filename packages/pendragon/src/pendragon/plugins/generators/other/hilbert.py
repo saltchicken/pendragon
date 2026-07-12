@@ -6,25 +6,23 @@ from pydantic import Field
 from shapely.geometry import LineString
 from shapely.geometry import MultiLineString
 
-from pendragon.engine import BasePluginConfig
-from pendragon.engine import PipelineContext
-from pendragon.engine import PipelineOperation
-from pendragon.engine import PipelineState
-from pendragon.engine import register_operation
+from nodeweaver.models import PipelineContext
+from pendragon.state import GeometryState
+from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
 
 
-class HilbertConfig(BasePluginConfig):
+class HilbertConfig(PendragonBaseConfig):
     spacing: float = Field(default=2.0,
                            gt=0.0,
                            description="Target distance between segments.")
 
 
-@register_operation("hilbert", config_class=HilbertConfig)
-class HilbertGen(PipelineOperation):
+@dxf_registry.register("hilbert", config_class=HilbertConfig)
+class HilbertGen(PendragonOperation):
 
     def process(self,
-                state: PipelineState,
-                context: Optional[PipelineContext] = None) -> PipelineState:
+                state: GeometryState,
+                context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or HilbertConfig()
         ctx = context or PipelineContext()
         effective_boundary = self.get_effective_boundary(state)
@@ -35,7 +33,7 @@ class HilbertGen(PipelineOperation):
         minx, miny, maxx, maxy = effective_boundary.bounds
         width, height = maxx - minx, maxy - miny
         size = max(width, height)
-        spacing = ctx.variables.get("spacing", cfg.spacing)
+        spacing = ctx.get("spacing", cfg.spacing)
         safe_spacing = max(spacing, 0.1)
 
         order = int(math.ceil(math.log2(
@@ -71,6 +69,6 @@ class HilbertGen(PipelineOperation):
                             clipped_lines.append(sub_line)
 
         logger.success(f"Generated {len(clipped_lines)} bounded Hilbert paths.")
-        return PipelineState(boundary=state.boundary,
+        return GeometryState(boundary=state.boundary,
                              lines=state.lines + clipped_lines,
                              operation_name="hilbert")

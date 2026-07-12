@@ -5,14 +5,12 @@ from pydantic import Field
 from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 
-from pendragon.engine import BasePluginConfig
-from pendragon.engine import PipelineContext
-from pendragon.engine import PipelineOperation
-from pendragon.engine import PipelineState
-from pendragon.engine import register_operation
+from nodeweaver.models import PipelineContext
+from pendragon.state import GeometryState
+from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
 
 
-class OffsetFillConfig(BasePluginConfig):
+class OffsetFillConfig(PendragonBaseConfig):
     spacing: float = Field(default=2.0,
                            gt=0.0,
                            description="Distance between offset rings.")
@@ -21,12 +19,12 @@ class OffsetFillConfig(BasePluginConfig):
                                  description="Simplification tolerance.")
 
 
-@register_operation("offset_fill", config_class=OffsetFillConfig)
-class OffsetFillGen(PipelineOperation):
+@dxf_registry.register("offset_fill", config_class=OffsetFillConfig)
+class OffsetFillGen(PendragonOperation):
 
     def process(self,
-                state: PipelineState,
-                context: Optional[PipelineContext] = None) -> PipelineState:
+                state: GeometryState,
+                context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or OffsetFillConfig()
         ctx = context or PipelineContext()
         effective_boundary = self.get_effective_boundary(state)
@@ -34,7 +32,7 @@ class OffsetFillGen(PipelineOperation):
         if not effective_boundary or effective_boundary.is_empty:
             return state
 
-        spacing = ctx.variables.get("spacing", cfg.spacing)
+        spacing = ctx.get("spacing", cfg.spacing)
         logger.info(
             f"Generating concentric offset fill with spacing {spacing}...")
 
@@ -44,8 +42,8 @@ class OffsetFillGen(PipelineOperation):
 
         while not current_geom.is_empty and current_geom.area > 0:
             polygons = [current_geom
-                       ] if current_geom.geom_type == 'Polygon' else list(
-                           current_geom.geoms)
+                        ] if current_geom.geom_type == 'Polygon' else list(
+                            current_geom.geoms)
             for p in polygons:
                 if p.exterior:
                     new_lines.append(LineString(p.exterior.coords))
@@ -56,6 +54,6 @@ class OffsetFillGen(PipelineOperation):
 
         logger.success(
             f"Offset fill complete. Generated {len(new_lines)} contour paths.")
-        return PipelineState(boundary=state.boundary,
+        return GeometryState(boundary=state.boundary,
                              lines=state.lines + new_lines,
                              operation_name="offset_fill")

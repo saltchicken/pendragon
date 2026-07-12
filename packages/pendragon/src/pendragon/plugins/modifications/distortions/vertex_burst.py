@@ -1,18 +1,12 @@
 from typing import List, Optional
 
 from loguru import logger
-from pydantic import BaseModel
-from pydantic import Field
-from shapely.affinity import scale
-from shapely.geometry import LineString
-
-from pendragon.engine import PipelineContext
-from pendragon.engine import PipelineOperation
-from pendragon.engine import PipelineState
-from pendragon.engine import register_operation
+from nodeweaver.models import PipelineContext
+from pendragon.state import GeometryState
+from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
 
 
-class ScaleConfig(BaseModel):
+class ScaleConfig(PendragonBaseConfig):
     factor: float = Field(default=1.0,
                           description="Uniform scaling multiplier.")
     origin: str = Field(
@@ -20,12 +14,12 @@ class ScaleConfig(BaseModel):
         description="Origin point for scaling ('center', 'centroid', etc).")
 
 
-@register_operation("scale", config_class=ScaleConfig)
-class ScaleMod(PipelineOperation):
+@dxf_registry.register("scale", config_class=ScaleConfig)
+class ScaleMod(PendragonOperation):
 
     def process(self,
-                state: PipelineState,
-                context: Optional[PipelineContext] = None) -> PipelineState:
+                state: GeometryState,
+                context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or ScaleConfig()
         ctx = context or PipelineContext()
         current_lines = state.lines
@@ -33,12 +27,14 @@ class ScaleMod(PipelineOperation):
         if not current_lines:
             return state
 
-        factor = ctx.variables.get("factor", cfg.factor)
-        origin = ctx.variables.get("origin", cfg.origin)
+        factor = ctx.get("factor", cfg.factor)
+        origin = ctx.get("origin", cfg.origin)
 
         # Allow dynamic cells to scale perfectly from their local centers
-        if origin == "center" and ctx.local_center_x is not None and ctx.local_center_y is not None:
-            origin_coords = (ctx.local_center_x, ctx.local_center_y)
+        lc_x = ctx.get("local_center_x")
+        lc_y = ctx.get("local_center_y")
+        if origin == "center" and lc_x is not None and lc_y is not None:
+            origin_coords = (lc_x, lc_y)
         else:
             origin_coords = origin
 

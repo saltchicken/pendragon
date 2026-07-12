@@ -2,20 +2,13 @@ import math
 from typing import Optional
 
 from loguru import logger
-from pydantic import BaseModel
-from pydantic import Field
-from shapely.geometry import box
-from shapely.geometry import LineString
-
-from pendragon.engine import PipelineContext
-from pendragon.engine import PipelineOperation
-from pendragon.engine import PipelineState
-from pendragon.engine import register_operation
-from pendragon.engine.registry import OPERATION_REGISTRY
+from nodeweaver.models import PipelineContext
+from pendragon.state import GeometryState
+from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
 from pendragon.utils import ImageSampler
 
 
-class ImageHalftoneConfig(BaseModel):
+class ImageHalftoneConfig(PendragonBaseConfig):
     source_image: str = Field(default="",
                               description="Source image to map.",
                               json_schema_extra={"widget": "file_picker"})
@@ -40,12 +33,12 @@ class ImageHalftoneConfig(BaseModel):
                            description="Value applied in pure black areas.")
 
 
-@register_operation("image_halftone", config_class=ImageHalftoneConfig)
-class ImageHalftoneGen(PipelineOperation):
+@dxf_registry.register("image_halftone", config_class=ImageHalftoneConfig)
+class ImageHalftoneGen(PendragonOperation):
 
     def process(self,
-                state: PipelineState,
-                context: Optional[PipelineContext] = None) -> PipelineState:
+                state: GeometryState,
+                context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or ImageHalftoneConfig()
 
         if not cfg.source_image:
@@ -54,7 +47,7 @@ class ImageHalftoneGen(PipelineOperation):
             return state
 
         # 1. Look up the chosen sub-generator from the registry
-        op_info = OPERATION_REGISTRY.get(cfg.generator)
+        op_info = dxf_registry.get(cfg.generator)
         if not op_info:
             logger.error(f"Halftone sub-generator '{cfg.generator}' not found.")
             return state
@@ -101,13 +94,16 @@ class ImageHalftoneGen(PipelineOperation):
                     return state
 
                 # 5. Create a localized context so the generator knows its explicit center
-                local_ctx = PipelineContext(local_center_x=current_x,
-                                            local_center_y=current_y)
+                local_ctx = PipelineContext(variables={
+                    "center_x": current_x,
+                    "center_y": current_y
+                })
 
                 # 6. Create a distinct boundary box for this specific cell to allow local clipping
                 cell_poly = box(current_x - half_space, current_y - half_space,
                                 current_x + half_space, current_y + half_space)
-                local_state = PipelineState(boundary=cell_poly)
+                local_state = GeometryState(boundary=cell_poly,
+                                            operation_name=f"cell_{cfg.generator}")
 
                 # 7. Execute the sub-generator and collect its lines
                 result_state = sub_gen.process(local_state, context=local_ctx)
@@ -120,6 +116,6 @@ class ImageHalftoneGen(PipelineOperation):
             f"Halftone generation complete. Created {len(new_lines)} path segments."
         )
 
-        return PipelineState(boundary=state.boundary,
+        return GeometryState(boundary=state.boundary,
                              lines=state.lines + new_lines,
                              operation_name="image_halftone")

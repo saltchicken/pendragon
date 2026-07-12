@@ -1,4 +1,3 @@
-# src/pendragon/plugins/generators/image/photo_wave.py
 import math
 from typing import List, Optional
 
@@ -7,15 +6,13 @@ from pydantic import Field
 from shapely.geometry import LineString
 from shapely.geometry import MultiLineString
 
-from pendragon.engine import BasePluginConfig
-from pendragon.engine import PipelineContext
-from pendragon.engine import PipelineOperation
-from pendragon.engine import PipelineState
-from pendragon.engine import register_operation
+from nodeweaver.models import PipelineContext
+from pendragon.state import GeometryState
+from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
 from pendragon.utils import ImageSampler
 
 
-class PhotoWaveConfig(BasePluginConfig):
+class PhotoWaveConfig(PendragonBaseConfig):
     lines: int = Field(default=80,
                        gt=0,
                        description="Number of horizontal wave lines.")
@@ -24,12 +21,12 @@ class PhotoWaveConfig(BasePluginConfig):
                                    description="File path to the source image.")
 
 
-@register_operation("photo_wave", config_class=PhotoWaveConfig)
-class PhotoWaveGen(PipelineOperation):
+@dxf_registry.register("photo_wave", config_class=PhotoWaveConfig)
+class PhotoWaveGen(PendragonOperation):
 
     def process(self,
-                state: PipelineState,
-                context: Optional[PipelineContext] = None) -> PipelineState:
+                state: GeometryState,
+                context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or PhotoWaveConfig()
         ctx = context or PipelineContext()
         effective_boundary = self.get_effective_boundary(state)
@@ -40,8 +37,8 @@ class PhotoWaveGen(PipelineOperation):
         if not cfg.image_path:
             return state
 
-        lines_count = int(ctx.variables.get("lines", cfg.lines))
-        amp = ctx.variables.get("amp", cfg.amp)
+        lines_count = int(ctx.get("lines", cfg.lines))
+        amp = ctx.get("amp", cfg.amp)
 
         logger.info(
             f"Generating {lines_count} photo waves from {cfg.image_path}...")
@@ -83,6 +80,6 @@ class PhotoWaveGen(PipelineOperation):
                             clipped_lines.append(sub_line)
 
         logger.success(f"Generated {len(clipped_lines)} bounded wave paths.")
-        return PipelineState(boundary=state.boundary,
+        return GeometryState(boundary=state.boundary,
                              lines=state.lines + clipped_lines,
                              operation_name="photo_wave")

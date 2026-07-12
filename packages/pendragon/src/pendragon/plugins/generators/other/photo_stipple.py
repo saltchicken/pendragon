@@ -6,15 +6,13 @@ from pydantic import Field
 from shapely.geometry import LineString
 from shapely.geometry import Point
 
-from pendragon.engine import BasePluginConfig
-from pendragon.engine import PipelineContext
-from pendragon.engine import PipelineOperation
-from pendragon.engine import PipelineState
-from pendragon.engine import register_operation
+from nodeweaver.models import PipelineContext
+from pendragon.state import GeometryState
+from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
 from pendragon.utils import ImageSampler
 
 
-class PhotoStippleConfig(BasePluginConfig):
+class PhotoStippleConfig(PendragonBaseConfig):
     dots: int = Field(default=5000,
                       gt=0,
                       description="Target number of stipple dots to generate.")
@@ -25,12 +23,12 @@ class PhotoStippleConfig(BasePluginConfig):
     seed: int = Field(default=42, description="Random seed.")
 
 
-@register_operation("photo_stipple", config_class=PhotoStippleConfig)
-class PhotoStippleGen(PipelineOperation):
+@dxf_registry.register("photo_stipple", config_class=PhotoStippleConfig)
+class PhotoStippleGen(PendragonOperation):
 
     def process(self,
-                state: PipelineState,
-                context: Optional[PipelineContext] = None) -> PipelineState:
+                state: GeometryState,
+                context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or PhotoStippleConfig()
         ctx = context or PipelineContext()
         effective_boundary = self.get_effective_boundary(state)
@@ -40,8 +38,8 @@ class PhotoStippleGen(PipelineOperation):
         if not cfg.image_path:
             return state
 
-        dots = int(ctx.variables.get("dots", cfg.dots))
-        dot_size = ctx.variables.get("dot_size", cfg.dot_size)
+        dots = int(ctx.get("dots", cfg.dots))
+        dot_size = ctx.get("dot_size", cfg.dot_size)
 
         logger.info(f"Generating {dots} stipple dots from {cfg.image_path}...")
 
@@ -71,6 +69,6 @@ class PhotoStippleGen(PipelineOperation):
                 f"Only generated {len(new_dots)} out of {dots} requested dots.")
 
         logger.success(f"Generated {len(new_dots)} bounded stipple points.")
-        return PipelineState(boundary=state.boundary,
+        return GeometryState(boundary=state.boundary,
                              lines=state.lines + new_dots,
                              operation_name="photo_stipple")
