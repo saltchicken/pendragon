@@ -1,5 +1,4 @@
 from typing import get_origin
-
 from loguru import logger
 import yaml
 from PyQt5.QtCore import Qt, QTimer
@@ -9,9 +8,7 @@ from PyQt5.QtWidgets import (
     QProgressBar, QPushButton, QVBoxLayout, QWidget
 )
 
-from pendragon.engine.registry import OPERATION_REGISTRY
-from pendragon.engine import PendragonEngine
-
+from pendragon.registry import dxf_registry
 from pendragon.gui.constants import DARK_THEME_STYLESHEET
 from pendragon.gui.viewer import PipelineViewer
 from pendragon.gui.worker import PipelineStreamingThread
@@ -109,7 +106,7 @@ class LiveEditorWindow(QMainWindow):
         self.edit_layout = QHBoxLayout()
 
         self.op_selector = QComboBox()
-        self.op_selector.addItems(sorted(OPERATION_REGISTRY.keys()))
+        self.op_selector.addItems(sorted([k for k, _ in dxf_registry.items()]))
 
         self.btn_add_op = QPushButton("Add Step")
         self.btn_remove_op = QPushButton("Remove Step")
@@ -173,7 +170,7 @@ class LiveEditorWindow(QMainWindow):
 
         self.worker_thread = PipelineStreamingThread(
             current_recipe,
-            self.engine.boundary,
+            self.engine.initial_state.boundary,  # <-- FIXED ATTRIBUTE ACCESS
             prior_history=prior_history,
             start_index=start_index)
         self.worker_thread.step_completed.connect(self._on_step_streamed)
@@ -261,7 +258,7 @@ class LiveEditorWindow(QMainWindow):
                 elif hasattr(operation.config, "generator"):
                     registry_key = getattr(operation.config, "generator")
 
-                op_info = OPERATION_REGISTRY.get(registry_key) if registry_key else None
+                op_info = dxf_registry.get(registry_key) if registry_key else None
 
                 if op_info and op_info["config"]:
                     sub_config_class = op_info["config"]
@@ -398,7 +395,7 @@ class LiveEditorWindow(QMainWindow):
     def _get_current_recipe(self) -> list:
         current_recipe = []
         for op in self.engine.runner.operations:
-            op_name = next((name for name, info in OPERATION_REGISTRY.items()
+            op_name = next((name for name, info in dxf_registry.items()
                             if isinstance(op, info["class"])), None)
             if not op_name:
                 continue

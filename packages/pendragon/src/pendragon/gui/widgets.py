@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (
     QSlider, QSpinBox, QWidget
 )
 
-from pendragon.engine.registry import OPERATION_REGISTRY
+from pendragon.registry import dxf_registry
 
 
 class WidgetFactory:
@@ -171,7 +171,7 @@ class WidgetFactory:
         if widget_type == "operation_selector":
             widget = QComboBox()
             widget.blockSignals(True)
-            widget.addItems(sorted(OPERATION_REGISTRY.keys()))
+            widget.addItems(sorted([k for k, _ in dxf_registry.items()]))
             if current_value:
                 widget.setCurrentText(str(current_value))
             widget.blockSignals(False)

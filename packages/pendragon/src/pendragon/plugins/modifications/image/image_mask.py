@@ -1,44 +1,33 @@
 import math
 from typing import List, Optional
-
 from loguru import logger
-from pydantic import BaseModel
-from pydantic import Field
+from pydantic import BaseModel, Field
 from shapely.geometry import LineString
 
-from pendragon.engine import PipelineContext
-from pendragon.engine import PipelineOperation
-from pendragon.engine import PipelineState
-from pendragon.engine import register_operation
+from nodeweaver.models import PipelineContext
+from pendragon.state import GeometryState
+from pendragon.registry import PendragonOperation, dxf_registry
 from pendragon.utils import ImageSampler
 
 
 class ImageMaskConfig(BaseModel):
-    mask_image: str = Field(default="",
-                            description="Source image.",
-                            json_schema_extra={"widget": "file_picker"})
-    threshold: float = Field(default=0.5,
-                             ge=0.0,
-                             le=1.0,
-                             description="Darkness threshold to keep lines.")
-    sample_step: float = Field(default=0.5,
-                               description="Resolution step size for sampling.")
+    mask_image: str = Field(default="", description="Source image.", json_schema_extra={"widget": "file_picker"})
+    threshold: float = Field(default=0.5, ge=0.0, le=1.0, description="Darkness threshold to keep lines.")
+    sample_step: float = Field(default=0.5, description="Resolution step size for sampling.")
 
 
-@register_operation("image_mask", config_class=ImageMaskConfig)
-class ImageMaskMod(PipelineOperation):
+@dxf_registry.register("image_mask", config_class=ImageMaskConfig)
+class ImageMaskMod(PendragonOperation):
 
-    def process(self,
-                state: PipelineState,
-                context: Optional[PipelineContext] = None) -> PipelineState:
+    def process(self, state: GeometryState, context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or ImageMaskConfig()
         ctx = context or PipelineContext()
 
         current_boundary = state.boundary
         current_lines = state.lines
 
-        threshold = ctx.variables.get("threshold", cfg.threshold)
-        step_size = ctx.variables.get("sample_step", cfg.sample_step)
+        threshold = ctx.get("threshold", cfg.threshold)
+        step_size = ctx.get("sample_step", cfg.sample_step)
 
         if not cfg.mask_image or not current_lines:
             return state
@@ -69,9 +58,7 @@ class ImageMaskMod(PipelineOperation):
             if len(current_segment_coords) >= 2:
                 new_lines.append(LineString(current_segment_coords))
 
-        logger.success(
-            f"Mask filtering complete. Retained {len(new_lines)} segmented lines."
-        )
-        return PipelineState(boundary=current_boundary,
+        logger.success(f"Mask filtering complete. Retained {len(new_lines)} segmented lines.")
+        return GeometryState(boundary=current_boundary,
                              lines=new_lines,
                              operation_name="image_mask")

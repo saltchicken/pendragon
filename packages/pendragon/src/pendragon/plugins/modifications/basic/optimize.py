@@ -1,24 +1,18 @@
-# src/pendragon/plugins/modifications/basic/optimize.py
 from typing import List, Optional, Tuple
-
 from loguru import logger
 import numpy as np
-from pydantic import BaseModel
-from pydantic import Field
+from pydantic import BaseModel, Field
 from scipy.spatial import cKDTree
 from shapely.geometry import LineString
 
-from pendragon.engine import PipelineContext
-from pendragon.engine import PipelineOperation
-from pendragon.engine import PipelineState
-from pendragon.engine import register_operation
+from nodeweaver.models import PipelineContext
+from pendragon.state import GeometryState
+from pendragon.registry import PendragonOperation, dxf_registry
 
 
 class OptimizeConfig(BaseModel):
-    start_x: float = Field(default=0.0,
-                           description="X coordinate to start optimizing from.")
-    start_y: float = Field(default=0.0,
-                           description="Y coordinate to start optimizing from.")
+    start_x: float = Field(default=0.0, description="X coordinate to start optimizing from.")
+    start_y: float = Field(default=0.0, description="Y coordinate to start optimizing from.")
 
 
 def optimize_paths_nearest_neighbor(
@@ -72,12 +66,10 @@ def optimize_paths_nearest_neighbor(
     return optimized
 
 
-@register_operation("optimize", config_class=OptimizeConfig)
-class OptimizeMod(PipelineOperation):
+@dxf_registry.register("optimize", config_class=OptimizeConfig)
+class OptimizeMod(PendragonOperation):
 
-    def process(self,
-                state: PipelineState,
-                context: Optional[PipelineContext] = None) -> PipelineState:
+    def process(self, state: GeometryState, context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or OptimizeConfig()
         ctx = context or PipelineContext()
         current_lines = state.lines
@@ -86,23 +78,20 @@ class OptimizeMod(PipelineOperation):
             return state
 
         raw_paths = [list(line.coords) for line in current_lines]
-        start_x = ctx.variables.get(
-            "start_x", ctx.local_center_x
-            if ctx.local_center_x is not None else cfg.start_x)
-        start_y = ctx.variables.get(
-            "start_y", ctx.local_center_y
-            if ctx.local_center_y is not None else cfg.start_y)
+        
+        # Handle dynamic variable extraction
+        lc_x = ctx.get("local_center_x")
+        lc_y = ctx.get("local_center_y")
+        
+        start_x = ctx.get("start_x", lc_x if lc_x is not None else cfg.start_x)
+        start_y = ctx.get("start_y", lc_y if lc_y is not None else cfg.start_y)
 
-        logger.info(
-            f"Optimizing {len(raw_paths)} paths starting near ({start_x}, {start_y})..."
-        )
+        logger.info(f"Optimizing {len(raw_paths)} paths starting near ({start_x}, {start_y})...")
 
-        optimized_paths = optimize_paths_nearest_neighbor(raw_paths,
-                                                          start_pt=(start_x,
-                                                                    start_y))
+        optimized_paths = optimize_paths_nearest_neighbor(raw_paths, start_pt=(start_x, start_y))
         optimized_lines = [LineString(path) for path in optimized_paths]
 
         logger.success("Path optimization complete.")
-        return PipelineState(boundary=state.boundary,
+        return GeometryState(boundary=state.boundary,
                              lines=optimized_lines,
                              operation_name="optimize")

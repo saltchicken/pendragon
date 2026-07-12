@@ -1,38 +1,29 @@
 import math
 from typing import List, Literal, Optional
-
 from loguru import logger
 from pydantic import Field
-from shapely.geometry import LineString
-from shapely.geometry import MultiLineString
+from shapely.geometry import LineString, MultiLineString
 
-from pendragon.engine import BasePluginConfig
-from pendragon.engine import PipelineContext
-from pendragon.engine import PipelineOperation
-from pendragon.engine import PipelineState
-from pendragon.engine import register_operation
+from nodeweaver.models import PipelineContext
+from pendragon.state import GeometryState
+from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
 
 
-class GridLinesConfig(BasePluginConfig):
-    spacing: float = Field(default=5,
-                           description="Distance between consecutive lines.")
+class GridLinesConfig(PendragonBaseConfig):
+    spacing: float = Field(default=5, description="Distance between consecutive lines.")
     orientation: Literal["horizontal", "vertical", "crosshatch"] = Field(
         default="horizontal",
-        description=
-        "Orientation of lines: 'horizontal', 'vertical', or 'crosshatch'.")
+        description="Orientation of lines: 'horizontal', 'vertical', or 'crosshatch'.")
 
+@dxf_registry.register("grid_lines", config_class=GridLinesConfig)
+class GridLinesGen(PendragonOperation):
 
-@register_operation("grid_lines", config_class=GridLinesConfig)
-class GridLinesGen(PipelineOperation):
-
-    def process(self,
-                state: PipelineState,
-                context: Optional[PipelineContext] = None) -> PipelineState:
+    def process(self, state: GeometryState, context: Optional[PipelineContext] = None) -> GeometryState:
         cfg = self.config or GridLinesConfig()
         ctx = context or PipelineContext()
 
-        spacing = ctx.variables.get("spacing", cfg.spacing)
-        orientation = ctx.variables.get("orientation", cfg.orientation)
+        spacing = ctx.get("spacing", cfg.spacing)
+        orientation = ctx.get("orientation", cfg.orientation)
 
         orig_minx, orig_miny, orig_maxx, orig_maxy = state.boundary.bounds
         effective_boundary = self.get_effective_boundary(state)
@@ -49,11 +40,9 @@ class GridLinesGen(PipelineOperation):
 
             for k in range(start_k, end_k + 1):
                 current_y = phase_y + k * spacing
-                if abs(current_y - eff_miny) < 1e-7 or abs(current_y -
-                                                           eff_maxy) < 1e-7:
+                if abs(current_y - eff_miny) < 1e-7 or abs(current_y - eff_maxy) < 1e-7:
                     continue
-                lines.append(
-                    LineString([(eff_minx, current_y), (eff_maxx, current_y)]))
+                lines.append(LineString([(eff_minx, current_y), (eff_maxx, current_y)]))
             return lines
 
         def make_vertical():
@@ -64,11 +53,9 @@ class GridLinesGen(PipelineOperation):
 
             for k in range(start_k, end_k + 1):
                 current_x = phase_x + k * spacing
-                if abs(current_x - eff_minx) < 1e-7 or abs(current_x -
-                                                           eff_maxx) < 1e-7:
+                if abs(current_x - eff_minx) < 1e-7 or abs(current_x - eff_maxx) < 1e-7:
                     continue
-                lines.append(
-                    LineString([(current_x, eff_miny), (current_x, eff_maxy)]))
+                lines.append(LineString([(current_x, eff_miny), (current_x, eff_maxy)]))
             return lines
 
         if orientation in ("horizontal", "crosshatch"):
@@ -87,8 +74,7 @@ class GridLinesGen(PipelineOperation):
                         if not sub_line.is_empty:
                             clipped_lines.append(sub_line)
 
-        logger.success(
-            f"Generated and clipped {len(clipped_lines)} pattern lines.")
-        return PipelineState(boundary=state.boundary,
+        logger.success(f"Generated and clipped {len(clipped_lines)} pattern lines.")
+        return GeometryState(boundary=state.boundary,
                              lines=state.lines + clipped_lines,
                              operation_name="grid_lines")

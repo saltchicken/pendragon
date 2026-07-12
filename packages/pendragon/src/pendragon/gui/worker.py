@@ -2,13 +2,13 @@ import inspect
 import multiprocessing
 import queue as standard_queue
 import time
-
 import numpy as np
+
 from PyQt5.QtCore import pyqtSignal, QThread
 
-from pendragon.engine.discovery import load_plugins
-from pendragon.engine.models import PipelineContext, PipelineState
-from pendragon.engine.registry import OPERATION_REGISTRY
+from nodeweaver.models import PipelineContext
+from pendragon.state import GeometryState
+from pendragon.registry import dxf_registry, load_batteries
 
 
 def _vectorize_lines(lines):
@@ -45,18 +45,18 @@ def run_pipeline_process(recipe, boundary, progress_queue, prior_history=None, s
     Executes the pipeline in a background process, pushing intermediate states.
     Pushes the final history array to the queue at the end.
     """
-    load_plugins()
+    load_batteries()
 
     if prior_history:
         history = prior_history
     else:
-        initial_state = PipelineState(boundary=boundary, operation_name="base_geometry")
+        initial_state = GeometryState(boundary=boundary, operation_name="base_geometry")
         history = [initial_state]
 
     operations = []
     for step in recipe:
         op_name = step.get("operation")
-        op_info = OPERATION_REGISTRY.get(op_name)
+        op_info = dxf_registry.get(op_name)
         if not op_info:
             continue
 

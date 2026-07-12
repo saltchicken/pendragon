@@ -1,28 +1,20 @@
 from typing import List, Optional
-
 from loguru import logger
-from shapely.geometry import LineString
-from shapely.geometry import MultiPolygon
-from shapely.geometry import Polygon
+from shapely.geometry import LineString, MultiPolygon, Polygon
 
-from pendragon.engine import BasePluginConfig
-from pendragon.engine import PipelineContext
-from pendragon.engine import PipelineOperation
-from pendragon.engine import PipelineState
-from pendragon.engine import register_operation
+from nodeweaver.models import PipelineContext
+from pendragon.state import GeometryState
+from pendragon.registry import PendragonBaseConfig, PendragonOperation, dxf_registry
 
 
-class AddBoundaryConfig(BasePluginConfig):
+class AddBoundaryConfig(PendragonBaseConfig):
     pass
 
-
-@register_operation("add_boundary", config_class=AddBoundaryConfig)
-class AddBoundaryGen(PipelineOperation):
+@dxf_registry.register("add_boundary", config_class=AddBoundaryConfig)
+class AddBoundaryGen(PendragonOperation):
     """Extracts the linear rings from the current boundary and adds them to the toolpath."""
 
-    def process(self,
-                state: PipelineState,
-                context: Optional[PipelineContext] = None) -> PipelineState:
+    def process(self, state: GeometryState, context: Optional[PipelineContext] = None) -> GeometryState:
         effective_boundary = self.get_effective_boundary(state)
 
         if not effective_boundary or effective_boundary.is_empty:
@@ -44,12 +36,10 @@ class AddBoundaryGen(PipelineOperation):
             for poly in effective_boundary.geoms:
                 new_lines.extend(extract_rings(poly))
         else:
-            logger.error(
-                f"Unsupported boundary geometry type: {type(effective_boundary)}"
-            )
+            logger.error(f"Unsupported boundary geometry type: {type(effective_boundary)}")
             return state
 
         logger.success(f"Successfully added {len(new_lines)} boundary paths.")
-        return PipelineState(boundary=state.boundary,
+        return GeometryState(boundary=state.boundary,
                              lines=state.lines + new_lines,
                              operation_name="add_boundary")
