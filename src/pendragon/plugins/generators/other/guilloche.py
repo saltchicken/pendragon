@@ -1,14 +1,10 @@
-import math
-from typing import List, Optional
+from typing import Optional
 
 from loguru import logger
 import numpy as np
-from pydantic import BaseModel
 from pydantic import Field
 from shapely.geometry import LineString
 from shapely.geometry import MultiLineString
-from shapely.geometry import MultiPolygon
-from shapely.geometry import Polygon
 
 from pendragon.engine import CenteredPluginConfig
 from pendragon.engine import PipelineContext

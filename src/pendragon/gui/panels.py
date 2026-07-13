@@ -5,7 +5,6 @@ from PyQt5.QtWidgets import QHBoxLayout
 from PyQt5.QtWidgets import QLabel
 from PyQt5.QtWidgets import QProgressBar
 from PyQt5.QtWidgets import QPushButton
-from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 
 from pendragon.engine.registry import OPERATION_REGISTRY

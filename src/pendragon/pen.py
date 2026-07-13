@@ -1,6 +1,5 @@
 from dataclasses import dataclass
-import logging
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
 from gscrib import GCodeBuilder
 from loguru import logger

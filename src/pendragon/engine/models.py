@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from dataclasses import field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from shapely.geometry import LineString
 from shapely.geometry import Polygon

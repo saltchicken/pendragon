@@ -1,6 +1,6 @@
 # src/pendragon/plugins/generators/image/photo_wave.py
 import math
-from typing import List, Optional
+from typing import Optional
 
 from loguru import logger
 from pydantic import Field

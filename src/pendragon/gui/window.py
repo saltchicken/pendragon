@@ -1,4 +1,3 @@
-from loguru import logger
 from PyQt5.QtCore import Qt
 from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QApplication

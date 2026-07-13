@@ -1,8 +1,6 @@
 import math
-from typing import List, Optional
 
 from loguru import logger
-import numpy as np
 from pydantic import Field
 from shapely.geometry import LineString
 

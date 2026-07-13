@@ -1,11 +1,9 @@
-import math
 from typing import Optional
 
 from loguru import logger
 from pydantic import BaseModel
 from pydantic import Field
 from shapely.geometry import box
-from shapely.geometry import LineString
 
 from pendragon.engine import PipelineContext
 from pendragon.engine import PipelineOperation

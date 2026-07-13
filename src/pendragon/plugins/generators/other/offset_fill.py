@@ -1,9 +1,8 @@
-from typing import List, Optional
+from typing import Optional
 
 from loguru import logger
 from pydantic import Field
 from shapely.geometry import LineString
-from shapely.geometry.base import BaseGeometry
 
 from pendragon.engine import BasePluginConfig
 from pendragon.engine import PipelineContext

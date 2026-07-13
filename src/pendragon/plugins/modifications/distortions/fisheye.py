@@ -1,5 +1,5 @@
 import math
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
 from loguru import logger
 from pydantic import BaseModel

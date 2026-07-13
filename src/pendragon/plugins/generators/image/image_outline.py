@@ -1,5 +1,5 @@
 # src/pendragon/plugins/generators/image/image_outline.py
-from typing import List, Optional
+from typing import Optional
 
 from loguru import logger
 import numpy as np

@@ -1,4 +1,4 @@
-from typing import List, Protocol
+from typing import Protocol
 
 from loguru import logger
 

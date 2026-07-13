@@ -1,5 +1,5 @@
 import inspect
-from typing import Generator, List, Optional
+from typing import Generator, Optional
 
 from loguru import logger
 from shapely.geometry import LineString
