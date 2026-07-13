@@ -7,16 +7,19 @@ from pydantic import Field
 from pydantic import RootModel
 
 from .discovery import load_plugins
-from .registry import OPERATION_REGISTRY
+from .registry import PluginRegistry
 
 
 def generate_recipe_schema(output_path: str = "recipe-schema.json"):
     # Ensure all plugins are discovered and loaded into the registry
     load_plugins()
 
+    registry = PluginRegistry()
+    registry.discover()
+
     step_models = []
 
-    for op_name, op_info in OPERATION_REGISTRY.items():
+    for op_name, op_info in registry.operations.items():
         ConfigClass = op_info["config"]
 
         if not ConfigClass:

@@ -13,15 +13,12 @@ from PyQt5.QtWidgets import QSlider
 from PyQt5.QtWidgets import QSpinBox
 from PyQt5.QtWidgets import QWidget
 
-from pendragon.engine.registry import OPERATION_REGISTRY
-
 
 class WidgetFactory:
     """A factory for creating standardized PyQt UI widgets from Pydantic fields."""
 
     @classmethod
-    def build_field_widget(cls, field_name, field_info, current_value, update_callback, parent=None):
-        """Routes the field to the appropriate widget builder based on its annotation."""
+    def build_field_widget(cls, field_name, field_info, current_value, update_callback, registry=None, parent=None):
         origin = get_origin(field_info.annotation)
         annotation = field_info.annotation
 
@@ -34,7 +31,7 @@ class WidgetFactory:
         elif origin is Literal:
             return cls.build_literal_widget(current_value, field_info, update_callback)
         elif annotation == str:
-            return cls.build_str_widget(field_name, field_info, current_value, update_callback, parent)
+            return cls.build_str_widget(field_name, field_info, current_value, update_callback, registry, parent)
         
         return None
 
@@ -163,7 +160,7 @@ class WidgetFactory:
         return container
 
     @staticmethod
-    def build_str_widget(field_name, field_info, current_value, update_callback, parent=None):
+    def build_str_widget(field_name, field_info, current_value, update_callback, registry=None, parent=None):
         container = QWidget()
         h_layout = QHBoxLayout(container)
         h_layout.setContentsMargins(0, 0, 0, 0)
@@ -177,7 +174,8 @@ class WidgetFactory:
         if widget_type == "operation_selector":
             widget = QComboBox()
             widget.blockSignals(True)
-            widget.addItems(sorted(OPERATION_REGISTRY.keys()))
+            if registry:
+                widget.addItems(registry.get_operation_names())
             if current_value:
                 widget.setCurrentText(str(current_value))
             widget.blockSignals(False)

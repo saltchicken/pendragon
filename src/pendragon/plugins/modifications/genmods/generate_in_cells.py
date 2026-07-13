@@ -14,7 +14,6 @@ from pendragon.engine import PipelineContext
 from pendragon.engine import PipelineOperation
 from pendragon.engine import PipelineState
 from pendragon.engine import register_operation
-from pendragon.engine.registry import OPERATION_REGISTRY
 from pendragon.utils import ImageSampler
 
 
@@ -132,6 +131,7 @@ class GenerateInCellsOp(PipelineOperation):
                                        state.boundary.bounds)
 
         # 5. Look up the requested sub-generator in the registry
+        # TODO: This needs to be fixed with new registry
         op_info = OPERATION_REGISTRY.get(cfg.generator)
         if not op_info:
             logger.error(

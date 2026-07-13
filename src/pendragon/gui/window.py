@@ -11,7 +11,6 @@ from PyQt5.QtWidgets import QPushButton
 from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 
-from pendragon.engine.registry import OPERATION_REGISTRY
 from pendragon.gui.controller import PipelineController
 from pendragon.gui.panels import ActionPanel
 from pendragon.gui.panels import EditPanel
@@ -82,7 +81,8 @@ class LiveEditorWindow(QMainWindow):
         self.control_layout.addWidget(self.action_panel)
 
         # 6. Editing Panel
-        self.edit_panel = EditPanel()
+        op_names = self.controller.engine.registry.get_operation_names()
+        self.edit_panel = EditPanel(op_names=op_names)
         self.edit_panel.btn_add.clicked.connect(self._gui_add_operation)
         self.edit_panel.btn_remove.clicked.connect(self._gui_remove_operation)
         self.control_layout.addWidget(self.edit_panel)
@@ -252,7 +252,8 @@ class LiveEditorWindow(QMainWindow):
                 elif hasattr(operation.config, "generator"):
                     registry_key = getattr(operation.config, "generator")
 
-                op_info = OPERATION_REGISTRY.get(registry_key) if registry_key else None
+                # Grab the op info from the engine's registry instance
+                op_info = self.controller.engine.registry.get(registry_key) if registry_key else None
 
                 if op_info and op_info["config"]:
                     sub_config_class = op_info["config"]
@@ -266,7 +267,8 @@ class LiveEditorWindow(QMainWindow):
                             self.controller.update_nested_parameter(idx, parent_dict, fname, val)
 
                         sub_container = WidgetFactory.build_field_widget(
-                            sub_field_name, sub_field_info, sub_current_value, nested_update_callback, parent=self
+                            sub_field_name, sub_field_info, sub_current_value, nested_update_callback, 
+                            registry=self.controller.engine.registry, parent=self
                         )
                         if sub_container:
                             self.form_layout.addRow(f"↳ {sub_field_name}", sub_container)
@@ -293,7 +295,8 @@ class LiveEditorWindow(QMainWindow):
                     self.controller.update_parameter(idx, fname, val)
 
             container = WidgetFactory.build_field_widget(
-                field_name, field_info, current_value, root_update_callback, parent=self
+                field_name, field_info, current_value, root_update_callback, 
+                registry=self.controller.engine.registry, parent=self
             )
             if container:
                 self.form_layout.addRow(field_name, container)

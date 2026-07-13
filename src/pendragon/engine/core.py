@@ -7,8 +7,7 @@ from shapely.geometry import Polygon
 
 from .models import PipelineContext
 from .models import PipelineState
-from .registry import OPERATION_REGISTRY
-from .registry import PipelineOperation
+from .registry import PipelineOperation, PluginRegistry
 from .store import InMemoryStateStore
 from .store import StateStore
 
@@ -19,15 +18,18 @@ class PendragonEngine:
                  recipe: list,
                  boundary: Optional[Polygon] = None,
                  interactive: bool = False,
-                 store: Optional[StateStore] = None):  # <-- Inject here
+                 store: Optional[StateStore] = None,
+                 registry: Optional[PluginRegistry] = None):
 
         self.recipe = recipe
-        self.boundary = boundary or Polygon([(0, 0), (200, 0), (200, 200),
-                                             (0, 200), (0, 0)])
+        self.boundary = boundary or Polygon([(0, 0), (200, 0), (200, 200), (0, 200), (0, 0)])
         self.interactive = interactive
         self.operations: list[PipelineOperation] = []
 
-        # Initialize the store. The engine no longer owns the list natively.
+        self.registry = registry or PluginRegistry()
+        if not self.registry.operations:
+            self.registry.discover()
+
         base_state = PipelineState(boundary=self.boundary,
                                    operation_name="base_geometry")
         self.store: StateStore = store or InMemoryStateStore(base_state)
@@ -53,12 +55,11 @@ class PendragonEngine:
         for step in self.recipe:
             op_name = step.get("operation")
             if not op_name:
-                logger.error(
-                    f"Invalid step configuration, missing 'operation' key: {step}"
-                )
+                logger.error(f"Invalid step configuration, missing 'operation' key: {step}")
                 return False
 
-            op_info = OPERATION_REGISTRY.get(op_name)
+            # 2. Query the instance-owned registry
+            op_info = self.registry.get(op_name)
             if not op_info:
                 logger.error(f"Operation '{op_name}' not found in registry.")
                 return False

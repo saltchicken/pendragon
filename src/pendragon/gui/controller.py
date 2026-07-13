@@ -5,7 +5,6 @@ from PyQt5.QtCore import QTimer
 import yaml
 
 from pendragon.engine import PendragonEngine
-from pendragon.engine.registry import OPERATION_REGISTRY
 from pendragon.export import export_gcode
 from pendragon.gui.worker import PipelineStreamingThread
 
@@ -99,8 +98,8 @@ class PipelineController(QObject):
     def get_current_recipe(self) -> list:
         current_recipe = []
         for op in self.engine.operations:
-            op_name = next((name for name, info in OPERATION_REGISTRY.items()
-                            if isinstance(op, info["class"])), None)
+            # Safely grab the plugin name attached by the decorator
+            op_name = getattr(op.__class__, '_plugin_name', None)
             if not op_name:
                 continue
 

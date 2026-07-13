@@ -8,7 +8,6 @@ from pendragon.engine import PipelineContext
 from pendragon.engine import PipelineOperation
 from pendragon.engine import PipelineState
 from pendragon.engine import register_operation
-from pendragon.engine.registry import OPERATION_REGISTRY
 
 
 class DistributeConfig(BasePluginConfig):
@@ -27,6 +26,7 @@ class DistributeAlongOp(PipelineOperation):
         cfg = self.config or DistributeConfig()
 
         # 1. Retrieve the sub-generator
+        # TODO: This needs to be fixed with the new built in registry
         op_info = OPERATION_REGISTRY.get(cfg.generator)
         if not op_info:
             logger.error(f"Generator {cfg.generator} not found.")

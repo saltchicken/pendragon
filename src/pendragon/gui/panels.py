@@ -7,8 +7,6 @@ from PyQt5.QtWidgets import QProgressBar
 from PyQt5.QtWidgets import QPushButton
 from PyQt5.QtWidgets import QWidget
 
-from pendragon.engine.registry import OPERATION_REGISTRY
-
 
 class StatsPanel(QGroupBox):
 
@@ -75,13 +73,13 @@ class ActionPanel(QWidget):
 
 class EditPanel(QWidget):
 
-    def __init__(self, parent=None):
+    def __init__(self, op_names: list[str], parent=None):
         super().__init__(parent)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
         self.op_selector = QComboBox()
-        self.op_selector.addItems(sorted(OPERATION_REGISTRY.keys()))
+        self.op_selector.addItems(op_names)
 
         self.btn_add = QPushButton("Add Step")
         self.btn_remove = QPushButton("Remove Step")

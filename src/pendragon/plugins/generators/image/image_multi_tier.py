@@ -10,7 +10,6 @@ from pendragon.engine import PipelineOperation
 from pendragon.engine import PipelineState
 from pendragon.engine import register_operation
 from pendragon.engine.registry import BasePluginConfig
-from pendragon.engine.registry import OPERATION_REGISTRY
 from pendragon.utils import ImageSampler
 
 
@@ -53,6 +52,7 @@ class ImageMultiTierGen(PipelineOperation):
         if not op_name or op_name.lower() == "none":
             return None
         
+        # TODO: This needs to be fixed with new registry
         op_info = OPERATION_REGISTRY.get(op_name)
         if not op_info:
             logger.warning(f"Operation '{op_name}' not found in registry.")
