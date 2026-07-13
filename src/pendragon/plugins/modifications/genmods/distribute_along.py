@@ -8,11 +8,15 @@ from pendragon.engine import PipelineContext
 from pendragon.engine import PipelineOperation
 from pendragon.engine import PipelineState
 from pendragon.engine import register_operation
+from pendragon.engine.registry import PluginRegistry
 
 
 class DistributeConfig(BasePluginConfig):
-    generator: str = Field(default="grid_lines",
-                           description="Generator to stamp along the line.")
+    generator: str = Field(
+        default="grid_lines",
+        description="Generator to stamp along the line.",
+        json_schema_extra={"widget": "operation_selector"}  # <-- Added this
+    )
     spacing: float = Field(default=10.0, description="Distance between stamps.")
     generator_settings: Dict[str, Any] = Field(default_factory=dict)
 
@@ -26,8 +30,10 @@ class DistributeAlongOp(PipelineOperation):
         cfg = self.config or DistributeConfig()
 
         # 1. Retrieve the sub-generator
-        # TODO: This needs to be fixed with the new built in registry
-        op_info = OPERATION_REGISTRY.get(cfg.generator)
+        registry = PluginRegistry()
+        registry.discover()
+        op_info = registry.get(cfg.generator)
+        
         if not op_info:
             logger.error(f"Generator {cfg.generator} not found.")
             return state

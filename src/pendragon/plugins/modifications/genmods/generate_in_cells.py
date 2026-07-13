@@ -14,6 +14,7 @@ from pendragon.engine import PipelineContext
 from pendragon.engine import PipelineOperation
 from pendragon.engine import PipelineState
 from pendragon.engine import register_operation
+from pendragon.engine.registry import PluginRegistry
 from pendragon.utils import ImageSampler
 
 
@@ -131,11 +132,12 @@ class GenerateInCellsOp(PipelineOperation):
                                        state.boundary.bounds)
 
         # 5. Look up the requested sub-generator in the registry
-        # TODO: This needs to be fixed with new registry
-        op_info = OPERATION_REGISTRY.get(cfg.generator)
+        registry = PluginRegistry()
+        registry.discover()
+        op_info = registry.get(cfg.generator)
+        
         if not op_info:
-            logger.error(
-                f"Sub-generator '{cfg.generator}' not found in registry.")
+            logger.error(f"Sub-generator '{cfg.generator}' not found in registry.")
             return state
 
         SubGenClass = op_info["class"]

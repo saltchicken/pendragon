@@ -9,7 +9,7 @@ from pendragon.engine import PipelineContext
 from pendragon.engine import PipelineOperation
 from pendragon.engine import PipelineState
 from pendragon.engine import register_operation
-from pendragon.engine.registry import BasePluginConfig
+from pendragon.engine.registry import BasePluginConfig, PluginRegistry
 from pendragon.utils import ImageSampler
 
 
@@ -48,12 +48,11 @@ class ImageMultiTierGen(PipelineOperation):
     to each cell based on the darkness threshold (0.0 to 1.0).
     """
 
-    def _load_generator(self, op_name: str, settings: dict):
+    def _load_generator(self, op_name: str, settings: dict, registry: PluginRegistry):
         if not op_name or op_name.lower() == "none":
             return None
         
-        # TODO: This needs to be fixed with new registry
-        op_info = OPERATION_REGISTRY.get(op_name)
+        op_info = registry.get(op_name)
         if not op_info:
             logger.warning(f"Operation '{op_name}' not found in registry.")
             return None
@@ -80,11 +79,15 @@ class ImageMultiTierGen(PipelineOperation):
         logger.info(f"Loading Multi-Tier image: {cfg.source_image}")
         sampler = ImageSampler(cfg.source_image, effective_boundary.bounds)
         
+        # Instantiate and discover plugins for this operation
+        registry = PluginRegistry()
+        registry.discover()
+        
         # Pre-instantiate the generators to avoid rebuilding them thousands of times
-        tier_1_gen = self._load_generator(cfg.tier_1_op, cfg.tier_1_settings) # 0.75 - 1.0
-        tier_2_gen = self._load_generator(cfg.tier_2_op, cfg.tier_2_settings) # 0.50 - 0.75
-        tier_3_gen = self._load_generator(cfg.tier_3_op, cfg.tier_3_settings) # 0.25 - 0.50
-        tier_4_gen = self._load_generator(cfg.tier_4_op, cfg.tier_4_settings) # 0.00 - 0.25
+        tier_1_gen = self._load_generator(cfg.tier_1_op, cfg.tier_1_settings, registry) # 0.75 - 1.0
+        tier_2_gen = self._load_generator(cfg.tier_2_op, cfg.tier_2_settings, registry) # 0.50 - 0.75
+        tier_3_gen = self._load_generator(cfg.tier_3_op, cfg.tier_3_settings, registry) # 0.25 - 0.50
+        tier_4_gen = self._load_generator(cfg.tier_4_op, cfg.tier_4_settings, registry) # 0.00 - 0.25
 
         new_lines = []
         cell_size = cfg.cell_size
@@ -159,7 +162,6 @@ class ImageMultiTierGen(PipelineOperation):
         from PyQt5.QtWidgets import QVBoxLayout
         from PyQt5.QtWidgets import QWidget
 
-        from pendragon.engine.registry import OPERATION_REGISTRY
         from pendragon.gui.widgets import WidgetFactory
 
         container = QWidget()
@@ -168,11 +170,17 @@ class ImageMultiTierGen(PipelineOperation):
 
         # --- Helper Callbacks to sync with the main window ---
         def trigger_recalc():
-            if window._pending_op_index is None:
-                window._pending_op_index = op_index
+            # 1. Invalidate the engine cache from this step onward
+            window.controller.engine.invalidate_from(op_index)
+            
+            # 2. Update the controller's pending index
+            if window.controller._pending_op_index is None:
+                window.controller._pending_op_index = op_index
             else:
-                window._pending_op_index = min(window._pending_op_index, op_index)
-            window.debounce_timer.start()
+                window.controller._pending_op_index = min(window.controller._pending_op_index, op_index)
+                
+            # 3. Trigger the controller's debounce timer
+            window.controller.debounce_timer.start()
 
         # --- 1. Source Image Selection ---
         img_layout = QHBoxLayout()
@@ -220,8 +228,9 @@ class ImageMultiTierGen(PipelineOperation):
             "Tier 4 (Lightest: 0%-25%)"
         ]
 
-        # Standardize the available operations mapping
-        available_ops = ["None"] + sorted(OPERATION_REGISTRY.keys())
+        # Grab the registry directly from the active engine
+        engine_registry = window.controller.engine.registry
+        available_ops = ["None"] + engine_registry.get_operation_names()
 
         for i in range(1, 5):
             op_attr = f"tier_{i}_op"
@@ -254,8 +263,8 @@ class ImageMultiTierGen(PipelineOperation):
             group_layout.addRow("Generator:", combo)
 
             # Delegate standard setting fields back to Pendragon's WidgetFactory
-            if current_op and current_op in OPERATION_REGISTRY:
-                ConfigClass = OPERATION_REGISTRY[current_op]["config"]
+            if current_op and current_op in engine_registry.operations:
+                ConfigClass = engine_registry.operations[current_op]["config"]
                 current_settings = getattr(self.config, settings_attr)
 
                 if ConfigClass:

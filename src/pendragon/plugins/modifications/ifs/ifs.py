@@ -140,11 +140,17 @@ class IFSMod(PipelineOperation):
 
         # --- Helper Callbacks to sync with the main window ---
         def trigger_recalc():
-            if window._pending_op_index is None:
-                window._pending_op_index = op_index
+            # 1. Invalidate the engine cache from this step onward
+            window.controller.engine.invalidate_from(op_index)
+            
+            # 2. Update the controller's pending index
+            if window.controller._pending_op_index is None:
+                window.controller._pending_op_index = op_index
             else:
-                window._pending_op_index = min(window._pending_op_index, op_index)
-            window.debounce_timer.start()
+                window.controller._pending_op_index = min(window.controller._pending_op_index, op_index)
+                
+            # 3. Trigger the controller's debounce timer
+            window.controller.debounce_timer.start()
 
         def add_transform():
             self.config.transforms.append(IFSTransform(matrix=[1.0, 0.0, 0.0, 1.0, 0.0, 0.0], variation="linear"))

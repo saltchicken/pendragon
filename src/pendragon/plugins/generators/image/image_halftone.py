@@ -9,6 +9,7 @@ from pendragon.engine import PipelineContext
 from pendragon.engine import PipelineOperation
 from pendragon.engine import PipelineState
 from pendragon.engine import register_operation
+from pendragon.engine.registry import PluginRegistry
 from pendragon.utils import ImageSampler
 
 
@@ -50,9 +51,11 @@ class ImageHalftoneGen(PipelineOperation):
                 "No source image provided. Skipping halftone generation.")
             return state
 
-        # 1. Look up the chosen sub-generator from the registry
-        # TODO: This needs to be fixed for new registry
-        op_info = OPERATION_REGISTRY.get(cfg.generator)
+        # 1. Initialize local registry and look up the chosen sub-generator
+        registry = PluginRegistry()
+        registry.discover()
+        op_info = registry.get(cfg.generator)
+        
         if not op_info:
             logger.error(f"Halftone sub-generator '{cfg.generator}' not found.")
             return state
