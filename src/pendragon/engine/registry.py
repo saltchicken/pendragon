@@ -5,6 +5,10 @@ from pydantic import BaseModel, Field
 
 from .models import PipelineContext, PipelineState
 
+from shapely.geometry import LineString
+from shapely.geometry import MultiLineString
+from shapely.geometry import Polygon
+
 
 class BasePluginConfig(BaseModel):
     """Base configuration for all pipeline operations."""
@@ -38,6 +42,23 @@ class PipelineOperation(ABC):
         if overscan != 0.0 and state.boundary:
             return state.boundary.buffer(overscan, join_style=2)
         return state.boundary
+
+    def clip_to_boundary(self, raw_lines: list[LineString], boundary: Polygon) -> list[LineString]:
+        """Uniformly clips a list of lines to a boundary and handles MultiLineString unpacking."""
+        clipped_lines = []
+        for line in raw_lines:
+            if not line.intersects(boundary):
+                continue
+                
+            clipped = line.intersection(boundary)
+            if isinstance(clipped, LineString) and not clipped.is_empty:
+                clipped_lines.append(clipped)
+            elif isinstance(clipped, MultiLineString):
+                for sub_line in clipped.geoms:
+                    if not sub_line.is_empty:
+                        clipped_lines.append(sub_line)
+                        
+        return clipped_lines
 
     @abstractmethod
     def process(self,
