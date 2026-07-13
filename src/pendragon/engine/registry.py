@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Type, Dict, Any, List
+from typing import Optional, Type, Dict, Any, List, Generic, TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -32,9 +32,12 @@ def register_operation(name: str, config_class: Optional[Type[BaseModel]] = None
     return decorator
 
 
-class PipelineOperation(ABC):
+T = TypeVar('T', bound=BaseModel)
 
-    def __init__(self, config: Optional[BaseModel] = None) -> None:
+class PipelineOperation(ABC, Generic[T]):
+    
+    # 2. Type hint config with the Generic T
+    def __init__(self, config: Optional[T] = None) -> None:
         self.config = config
 
     def resolve(self, field_name: str, context: Optional[PipelineContext] = None) -> Any:
@@ -67,19 +70,16 @@ class PipelineOperation(ABC):
         return clipped_lines
 
     def resolve_center(self, 
-                       context: PipelineContext, 
+                       context: Optional[PipelineContext], 
                        poly: Polygon) -> tuple[float, float]:
         """
-        Extracts the X/Y origin using the standard fallback hierarchy:
-        1. Context variables (e.g., from GenerateInCells)
-        2. YAML/GUI Config (if the plugin inherits CenteredPluginConfig)
-        3. The centroid of the current geometry
+        Extracts the X/Y origin using the standard fallback hierarchy.
         """
-        # 1. Check transient context
-        if context.local_center_x is not None and context.local_center_y is not None:
+        # 1. Check transient context (safeguarded against None)
+        if context and context.local_center_x is not None and context.local_center_y is not None:
             return context.local_center_x, context.local_center_y
 
-        # 2. Check static config (safely, in case this isn't a CenteredPluginConfig)
+        # 2. Check static config safely
         cfg_cx = getattr(self.config, 'center_x', None)
         cfg_cy = getattr(self.config, 'center_y', None)
         
