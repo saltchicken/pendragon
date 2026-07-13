@@ -1,4 +1,3 @@
-DARK_THEME_STYLESHEET = """
 QWidget {
     background-color: #1e1e1e;
     color: #cccccc;
@@ -68,4 +67,3 @@ QProgressBar::chunk {
     background-color: #007acc;
     width: 10px;
 }
-"""

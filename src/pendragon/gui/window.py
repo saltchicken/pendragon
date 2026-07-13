@@ -12,7 +12,6 @@ from PyQt5.QtWidgets import QVBoxLayout
 from PyQt5.QtWidgets import QWidget
 
 from pendragon.engine.registry import OPERATION_REGISTRY
-from pendragon.gui.constants import DARK_THEME_STYLESHEET
 from pendragon.gui.controller import PipelineController
 from pendragon.gui.panels import ActionPanel
 from pendragon.gui.panels import EditPanel
@@ -20,6 +19,8 @@ from pendragon.gui.panels import ProgressPanel
 from pendragon.gui.panels import StatsPanel
 from pendragon.gui.viewer import PipelineViewer
 from pendragon.gui.widgets import WidgetFactory
+
+from pendragon.gui.utils import load_stylesheet
 
 
 class LiveEditorWindow(QMainWindow):
@@ -29,7 +30,7 @@ class LiveEditorWindow(QMainWindow):
         self.setWindowTitle("Pendragon Live Editor")
         self.controller = controller
         
-        self.setStyleSheet(DARK_THEME_STYLESHEET)
+        self.setStyleSheet(load_stylesheet("style.qss"))
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
