@@ -35,7 +35,7 @@ class MergeMod(PipelineOperation):
         union_geom = unary_union(current_lines)
         merged_geom = linemerge(union_geom)
 
-        final_lines: List[LineString] = []
+        final_lines: list[LineString] = []
         if isinstance(merged_geom, LineString):
             if not merged_geom.is_empty:
                 final_lines.append(merged_geom)

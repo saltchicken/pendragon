@@ -45,7 +45,7 @@ class ImageMaskMod(PipelineOperation):
 
         logger.info(f"Applying mask from {cfg.mask_image}")
         sampler = ImageSampler(cfg.mask_image, current_boundary.bounds)
-        new_lines: List[LineString] = []
+        new_lines: list[LineString] = []
 
         for line in current_lines:
             current_segment_coords = []

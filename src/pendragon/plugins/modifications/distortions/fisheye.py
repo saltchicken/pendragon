@@ -90,7 +90,7 @@ class FisheyeMod(PipelineOperation):
             scale = r_prime / r
             return (cx + dx * scale, cy + dy * scale)
 
-        distorted_lines: List[LineString] = []
+        distorted_lines: list[LineString] = []
         for line in current_lines:
             if line.is_empty:
                 continue

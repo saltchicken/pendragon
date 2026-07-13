@@ -30,7 +30,7 @@ class ClipMod(PipelineOperation):
         logger.info(
             f"Clipping {len(current_lines)} lines strictly to the current pipeline boundary..."
         )
-        clipped_lines: List[LineString] = []
+        clipped_lines: list[LineString] = []
 
         for line in current_lines:
             if line.intersects(boundary):

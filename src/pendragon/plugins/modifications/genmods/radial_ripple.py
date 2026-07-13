@@ -40,7 +40,7 @@ class RadialRippleMod(PipelineOperation):
         logger.info(
             f"Applying radial ripples (amp={cfg.amplitude}) from ({cx}, {cy}).")
 
-        rippled_lines: List[LineString] = []
+        rippled_lines: list[LineString] = []
         for line in state.lines:
             new_coords = []
             for x, y in line.coords:

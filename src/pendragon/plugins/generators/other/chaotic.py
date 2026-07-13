@@ -130,7 +130,7 @@ class ChaoticFill(PipelineOperation):
 
         raw_fractal_line = LineString(fractal_coords)
 
-        clipped_lines: List[LineString] = []
+        clipped_lines: list[LineString] = []
         if raw_fractal_line.intersects(effective_boundary):
             clipped = raw_fractal_line.intersection(effective_boundary)
             if isinstance(clipped, LineString) and not clipped.is_empty:

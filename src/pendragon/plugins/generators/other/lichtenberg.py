@@ -54,7 +54,7 @@ class LichtenbergGen(PipelineOperation):
                     f"across {len(polygons)} boundary region(s)...")
 
         np.random.seed(cfg.seed)
-        all_fractal_lines: List[LineString] = []
+        all_fractal_lines: list[LineString] = []
 
         for poly in polygons:
             minx, miny, maxx, maxy = poly.bounds

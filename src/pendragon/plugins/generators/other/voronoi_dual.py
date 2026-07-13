@@ -62,7 +62,7 @@ class VoronoiDualGen(PipelineOperation):
 
         if len(points) < 4:
             return state
-        raw_lines: List[LineString] = []
+        raw_lines: list[LineString] = []
 
         if mode in ["voronoi", "dual"]:
             vor = Voronoi(points)
@@ -82,7 +82,7 @@ class VoronoiDualGen(PipelineOperation):
             for edge in delaunay_edges:
                 raw_lines.append(LineString([points[edge[0]], points[edge[1]]]))
 
-        clipped_lines: List[LineString] = []
+        clipped_lines: list[LineString] = []
         for line in raw_lines:
             if line.intersects(effective_boundary):
                 clipped = line.intersection(effective_boundary)

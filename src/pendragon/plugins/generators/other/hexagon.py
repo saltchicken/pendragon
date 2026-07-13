@@ -110,7 +110,7 @@ class HexagonGen(PipelineOperation):
             if len(path) > 1:
                 raw_lines.append(LineString([pts_map[node] for node in path]))
 
-        clipped_lines: List[LineString] = []
+        clipped_lines: list[LineString] = []
 
         def extract_valid_lines(geom):
             extracted = []

@@ -37,7 +37,7 @@ class InMemoryStateStore:
     """The default list-based cache, identical to the original engine behavior."""
 
     def __init__(self, initial_state: PipelineState):
-        self._history: List[PipelineState] = [initial_state]
+        self._history: list[PipelineState] = [initial_state]
 
     def get(self, index: int) -> PipelineState:
         return self._history[index]

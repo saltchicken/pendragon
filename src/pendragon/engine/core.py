@@ -25,7 +25,7 @@ class PendragonEngine:
         self.boundary = boundary or Polygon([(0, 0), (200, 0), (200, 200),
                                              (0, 200), (0, 0)])
         self.interactive = interactive
-        self.operations: List[PipelineOperation] = []
+        self.operations: list[PipelineOperation] = []
 
         # Initialize the store. The engine no longer owns the list natively.
         base_state = PipelineState(boundary=self.boundary,
@@ -110,7 +110,7 @@ class PendragonEngine:
             self.store.append(new_state)  # Save to store
             yield new_state
 
-    def run(self) -> List[LineString]:
+    def run(self) -> list[LineString]:
         for _ in self.compute_to_generator(len(self.operations)):
             pass
 

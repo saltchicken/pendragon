@@ -60,7 +60,7 @@ class TriangleGen(PipelineOperation):
                     LineString([(px - cos_a * r, py - sin_a * r),
                                 (px + cos_a * r, py + sin_a * r)]))
 
-        clipped_lines: List[LineString] = []
+        clipped_lines: list[LineString] = []
         for line in raw_lines:
             if line.intersects(effective_boundary):
                 clipped = line.intersection(effective_boundary)

@@ -129,7 +129,7 @@ class ChladniGen(PipelineOperation):
         raw_lines = [merged] if isinstance(merged, LineString) else list(
             merged.geoms) if isinstance(merged, MultiLineString) else segments
 
-        clipped_lines: List[LineString] = []
+        clipped_lines: list[LineString] = []
         for line in raw_lines:
             if line.intersects(effective_boundary):
                 clipped = line.intersection(effective_boundary)

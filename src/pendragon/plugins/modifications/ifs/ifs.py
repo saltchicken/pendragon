@@ -15,7 +15,7 @@ from pendragon.engine import register_operation
 
 class IFSTransform(BaseModel):
     """Configuration for a single branch of the fractal."""
-    matrix: List[float] = Field(
+    matrix: list[float] = Field(
         ..., 
         min_length=6, 
         max_length=6,
@@ -29,7 +29,7 @@ class IFSTransform(BaseModel):
 
 class IFSConfig(BaseModel):
     iterations: int = Field(default=3, ge=1, le=8)
-    transforms: List[IFSTransform] = Field(default_factory=list)
+    transforms: list[IFSTransform] = Field(default_factory=list)
 
 
 @register_operation("ifs", config_class=IFSConfig)
@@ -83,7 +83,7 @@ class IFSMod(PipelineOperation):
         working_lines = current_lines
         
         for i in range(iterations):
-            next_lines: List[LineString] = []
+            next_lines: list[LineString] = []
             
             for transform_cfg in cfg.transforms:
                 matrix = transform_cfg.matrix

@@ -32,7 +32,7 @@ class JitterLinesMod(PipelineOperation):
         )
         np.random.seed(cfg.seed)
 
-        jittered_lines: List[LineString] = []
+        jittered_lines: list[LineString] = []
         for line in state.lines:
             # Add random noise to each coordinate
             coords = np.array(line.coords)

@@ -43,7 +43,7 @@ class ZoomMod(PipelineOperation):
         logger.info(
             f"Zooming {len(current_lines)} lines by a factor of {factor}...")
 
-        scaled_lines: List[LineString] = []
+        scaled_lines: list[LineString] = []
         for line in current_lines:
             if line.is_empty:
                 continue
@@ -53,7 +53,7 @@ class ZoomMod(PipelineOperation):
                                 origin=origin_coords)
             scaled_lines.append(scaled_geom)
 
-        clipped_lines: List[LineString] = []
+        clipped_lines: list[LineString] = []
         if boundary and not boundary.is_empty:
             for line in scaled_lines:
                 if line.intersects(boundary):

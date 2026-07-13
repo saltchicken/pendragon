@@ -75,7 +75,7 @@ class PhotoConcentricGen(PipelineOperation):
 
         pixel_spacing = spacing / resolution
         max_dist = np.max(distance_field)
-        raw_lines: List[LineString] = []
+        raw_lines: list[LineString] = []
 
         current_dist = pixel_spacing
         while current_dist < max_dist:
@@ -94,7 +94,7 @@ class PhotoConcentricGen(PipelineOperation):
                         raw_lines.append(line)
             current_dist += pixel_spacing
 
-        clipped_lines: List[LineString] = []
+        clipped_lines: list[LineString] = []
         for line in raw_lines:
             if line.intersects(effective_boundary):
                 clipped = line.intersection(effective_boundary)

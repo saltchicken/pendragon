@@ -30,9 +30,9 @@ class AddBoundaryGen(PipelineOperation):
             return state
 
         logger.info("Extracting boundary perimeter into writable paths...")
-        new_lines: List[LineString] = []
+        new_lines: list[LineString] = []
 
-        def extract_rings(poly: Polygon) -> List[LineString]:
+        def extract_rings(poly: Polygon) -> list[LineString]:
             lines = [LineString(poly.exterior.coords)]
             for interior in poly.interiors:
                 lines.append(LineString(interior.coords))

@@ -45,7 +45,7 @@ class PenroseGen(PipelineOperation):
 
         polygons = extract_target_polygons(effective_boundary,
                                            cfg.group_boundaries)
-        clipped_lines: List[LineString] = []
+        clipped_lines: list[LineString] = []
 
         logger.info(f"Generating Penrose tiling (depth {cfg.depth}) "
                     f"across {len(polygons)} boundary region(s)...")

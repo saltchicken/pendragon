@@ -29,7 +29,7 @@ class SubdivideLinesMod(PipelineOperation):
         logger.info(
             f"Subdividing lines with max length {cfg.max_segment_length}.")
 
-        subdivided_lines: List[LineString] = []
+        subdivided_lines: list[LineString] = []
         for line in state.lines:
             # We use Shapely's segmentize, which handles the math of
             # inserting points efficiently along a LineString

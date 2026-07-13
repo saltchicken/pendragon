@@ -76,7 +76,7 @@ class PenTool:
             self.current_z = target_z
 
     def draw_path(self,
-                  points: List[Tuple[float, float]],
+                  points: list[Tuple[float, float]],
                   clearance: bool = False) -> None:
         if not points:
             return

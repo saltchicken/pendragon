@@ -42,7 +42,7 @@ class SimplifyMod(PipelineOperation):
             f"Simplifying {len(current_lines)} lines with tolerance {tolerance}..."
         )
 
-        simplified_lines: List[LineString] = []
+        simplified_lines: list[LineString] = []
         for line in current_lines:
             if line.is_empty:
                 continue

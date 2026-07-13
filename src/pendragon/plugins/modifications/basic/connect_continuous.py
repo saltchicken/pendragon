@@ -33,7 +33,7 @@ class ConnectContinuousMod(PipelineOperation):
         ctx = context or PipelineContext()
         snap_distance = ctx.variables.get("snap_distance", cfg.snap_distance)
 
-        connected_lines: List[LineString] = []
+        connected_lines: list[LineString] = []
         current_poly = list(current_lines[0].coords)
 
         for next_line in current_lines[1:]:

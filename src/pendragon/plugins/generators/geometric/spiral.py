@@ -40,7 +40,7 @@ class SpiralGen(PipelineOperation):
         boundary = self.get_effective_boundary(state)
 
         polygons = extract_target_polygons(boundary, cfg.group_boundaries)
-        clipped_lines: List[LineString] = []
+        clipped_lines: list[LineString] = []
 
         revolutions = ctx.variables.get("revolutions", cfg.revolutions)
 

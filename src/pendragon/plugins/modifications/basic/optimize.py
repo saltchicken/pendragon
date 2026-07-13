@@ -21,9 +21,9 @@ class OptimizeConfig(BaseModel):
 
 
 def optimize_paths_nearest_neighbor(
-    paths: List[List[Tuple[float, float]]],
+    paths: list[List[Tuple[float, float]]],
     start_pt: Tuple[float, float] = (0.0, 0.0)
-) -> List[List[Tuple[float, float]]]:
+) -> list[List[Tuple[float, float]]]:
     if not paths:
         return []
     valid_paths = [p for p in paths if p]
@@ -37,7 +37,7 @@ def optimize_paths_nearest_neighbor(
 
     tree = cKDTree(endpoints)
     visited = np.zeros(n_paths, dtype=bool)
-    optimized: List[List[Tuple[float, float]]] = []
+    optimized: list[List[Tuple[float, float]]] = []
     current_pt = np.array(start_pt)
 
     for _ in range(n_paths):

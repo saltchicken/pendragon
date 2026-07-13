@@ -49,7 +49,7 @@ class PhotoStippleGen(PipelineOperation):
         sampler = ImageSampler(cfg.image_path, effective_boundary.bounds)
         np.random.seed(cfg.seed)
 
-        new_dots: List[LineString] = []
+        new_dots: list[LineString] = []
         batch_size, max_batches, batches = dots * 2, 100, 0
 
         while len(new_dots) < dots and batches < max_batches:

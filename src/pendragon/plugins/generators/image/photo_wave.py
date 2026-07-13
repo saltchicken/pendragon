@@ -51,7 +51,7 @@ class PhotoWaveGen(PipelineOperation):
         row_spacing = height / lines_count
 
         sampler = ImageSampler(cfg.image_path, effective_boundary.bounds)
-        raw_lines: List[LineString] = []
+        raw_lines: list[LineString] = []
 
         for r in range(lines_count):
             y_base = miny + (r * row_spacing)
@@ -71,7 +71,7 @@ class PhotoWaveGen(PipelineOperation):
             if len(coords) >= 2:
                 raw_lines.append(LineString(coords))
 
-        clipped_lines: List[LineString] = []
+        clipped_lines: list[LineString] = []
         for line in raw_lines:
             if line.intersects(effective_boundary):
                 clipped = line.intersection(effective_boundary)

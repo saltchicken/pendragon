@@ -96,7 +96,7 @@ class FlowFieldGen(PipelineOperation):
             if len(path) > 1:
                 raw_lines.append(LineString(path))
 
-        clipped_lines: List[LineString] = []
+        clipped_lines: list[LineString] = []
         for line in raw_lines:
             if line.intersects(effective_boundary):
                 clipped = line.intersection(effective_boundary)

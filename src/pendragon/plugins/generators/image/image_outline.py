@@ -70,7 +70,7 @@ class ImageOutlineGen(PipelineOperation):
                 grid[i, j] = sampler.get_darkness(px, py)
 
         edges = feature.canny(grid, sigma=sigma)
-        out_lines: List[LineString] = []
+        out_lines: list[LineString] = []
         contours = measure.find_contours(edges, 0.5)
 
         for contour in contours:

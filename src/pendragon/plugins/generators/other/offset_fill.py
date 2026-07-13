@@ -38,7 +38,7 @@ class OffsetFillGen(PipelineOperation):
         logger.info(
             f"Generating concentric offset fill with spacing {spacing}...")
 
-        new_lines: List[LineString] = []
+        new_lines: list[LineString] = []
         current_geom = effective_boundary.buffer(-spacing).simplify(
             cfg.ring_simplify, preserve_topology=False)
 

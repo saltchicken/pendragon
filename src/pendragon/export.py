@@ -7,7 +7,7 @@ from pendragon.pen import PenConfig
 from pendragon.pen import PenTool
 
 
-def export_gcode(lines: List[LineString], output_filename: str = "output.nc"):
+def export_gcode(lines: list[LineString], output_filename: str = "output.nc"):
     """Handles the writing of G-code paths to a file."""
     if not lines:
         logger.warning("No lines to export!")

@@ -39,7 +39,7 @@ class GridLinesGen(PipelineOperation):
         eff_minx, eff_miny, eff_maxx, eff_maxy = effective_boundary.bounds
 
         logger.info(f"Generating {orientation} lines with spacing {spacing}")
-        generated_lines: List[LineString] = []
+        generated_lines: list[LineString] = []
 
         def make_horizontal():
             lines = []
@@ -76,7 +76,7 @@ class GridLinesGen(PipelineOperation):
         if orientation in ("vertical", "crosshatch"):
             generated_lines.extend(make_vertical())
 
-        clipped_lines: List[LineString] = []
+        clipped_lines: list[LineString] = []
         for line in generated_lines:
             if line.intersects(effective_boundary):
                 clipped = line.intersection(effective_boundary)

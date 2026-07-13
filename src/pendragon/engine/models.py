@@ -19,5 +19,5 @@ class PipelineContext:
 class PipelineState:
     """An immutable snapshot of the geometry at one stage of the pipeline."""
     boundary: Polygon
-    lines: List[LineString] = field(default_factory=list)
+    lines: list[LineString] = field(default_factory=list)
     operation_name: str = "initialization"

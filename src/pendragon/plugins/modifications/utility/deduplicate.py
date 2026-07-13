@@ -35,7 +35,7 @@ class DeduplicateMod(PipelineOperation):
 
         tree = STRtree(current_lines)
         duplicates_to_skip = set()
-        unique_lines: List[LineString] = []
+        unique_lines: list[LineString] = []
 
         for i, line in enumerate(current_lines):
             if i in duplicates_to_skip:

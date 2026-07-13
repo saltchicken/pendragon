@@ -57,7 +57,7 @@ class HilbertGen(PipelineOperation):
                             -yj / 2, -xi / 2, -xj / 2, n - 1))
 
         pts = hilbert(minx, miny, size, 0.0, 0.0, size, order)
-        clipped_lines: List[LineString] = []
+        clipped_lines: list[LineString] = []
 
         if len(pts) >= 2:
             raw_hilbert_line = LineString(pts)

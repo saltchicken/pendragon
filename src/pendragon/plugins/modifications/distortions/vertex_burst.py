@@ -45,7 +45,7 @@ class ScaleMod(PipelineOperation):
         logger.info(
             f"Scaling {len(current_lines)} lines by a factor of {factor}...")
 
-        scaled_lines: List[LineString] = []
+        scaled_lines: list[LineString] = []
         for line in current_lines:
             if line.is_empty:
                 continue

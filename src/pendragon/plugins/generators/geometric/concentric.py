@@ -46,7 +46,7 @@ class ConcentricGen(PipelineOperation):
         boundary = self.get_effective_boundary(state)
 
         polygons = extract_target_polygons(boundary, cfg.group_boundaries)
-        clipped_lines: List[LineString] = []
+        clipped_lines: list[LineString] = []
 
         logger.info(f"Generating concentric shapes with {cfg.sides} sides "
                     f"across {len(polygons)} boundary region(s).")

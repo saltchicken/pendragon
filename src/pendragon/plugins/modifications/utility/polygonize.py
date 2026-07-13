@@ -37,7 +37,7 @@ class PolygonizeMod(PipelineOperation):
                 "Could not form any closed polygons from the current lines!")
             return state
 
-        new_boundary_lines: List[LineString] = []
+        new_boundary_lines: list[LineString] = []
         for poly in polygons:
             new_boundary_lines.append(LineString(poly.exterior.coords))
             for interior in poly.interiors:

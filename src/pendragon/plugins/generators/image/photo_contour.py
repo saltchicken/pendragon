@@ -66,7 +66,7 @@ class PhotoContourGen(PipelineOperation):
                 px = minx + (j / (res_x - 1)) * width
                 grid[i, j] = sampler.get_darkness(px, py)
 
-        out_lines: List[LineString] = []
+        out_lines: list[LineString] = []
         thresholds = np.linspace(0.05, 0.95, levels)
 
         for level in thresholds:

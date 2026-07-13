@@ -75,7 +75,7 @@ class PeanoGen(PipelineOperation):
             return state
 
         raw_line = LineString(pts)
-        clipped_lines: List[LineString] = []
+        clipped_lines: list[LineString] = []
         if raw_line.intersects(effective_boundary):
             clipped = raw_line.intersection(effective_boundary)
             if isinstance(clipped, LineString) and not clipped.is_empty:

@@ -146,7 +146,7 @@ class VenationGen(PipelineOperation):
         )
 
         # 4. Clip final merged paths to boundary
-        clipped_lines: List[LineString] = []
+        clipped_lines: list[LineString] = []
         for line in merged_lines:
             if line.intersects(boundary):
                 clipped = line.intersection(boundary)

@@ -43,7 +43,7 @@ def generate_recipe_schema(output_path: str = "recipe-schema.json"):
         )
         return
 
-    RecipeType = List[Union[tuple(step_models)]]
+    RecipeType = list[Union[tuple(step_models)]]
     RecipeRoot = RootModel[RecipeType]
     schema_dict = RecipeRoot.model_json_schema()
 
