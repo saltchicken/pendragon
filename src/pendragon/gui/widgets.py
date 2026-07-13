@@ -1,11 +1,17 @@
 from typing import get_args, get_origin, Literal
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (
-    QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog,
-    QHBoxLayout, QLabel, QLineEdit, QPushButton,
-    QSlider, QSpinBox, QWidget
-)
+from PyQt5.QtWidgets import QCheckBox
+from PyQt5.QtWidgets import QComboBox
+from PyQt5.QtWidgets import QDoubleSpinBox
+from PyQt5.QtWidgets import QFileDialog
+from PyQt5.QtWidgets import QHBoxLayout
+from PyQt5.QtWidgets import QLabel
+from PyQt5.QtWidgets import QLineEdit
+from PyQt5.QtWidgets import QPushButton
+from PyQt5.QtWidgets import QSlider
+from PyQt5.QtWidgets import QSpinBox
+from PyQt5.QtWidgets import QWidget
 
 from pendragon.engine.registry import OPERATION_REGISTRY
 

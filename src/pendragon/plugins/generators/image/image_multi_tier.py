@@ -5,8 +5,12 @@ from loguru import logger
 from pydantic import Field
 from shapely.geometry import Polygon
 
-from pendragon.engine import PipelineContext, PipelineOperation, PipelineState, register_operation
-from pendragon.engine.registry import OPERATION_REGISTRY, BasePluginConfig
+from pendragon.engine import PipelineContext
+from pendragon.engine import PipelineOperation
+from pendragon.engine import PipelineState
+from pendragon.engine import register_operation
+from pendragon.engine.registry import BasePluginConfig
+from pendragon.engine.registry import OPERATION_REGISTRY
 from pendragon.utils import ImageSampler
 
 
@@ -143,10 +147,18 @@ class ImageMultiTierGen(PipelineOperation):
         Builds a custom GUI for the Image Multi-Tier plugin. 
         PyQt5 is imported locally to ensure headless CLI compatibility.
         """
-        from PyQt5.QtWidgets import (
-            QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, 
-            QDoubleSpinBox, QComboBox, QLineEdit, QFileDialog, QGroupBox, QFormLayout
-        )
+        from PyQt5.QtWidgets import QComboBox
+        from PyQt5.QtWidgets import QDoubleSpinBox
+        from PyQt5.QtWidgets import QFileDialog
+        from PyQt5.QtWidgets import QFormLayout
+        from PyQt5.QtWidgets import QGroupBox
+        from PyQt5.QtWidgets import QHBoxLayout
+        from PyQt5.QtWidgets import QLabel
+        from PyQt5.QtWidgets import QLineEdit
+        from PyQt5.QtWidgets import QPushButton
+        from PyQt5.QtWidgets import QVBoxLayout
+        from PyQt5.QtWidgets import QWidget
+
         from pendragon.engine.registry import OPERATION_REGISTRY
         from pendragon.gui.widgets import WidgetFactory
 

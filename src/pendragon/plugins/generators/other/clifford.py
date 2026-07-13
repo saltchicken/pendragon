@@ -5,7 +5,10 @@ from loguru import logger
 from pydantic import Field
 from shapely.geometry import LineString
 
-from pendragon.engine import PipelineContext, PipelineOperation, PipelineState, register_operation
+from pendragon.engine import PipelineContext
+from pendragon.engine import PipelineOperation
+from pendragon.engine import PipelineState
+from pendragon.engine import register_operation
 from pendragon.engine.mixins import CenteredPluginConfig
 
 

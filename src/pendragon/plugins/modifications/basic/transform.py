@@ -1,9 +1,13 @@
 from typing import List, Optional
 
 from loguru import logger
-from pydantic import BaseModel, Field
-from shapely.affinity import rotate, scale, translate
-from shapely.geometry import LineString, MultiLineString
+from pydantic import BaseModel
+from pydantic import Field
+from shapely.affinity import rotate
+from shapely.affinity import scale
+from shapely.affinity import translate
+from shapely.geometry import LineString
+from shapely.geometry import MultiLineString
 
 from pendragon.engine import PipelineContext
 from pendragon.engine import PipelineOperation

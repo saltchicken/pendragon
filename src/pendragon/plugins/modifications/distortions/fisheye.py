@@ -2,7 +2,8 @@ import math
 from typing import List, Optional, Tuple
 
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+from pydantic import Field
 from shapely.geometry import LineString
 
 from pendragon.engine import PipelineContext

@@ -1,28 +1,41 @@
-from abc import ABC, abstractmethod
+from abc import ABC
+from abc import abstractmethod
 from typing import Optional, Type
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+from pydantic import Field
 
-from .models import PipelineContext, PipelineState
+from .models import PipelineContext
+from .models import PipelineState
 
 OPERATION_REGISTRY = {}
+
 
 class BasePluginConfig(BaseModel):
     """Base configuration for all pipeline operations."""
     overscan: float = Field(
         default=0.0,
-        description="Distance to expand (positive) or shrink (negative) the operation's clipping boundary."
+        description=
+        "Distance to expand (positive) or shrink (negative) the operation's clipping boundary."
     )
 
-def register_operation(name: str, config_class: Optional[Type[BaseModel]] = None):
+
+def register_operation(name: str,
+                       config_class: Optional[Type[BaseModel]] = None):
+
     def decorator(cls: Type['PipelineOperation']):
         if not issubclass(cls, PipelineOperation):
-            raise TypeError(f"Plugin '{name}' ({cls.__name__}) must inherit from PipelineOperation.")
+            raise TypeError(
+                f"Plugin '{name}' ({cls.__name__}) must inherit from PipelineOperation."
+            )
         OPERATION_REGISTRY[name] = {"class": cls, "config": config_class}
         return cls
+
     return decorator
 
+
 class PipelineOperation(ABC):
+
     def __init__(self, config: Optional[BaseModel] = None) -> None:
         """
         Base initialization for all pipeline operations.
@@ -41,6 +54,8 @@ class PipelineOperation(ABC):
         return state.boundary
 
     @abstractmethod
-    def process(self, state: PipelineState, context: Optional[PipelineContext] = None) -> PipelineState:
+    def process(self,
+                state: PipelineState,
+                context: Optional[PipelineContext] = None) -> PipelineState:
         """Takes the current state and context, and returns a NEW PipelineState snapshot."""
         pass

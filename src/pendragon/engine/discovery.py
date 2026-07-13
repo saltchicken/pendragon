@@ -1,6 +1,8 @@
 import importlib
 from pathlib import Path
+
 from loguru import logger
+
 
 def load_plugins():
     """Dynamically loads all modules in the plugins directory and subdirectories."""
@@ -19,7 +21,7 @@ def load_plugins():
         relative_path = file_path.relative_to(plugins_dir)
         module_parts = list(relative_path.parts[:-1]) + [relative_path.stem]
         module_path = ".".join(module_parts)
-        
+
         module_name = f"pendragon.plugins.{module_path}"
 
         try:

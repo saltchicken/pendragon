@@ -41,10 +41,12 @@ class PipelineViewer(scene.SceneCanvas):
         self.freeze()
         self.update_view()
 
-        history = self.engine.history
-        if history and history[0].boundary:
-            minx, miny, maxx, maxy = history[0].boundary.bounds
-            self.view.camera.set_range(x=(minx, maxx), y=(miny, maxy))
+        # Update: Use the store's length and .get() method
+        if len(self.engine.store) > 0:
+            first_state = self.engine.store.get(0)
+            if first_state.boundary:
+                minx, miny, maxx, maxy = first_state.boundary.bounds
+                self.view.camera.set_range(x=(minx, maxx), y=(miny, maxy))
         else:
             try:
                 self.view.camera.set_range()
@@ -131,12 +133,11 @@ class PipelineViewer(scene.SceneCanvas):
         self.set_live_vectors(stacked_pos, final_connect)
 
     def update_view(self):
-        target_step = len(self.engine.operations
-                         ) if self.show_final_view else self.current_step
+        target_step = len(self.engine.operations) if self.show_final_view else self.current_step
 
-        # Safely cap the display step to whatever history currently exists
-        display_step = min(target_step, len(self.engine.history) - 1)
-        state = self.engine.history[display_step]
+        # Update: Safely cap the display step and use .get()
+        display_step = min(target_step, len(self.engine.store) - 1)
+        state = self.engine.store.get(display_step)
 
         total_vertices = sum(len(line.coords) for line in state.lines)
         total_ops = len(self.engine.operations)
@@ -187,4 +188,3 @@ class PipelineViewer(scene.SceneCanvas):
             self.boundary_visual.visible = False
 
         self.set_live_lines(state.lines)
-

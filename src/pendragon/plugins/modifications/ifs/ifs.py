@@ -2,11 +2,15 @@ import math
 from typing import List, Literal, Optional, Tuple
 
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+from pydantic import Field
 from shapely.affinity import affine_transform
 from shapely.geometry import LineString
 
-from pendragon.engine import PipelineContext, PipelineOperation, PipelineState, register_operation
+from pendragon.engine import PipelineContext
+from pendragon.engine import PipelineOperation
+from pendragon.engine import PipelineState
+from pendragon.engine import register_operation
 
 
 class IFSTransform(BaseModel):
@@ -117,11 +121,18 @@ class IFSMod(PipelineOperation):
         Builds a custom GUI for the IFS plugin. 
         PyQt5 is imported locally to ensure headless CLI compatibility.
         """
-        from PyQt5.QtWidgets import (
-            QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, 
-            QDoubleSpinBox, QComboBox, QSpinBox, QFrame, QGridLayout, QGroupBox
-        )
         from PyQt5.QtCore import Qt
+        from PyQt5.QtWidgets import QComboBox
+        from PyQt5.QtWidgets import QDoubleSpinBox
+        from PyQt5.QtWidgets import QFrame
+        from PyQt5.QtWidgets import QGridLayout
+        from PyQt5.QtWidgets import QGroupBox
+        from PyQt5.QtWidgets import QHBoxLayout
+        from PyQt5.QtWidgets import QLabel
+        from PyQt5.QtWidgets import QPushButton
+        from PyQt5.QtWidgets import QSpinBox
+        from PyQt5.QtWidgets import QVBoxLayout
+        from PyQt5.QtWidgets import QWidget
 
         container = QWidget()
         layout = QVBoxLayout(container)

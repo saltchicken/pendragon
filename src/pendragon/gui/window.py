@@ -1,220 +1,218 @@
-from typing import get_origin
-
 from loguru import logger
-import yaml
-from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtWidgets import (
-    QApplication, QCheckBox, QComboBox, QFileDialog, 
-    QFormLayout, QGroupBox, QHBoxLayout, QLabel, QMainWindow, 
-    QProgressBar, QPushButton, QVBoxLayout, QWidget
-)
+from PyQt5.QtCore import Qt
+from PyQt5.QtCore import QTimer
+from PyQt5.QtWidgets import QApplication
+from PyQt5.QtWidgets import QCheckBox
+from PyQt5.QtWidgets import QFileDialog
+from PyQt5.QtWidgets import QFormLayout
+from PyQt5.QtWidgets import QHBoxLayout
+from PyQt5.QtWidgets import QLabel
+from PyQt5.QtWidgets import QMainWindow
+from PyQt5.QtWidgets import QPushButton
+from PyQt5.QtWidgets import QVBoxLayout
+from PyQt5.QtWidgets import QWidget
 
 from pendragon.engine.registry import OPERATION_REGISTRY
-from pendragon.engine import PendragonEngine
-
 from pendragon.gui.constants import DARK_THEME_STYLESHEET
+from pendragon.gui.controller import PipelineController
+from pendragon.gui.panels import ActionPanel
+from pendragon.gui.panels import EditPanel
+from pendragon.gui.panels import ProgressPanel
+from pendragon.gui.panels import StatsPanel
 from pendragon.gui.viewer import PipelineViewer
-from pendragon.gui.worker import PipelineStreamingThread
 from pendragon.gui.widgets import WidgetFactory
 
 
 class LiveEditorWindow(QMainWindow):
 
-    def __init__(self, engine):
+    def __init__(self, controller: PipelineController):
         super().__init__()
-        self.setWindowTitle("Pendragon")
-        self.engine = engine
-
+        self.setWindowTitle("Pendragon Live Editor")
+        self.controller = controller
+        
         self.setStyleSheet(DARK_THEME_STYLESHEET)
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QHBoxLayout(central_widget)
 
-        self.viewer = PipelineViewer(self.engine)
+        # Viewer setup
+        self.viewer = PipelineViewer(self.controller.engine)
         main_layout.addWidget(self.viewer.native, stretch=3)
 
+        # Control Panel setup
         self.control_panel = QWidget()
         self.control_layout = QVBoxLayout(self.control_panel)
         self.control_layout.setAlignment(Qt.AlignTop)
         main_layout.addWidget(self.control_panel, stretch=1)
 
-        self.stats_group = QGroupBox("Pipeline Statistics")
-        self.stats_layout = QFormLayout(self.stats_group)
+        # 1. Stats Panel
+        self.stats_panel = StatsPanel()
+        self.control_layout.addWidget(self.stats_panel)
 
-        self.step_label = QLabel("-")
-        self.op_label = QLabel("-")
-        self.lines_label = QLabel("-")
-        self.vertices_label = QLabel("-")
+        # 2. Progress Panel
+        self.progress_panel = ProgressPanel()
+        self.progress_panel.btn_cancel.clicked.connect(self.controller.cancel_computation)
+        self.control_layout.addWidget(self.progress_panel)
 
-        self.stats_layout.addRow("Step:", self.step_label)
-        self.stats_layout.addRow("Operation:", self.op_label)
-        self.stats_layout.addRow("Lines:", self.lines_label)
-        self.stats_layout.addRow("Vertices:", self.vertices_label)
-
-        self.control_layout.addWidget(self.stats_group)
-
-        # --- PROGRESS & CANCEL UI ---
-        self.progress_layout = QHBoxLayout()
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setValue(0)
-        self.progress_bar.setTextVisible(True)
-
-        self.btn_cancel = QPushButton("Cancel")
-        self.btn_cancel.setStyleSheet(
-            "background-color: #8b0000; font-weight: bold;")
-        self.btn_cancel.setEnabled(False)
-        self.btn_cancel.clicked.connect(self._cancel_computation)
-
-        self.progress_layout.addWidget(self.progress_bar)
-        self.progress_layout.addWidget(self.btn_cancel)
-        self.control_layout.addLayout(self.progress_layout)
-        # --------------------------------
-
+        # 3. Viewer Toggles
         self.show_vertices_checkbox = QCheckBox("Show Vertices")
-        self.show_vertices_checkbox.setChecked(False)
         self.show_vertices_checkbox.toggled.connect(self._on_vertices_toggled)
         self.control_layout.addWidget(self.show_vertices_checkbox)
 
         self.final_view_checkbox = QCheckBox("Show Final View")
-        self.final_view_checkbox.setChecked(False)
         self.final_view_checkbox.toggled.connect(self._on_view_mode_toggled)
         self.control_layout.addWidget(self.final_view_checkbox)
 
+        # 4. Navigation Buttons
         self.nav_layout = QHBoxLayout()
         self.btn_prev = QPushButton("Previous Step")
         self.btn_next = QPushButton("Next Step")
-
         self.btn_prev.clicked.connect(self.viewer.step_backward)
         self.btn_next.clicked.connect(self.viewer.step_forward)
-
         self.nav_layout.addWidget(self.btn_prev)
         self.nav_layout.addWidget(self.btn_next)
         self.control_layout.addLayout(self.nav_layout)
 
-        self.action_layout = QHBoxLayout()
-        self.btn_load_recipe = QPushButton("Load Recipe")
-        self.btn_export_gcode = QPushButton("Export G-Code")
-        self.btn_save_recipe = QPushButton("Save Recipe")
+        # 5. File Actions Panel
+        self.action_panel = ActionPanel()
+        self.action_panel.btn_load.clicked.connect(self._gui_load_recipe)
+        self.action_panel.btn_save.clicked.connect(self._gui_save_recipe)
+        self.action_panel.btn_export.clicked.connect(self._gui_export_gcode)
+        self.control_layout.addWidget(self.action_panel)
 
-        self.btn_load_recipe.clicked.connect(self._load_live_recipe)
-        self.btn_export_gcode.clicked.connect(self._export_live_gcode)
-        self.btn_save_recipe.clicked.connect(self._save_live_recipe)
+        # 6. Editing Panel
+        self.edit_panel = EditPanel()
+        self.edit_panel.btn_add.clicked.connect(self._gui_add_operation)
+        self.edit_panel.btn_remove.clicked.connect(self._gui_remove_operation)
+        self.control_layout.addWidget(self.edit_panel)
 
-        self.action_layout.addWidget(self.btn_load_recipe)
-        self.action_layout.addWidget(self.btn_save_recipe)
-        self.action_layout.addWidget(self.btn_export_gcode)
-        self.control_layout.addLayout(self.action_layout)
-
-        self.edit_layout = QHBoxLayout()
-
-        self.op_selector = QComboBox()
-        self.op_selector.addItems(sorted(OPERATION_REGISTRY.keys()))
-
-        self.btn_add_op = QPushButton("Add Step")
-        self.btn_remove_op = QPushButton("Remove Step")
-
-        self.btn_add_op.clicked.connect(self._add_operation)
-        self.btn_remove_op.clicked.connect(self._remove_operation)
-
-        self.edit_layout.addWidget(self.op_selector, stretch=2)
-        self.edit_layout.addWidget(self.btn_add_op, stretch=1)
-        self.edit_layout.addWidget(self.btn_remove_op, stretch=1)
-
-        self.control_layout.addLayout(self.edit_layout)
-
+        # 7. Dynamic Form Area
         self.dynamic_form_widget = QWidget()
         self.form_layout = QFormLayout(self.dynamic_form_widget)
         self.control_layout.addWidget(self.dynamic_form_widget)
 
+        # --- Bind Viewer Callbacks ---
         self.viewer.on_step_changed = self.build_ui_for_current_step
         self.viewer.on_close_requested = self.close
-        self.viewer.on_stats_updated = self.update_stats_ui
+        self.viewer.on_stats_updated = self.stats_panel.update_stats
 
-        self.debounce_timer = QTimer()
-        self.debounce_timer.setSingleShot(True)
-        self.debounce_timer.setInterval(300)
-        self.debounce_timer.timeout.connect(self._execute_recalculation)
-        self._pending_op_index = None
+        # --- Bind Controller Signals ---
+        self.controller.computation_started.connect(self._on_compute_start)
+        self.controller.step_streamed.connect(self._on_step_streamed)
+        self.controller.computation_finished.connect(self._on_compute_finish)
+        self.controller.computation_error.connect(self._on_compute_error)
+        self.controller.computation_cancelled.connect(self._on_compute_cancel)
+        self.controller.ui_rebuild_requested.connect(self._on_ui_rebuild)
 
-        # Thread and Queuing State
-        self.worker_thread = None
-        self._is_computing = False
-        self._computation_queued = False
-
+        # Initial Boot
         self.build_ui_for_current_step()
-        self._trigger_computation()
+        self.controller.trigger_computation()
 
-    def _trigger_computation(self):
-        """Centralized queue manager. Prevents overlapping threads and freezes."""
-        if self._is_computing:
-            self._computation_queued = True
-            return
+    # --- GUI -> Controller Interactions ---
+    
+    def _gui_add_operation(self):
+        op_name = self.edit_panel.op_selector.currentText()
+        insert_idx = self.viewer.current_step
+        self.controller.add_operation(insert_idx, op_name)
 
-        self._is_computing = True
+    def _gui_remove_operation(self):
+        remove_idx = self.viewer.current_step - 1
+        self.controller.remove_operation(remove_idx)
 
-        start_index = self._pending_op_index if self._pending_op_index is not None else 0
-        self._pending_op_index = None
+    def _gui_load_recipe(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Load Recipe", "", "YAML Files (*.yaml *.yml);;All Files (*)")
+        if file_path:
+            if self.controller.load_recipe_from_file(file_path):
+                self.viewer.current_step = len(self.controller.engine.operations)
 
-        prior_history = list(self.engine.history)
+    def _gui_save_recipe(self):
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Save Recipe", "preset.yaml", "YAML Files (*.yaml *.yml);;All Files (*)")
+        if file_path:
+            self.controller.save_recipe_to_file(file_path)
 
-        self.btn_cancel.setEnabled(True)
-        self.btn_cancel.setStyleSheet(
-            "background-color: #ff4444; color: white; font-weight: bold;")
-
-        self.progress_bar.setValue(start_index)
-        self.progress_bar.setFormat("Initializing...")
-
-        current_recipe = self._get_current_recipe()
-
-        self.worker_thread = PipelineStreamingThread(
-            current_recipe,
-            self.engine.boundary,
-            prior_history=prior_history,
-            start_index=start_index)
-        self.worker_thread.step_completed.connect(self._on_step_streamed)
-        self.worker_thread.finished.connect(self._on_calculation_finished)
-        self.worker_thread.error.connect(self._on_calculation_error)
-        self.worker_thread.cancelled.connect(self._on_calculation_cancelled)
-
-        self.worker_thread.start()
-
-    def _cancel_computation(self):
-        """Triggered by the user clicking the red Cancel button."""
-        if self.worker_thread and self.worker_thread.isRunning():
-            self.progress_bar.setFormat("Cancelling...")
-            self.btn_cancel.setEnabled(False)
-            self.worker_thread.cancel()
-
-    def _on_calculation_cancelled(self):
-        self._is_computing = False
-        self._computation_queued = False
-        self.btn_cancel.setEnabled(False)
-        self.btn_cancel.setStyleSheet(
-            "background-color: #8b0000; color: #aaaaaa; font-weight: bold;")
-        self.progress_bar.setFormat("Computation Aborted")
-        logger.warning("Pipeline calculation cancelled by user.")
-
-    def _on_view_mode_toggled(self, checked):
-        self.viewer.show_final_view = checked
-        self.viewer.update_view()
+    def _gui_export_gcode(self):
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Export G-Code", "output.nc", "G-Code Files (*.nc *.gcode);;All Files (*)")
+        if file_path:
+            self.controller.export_gcode_to_file(file_path)
 
     def _on_vertices_toggled(self, checked):
         self.viewer.show_vertices = checked
         self.viewer.update_view()
 
-    def update_stats_ui(self, step, total_ops, op_name, lines, vertices,
-                        final_view):
-        step_text = f"{step} / {total_ops}"
-        if final_view:
-            step_text += " (FINAL VIEW)"
+    def _on_view_mode_toggled(self, checked):
+        self.viewer.show_final_view = checked
+        self.viewer.update_view()
 
-        self.step_label.setText(step_text)
-        self.op_label.setText(str(op_name))
-        self.lines_label.setText(str(lines))
-        self.vertices_label.setText(str(vertices))
+    # --- Controller -> GUI Updates ---
+
+    def _on_ui_rebuild(self):
+        """Called when operations are added/removed to fix viewer indexing."""
+        max_step = len(self.controller.engine.operations)
+        if self.viewer.current_step > max_step:
+            self.viewer.current_step = max_step
+        self.build_ui_for_current_step()
+
+    def _on_compute_start(self, start_index: int):
+        self.progress_panel.btn_cancel.setEnabled(True)
+        self.progress_panel.btn_cancel.setStyleSheet("background-color: #ff4444; color: white; font-weight: bold;")
+        self.progress_panel.bar.setValue(start_index)
+        self.progress_panel.bar.setFormat("Initializing...")
+
+    def _on_step_streamed(self, state_data):
+        step, total, op_name = state_data["step"], state_data["total"], state_data["op_name"]
+        
+        safe_total = max(1, total)
+        self.progress_panel.bar.setMaximum(safe_total)
+        self.progress_panel.bar.setValue(step)
+        self.progress_panel.bar.setFormat(f"{step} / {total} ({op_name}) - Rendering...")
+        
+        QApplication.processEvents()
+
+        if self.viewer.show_final_view or step == self.viewer.current_step:
+            self.stats_panel.update_stats(
+                step, total, op_name, state_data["line_count"], len(state_data["pos"]), False
+            )
+            self.viewer.set_live_vectors(state_data["pos"], state_data["connect"])
+
+        self.progress_panel.bar.setFormat(f"{step} / {total} ({op_name})")
+
+    def _on_compute_finish(self, final_store):
+        self.progress_panel.btn_cancel.setEnabled(False)
+        self.progress_panel.btn_cancel.setStyleSheet("background-color: #8b0000; color: #aaaaaa; font-weight: bold;")
+        self.progress_panel.bar.setValue(self.progress_panel.bar.maximum())
+        self.progress_panel.bar.setFormat("Finalizing Display...")
+        QApplication.processEvents()
+
+        target = len(self.controller.engine.operations) if self.viewer.show_final_view else self.viewer.current_step
+        self.viewer.current_step = min(target, len(final_store) - 1)
+        self.viewer.update_view()
+
+        QTimer.singleShot(150, self._set_ready_state)
+
+    def _set_ready_state(self):
+        self.progress_panel.bar.setFormat("Ready")
+        self.controller.finalize_state()
+
+    def _on_compute_error(self, error_msg):
+        self.progress_panel.bar.setFormat("Error")
+        self._disable_cancel()
+
+    def _on_compute_cancel(self):
+        self.progress_panel.bar.setFormat("Computation Aborted")
+        self._disable_cancel()
+
+    def _disable_cancel(self):
+        self.progress_panel.btn_cancel.setEnabled(False)
+        self.progress_panel.btn_cancel.setStyleSheet("background-color: #8b0000; color: #aaaaaa; font-weight: bold;")
+
+    # --- Dynamic Form Builder ---
 
     def build_ui_for_current_step(self):
+        """Constructs the property editor based on the engine's current operation config."""
         self.control_layout.removeWidget(self.dynamic_form_widget)
         self.dynamic_form_widget.deleteLater()
 
@@ -223,19 +221,16 @@ class LiveEditorWindow(QMainWindow):
         self.control_layout.addWidget(self.dynamic_form_widget)
 
         op_index = self.viewer.current_step - 1
-        if op_index < 0 or op_index >= len(self.engine.operations):
-            self.form_layout.addRow(
-                QLabel("No configurable parameters for this state."))
+        if op_index < 0 or op_index >= len(self.controller.engine.operations):
+            self.form_layout.addRow(QLabel("No configurable parameters for this state."))
             return
 
-        operation = self.engine.operations[op_index]
+        operation = self.controller.engine.operations[op_index]
         if not operation.config:
-            self.form_layout.addRow(
-                QLabel(f"{operation.__class__.__name__} has no config."))
+            self.form_layout.addRow(QLabel(f"{operation.__class__.__name__} has no config."))
             return
 
-        self.form_layout.addRow(
-            QLabel(f"<b>Editing: {operation.__class__.__name__}</b>"))
+        self.form_layout.addRow(QLabel(f"<b>Editing: {operation.__class__.__name__}</b>"))
 
         # --- PLUGIN UI DELEGATION HOOK ---
         if hasattr(operation, "build_custom_ui"):
@@ -268,7 +263,7 @@ class LiveEditorWindow(QMainWindow):
                             sub_field_name, sub_field_info.default if sub_field_info.default is not None else 0.0)
 
                         def nested_update_callback(val, parent_dict=field_name, fname=sub_field_name, idx=op_index):
-                            self.update_nested_parameter(idx, parent_dict, fname, val)
+                            self.controller.update_nested_parameter(idx, parent_dict, fname, val)
 
                         sub_container = WidgetFactory.build_field_widget(
                             sub_field_name, sub_field_info, sub_current_value, nested_update_callback, parent=self
@@ -283,10 +278,10 @@ class LiveEditorWindow(QMainWindow):
 
             if field_info.annotation == str:
                 def root_update_callback(text, fname=field_name, idx=op_index, wtype=widget_type):
-                    op = self.engine.operations[idx]
+                    op = self.controller.engine.operations[idx]
                     if getattr(op.config, fname) == text:
                         return
-                    self.update_parameter(idx, fname, text)
+                    self.controller.update_parameter(idx, fname, text)
                     
                     if wtype == "operation_selector":
                         settings_key = f"{fname}_settings"
@@ -295,7 +290,7 @@ class LiveEditorWindow(QMainWindow):
                         QTimer.singleShot(0, self.build_ui_for_current_step)
             else:
                 def root_update_callback(val, fname=field_name, idx=op_index):
-                    self.update_parameter(idx, fname, val)
+                    self.controller.update_parameter(idx, fname, val)
 
             container = WidgetFactory.build_field_widget(
                 field_name, field_info, current_value, root_update_callback, parent=self
@@ -303,230 +298,6 @@ class LiveEditorWindow(QMainWindow):
             if container:
                 self.form_layout.addRow(field_name, container)
 
-    def update_parameter(self, op_index, field_name, new_value):
-        operation = self.engine.operations[op_index]
-        setattr(operation.config, field_name, new_value)
-        
-        # Instantly drop dirty cache from this step onward!
-        self.engine.invalidate_from(op_index) 
-        
-        if self._pending_op_index is None:
-            self._pending_op_index = op_index
-        else:
-            self._pending_op_index = min(self._pending_op_index, op_index)
-        self.debounce_timer.start()
-
-    def update_nested_parameter(self, op_index, parent_dict_name,
-                                sub_field_name, new_value):
-        operation = self.engine.operations[op_index]
-        if hasattr(operation.config, parent_dict_name):
-            target_dict = getattr(operation.config, parent_dict_name)
-            if isinstance(target_dict, dict):
-                target_dict[sub_field_name] = new_value
-                
-                # Instantly drop dirty cache from this step onward!
-                self.engine.invalidate_from(op_index)
-                
-                if self._pending_op_index is None:
-                    self._pending_op_index = op_index
-                else:
-                    self._pending_op_index = min(self._pending_op_index,
-                                                 op_index)
-                self.debounce_timer.start()
-
-    def _execute_recalculation(self):
-        if self._pending_op_index is not None:
-            self._trigger_computation()
-
-    def _on_step_streamed(self, state_data):
-        step = state_data["step"]
-        total = state_data["total"]
-        op_name = state_data["op_name"]
-
-        line_count = state_data["line_count"]
-        pos = state_data["pos"]
-        connect = state_data["connect"]
-        vertices = len(pos)
-
-        safe_total = max(1, total)
-        self.progress_bar.setMaximum(safe_total)
-        self.progress_bar.setValue(step)
-
-        self.progress_bar.setFormat(
-            f"{step} / {total} ({op_name}) - Rendering...")
-        QApplication.processEvents()
-
-        if self.viewer.show_final_view or step == self.viewer.current_step:
-            self.update_stats_ui(step, total, op_name, line_count, vertices,
-                                 False)
-            self.viewer.set_live_vectors(pos, connect)
-
-        self.progress_bar.setFormat(f"{step} / {total} ({op_name})")
-
-    def _on_calculation_finished(self, history):
-        self._is_computing = False
-
-        self.btn_cancel.setEnabled(False)
-        self.btn_cancel.setStyleSheet(
-            "background-color: #8b0000; color: #aaaaaa; font-weight: bold;")
-
-        self.progress_bar.setValue(self.progress_bar.maximum())
-        self.progress_bar.setFormat("Finalizing Display...")
-        QApplication.processEvents()
-
-        self.engine.history = history
-
-        target = len(
-            self.engine.operations
-        ) if self.viewer.show_final_view else self.viewer.current_step
-        self.viewer.current_step = min(target, len(history) - 1)
-
-        self.viewer.update_view()
-
-        QTimer.singleShot(150, self._set_ready_state)
-
-    def _set_ready_state(self):
-        self.progress_bar.setFormat("Ready")
-        if self._computation_queued:
-            self._computation_queued = False
-            self._trigger_computation()
-
-    def _on_calculation_error(self, error_msg):
-        self._is_computing = False
-        logger.error(f"Background pipeline failed: {error_msg}")
-        self.progress_bar.setFormat("Error")
-        self.btn_cancel.setEnabled(False)
-        self.btn_cancel.setStyleSheet(
-            "background-color: #8b0000; color: #aaaaaa; font-weight: bold;")
-
-    def _get_current_recipe(self) -> list:
-        current_recipe = []
-        for op in self.engine.operations:
-            op_name = next((name for name, info in OPERATION_REGISTRY.items()
-                            if isinstance(op, info["class"])), None)
-            if not op_name:
-                continue
-
-            step = {"operation": op_name}
-            if op.config:
-                step["settings"] = op.config.model_dump()
-            current_recipe.append(step)
-
-        return current_recipe
-
-    def _reload_pipeline(self,
-                         new_recipe: list,
-                         target_step: int,
-                         valid_history_idx: int = 0):
-        valid_history = []
-        if valid_history_idx > 0 and len(
-                self.engine.history) > valid_history_idx:
-            valid_history = self.engine.history[:valid_history_idx + 1]
-
-        success = self.engine.load_recipe(new_recipe)
-
-        if success:
-            if valid_history:
-                self.engine.history = valid_history
-
-            self._pending_op_index = valid_history_idx
-
-            max_step = len(self.engine.operations)
-            self.viewer.current_step = max(0, min(target_step, max_step))
-            self.build_ui_for_current_step()
-            self._trigger_computation()
-
-    def _add_operation(self):
-        op_name = self.op_selector.currentText()
-        if not op_name:
-            return
-
-        recipe = self._get_current_recipe()
-        insert_idx = self.viewer.current_step
-
-        recipe.insert(insert_idx, {"operation": op_name, "settings": {}})
-
-        self._reload_pipeline(recipe,
-                              target_step=insert_idx + 1,
-                              valid_history_idx=insert_idx)
-
-    def _remove_operation(self):
-        recipe = self._get_current_recipe()
-        remove_idx = self.viewer.current_step - 1
-
-        if 0 <= remove_idx < len(recipe):
-            recipe.pop(remove_idx)
-
-            self._reload_pipeline(recipe,
-                                  target_step=max(0, remove_idx),
-                                  valid_history_idx=remove_idx)
-
-    def _load_live_recipe(self):
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "Load Recipe", "", "YAML Files (*.yaml *.yml);;All Files (*)")
-
-        if not file_path:
-            return
-
-        try:
-            with open(file_path, 'r') as f:
-                new_recipe = yaml.safe_load(f)
-
-            if not isinstance(new_recipe, list):
-                logger.error(
-                    "Invalid recipe format: must be a list of operations.")
-                return
-
-            success = self.engine.load_recipe(new_recipe)
-
-            if success:
-                self.viewer.current_step = len(self.engine.operations)
-                self.build_ui_for_current_step()
-                self._trigger_computation()
-
-        except Exception as e:
-            logger.error(f"Error loading recipe from {file_path}: {e}")
-
-    def _export_live_gcode(self):
-        file_path, _ = QFileDialog.getSaveFileName(
-            self, "Export G-Code", "output.nc",
-            "G-Code Files (*.nc *.gcode);;All Files (*)")
-
-        if file_path:
-            final_lines = self.engine.history[-1].lines
-            from pendragon.pen import PenConfig, PenTool
-            config = PenConfig()
-            with PenTool(config=config, output_filename=file_path) as pen:
-                for line in final_lines:
-                    pen.draw_path(list(line.coords))
-
-    def _save_live_recipe(self):
-        file_path, _ = QFileDialog.getSaveFileName(
-            self, "Save Recipe", "preset.yaml",
-            "YAML Files (*.yaml *.yml);;All Files (*)")
-
-        if not file_path:
-            return
-
-        current_recipe = self._get_current_recipe()
-
-        try:
-            with open(file_path, 'w') as f:
-                yaml.safe_dump(current_recipe,
-                               f,
-                               sort_keys=False,
-                               default_flow_style=False)
-            logger.success(f"Recipe successfully saved to {file_path}")
-        except Exception as e:
-            logger.error(f"Failed to save recipe: {e}")
-
     def closeEvent(self, event):
-        if self.worker_thread and self.worker_thread.isRunning():
-            logger.info(
-                "Application closing: Terminating background workers...")
-
-            self.worker_thread.cancel()
-            self.worker_thread.quit()
-            self.worker_thread.wait(1000)
-
+        self.controller.shutdown()
         event.accept()

@@ -4,28 +4,33 @@ import queue as standard_queue
 from .core import PendragonEngine
 from .discovery import load_plugins
 
-def _worker_process(recipe, boundary, out_queue, prior_history, start_index, formatter):
+
+def _worker_process(recipe, boundary, out_queue, prior_store, start_index,
+                    formatter):
     load_plugins()
-    engine = PendragonEngine(recipe=recipe, boundary=boundary)
+
+    engine = PendragonEngine(recipe=recipe,
+                             boundary=boundary,
+                             store=prior_store)
     engine.build_pipeline()
-    
-    if prior_history:
-        engine.history = prior_history
 
     total_ops = len(engine.operations)
 
     try:
-        # Prime the pump for the initial state if starting fresh
-        if start_index == 0 and engine.history:
-            state = engine.history[0]
+        if start_index == 0 and len(engine.store) > 0:
+            state = engine.store.get(0)
             data = formatter(state) if formatter else state
-            out_queue.put({"type": "FRAME", "step": 0, "total": total_ops, "data": data})
+            out_queue.put({
+                "type": "FRAME",
+                "step": 0,
+                "total": total_ops,
+                "data": data
+            })
 
-        # Intelligently compute missing steps
         for new_state in engine.compute_to_generator(total_ops):
-            step_idx = len(engine.history) - 1
+            step_idx = len(engine.store) - 1
             data = formatter(new_state) if formatter else new_state
-            
+
             out_queue.put({
                 "type": "FRAME",
                 "step": step_idx,
@@ -33,19 +38,26 @@ def _worker_process(recipe, boundary, out_queue, prior_history, start_index, for
                 "data": data
             })
 
-        out_queue.put({"type": "DONE", "history": engine.history})
+        # Return the store object so the main process can hold onto it
+        out_queue.put({"type": "DONE", "store": engine.store})
     except Exception as e:
         out_queue.put({"type": "ERROR", "message": str(e)})
 
+
 class PipelineRunner:
     """A clean, boilerplate-free wrapper for running the pipeline in the background."""
-    
-    def __init__(self, recipe, boundary, prior_history=None, start_index=0, formatter=None):
+
+    def __init__(self,
+                 recipe,
+                 boundary,
+                 prior_history=None,
+                 start_index=0,
+                 formatter=None):
         self.queue = multiprocessing.Queue()
-        self.process = multiprocessing.Process(
-            target=_worker_process,
-            args=(recipe, boundary, self.queue, prior_history, start_index, formatter)
-        )
+        self.process = multiprocessing.Process(target=_worker_process,
+                                               args=(recipe, boundary,
+                                                     self.queue, prior_history,
+                                                     start_index, formatter))
 
     def start(self):
         self.process.start()

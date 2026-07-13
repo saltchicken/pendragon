@@ -1,0 +1,42 @@
+- operation: hexagon
+  settings:
+    overscan: 20.1
+    radius: 15.0
+- operation: transform
+  settings:
+    translate_x: 21.0
+    translate_y: 0.0
+    rotation: 0.0
+    rotation_origin: center
+    scale_x: 1.8000000000000007
+    scale_y: 0.8
+    scale_origin: center
+- operation: generate_in_cells
+  settings:
+    overscan: 0.0
+    generator: grid_lines
+    generator_settings: {}
+    auto_center: true
+    auto_rotate: false
+    rotation_setting: rotation
+    keep_scaffolding: false
+    tolerance: 1.0e-05
+    image_modulator: null
+- operation: transform
+  settings:
+    translate_x: 13.000000000000007
+    translate_y: 2.5000000000000004
+    rotation: 0.0
+    rotation_origin: center
+    scale_x: 2.2000000000000006
+    scale_y: 2.2000000000000006
+    scale_origin: center
+- operation: clip
+  settings: {}
+- operation: optimize
+  settings:
+    start_x: 0.0
+    start_y: 0.0
+- operation: connect_continuous
+  settings:
+    snap_distance: 0.05
