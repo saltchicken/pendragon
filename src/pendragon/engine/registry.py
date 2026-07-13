@@ -37,6 +37,12 @@ class PipelineOperation(ABC):
     def __init__(self, config: Optional[BaseModel] = None) -> None:
         self.config = config
 
+    def resolve(self, field_name: str, context: Optional[PipelineContext] = None) -> Any:
+        """Fetches a variable from transient context, falling back to static config."""
+        if context and field_name in context.variables:
+            return context.variables[field_name]
+        return getattr(self.config, field_name)
+
     def get_effective_boundary(self, state: PipelineState):
         overscan = getattr(self.config, 'overscan', 0.0)
         if overscan != 0.0 and state.boundary:
@@ -59,6 +65,29 @@ class PipelineOperation(ABC):
                         clipped_lines.append(sub_line)
                         
         return clipped_lines
+
+    def resolve_center(self, 
+                       context: PipelineContext, 
+                       poly: Polygon) -> tuple[float, float]:
+        """
+        Extracts the X/Y origin using the standard fallback hierarchy:
+        1. Context variables (e.g., from GenerateInCells)
+        2. YAML/GUI Config (if the plugin inherits CenteredPluginConfig)
+        3. The centroid of the current geometry
+        """
+        # 1. Check transient context
+        if context.local_center_x is not None and context.local_center_y is not None:
+            return context.local_center_x, context.local_center_y
+
+        # 2. Check static config (safely, in case this isn't a CenteredPluginConfig)
+        cfg_cx = getattr(self.config, 'center_x', None)
+        cfg_cy = getattr(self.config, 'center_y', None)
+        
+        if cfg_cx is not None and cfg_cy is not None:
+            return cfg_cx, cfg_cy
+
+        # 3. Fallback to geometric centroid
+        return poly.centroid.x, poly.centroid.y
 
     @abstractmethod
     def process(self,
