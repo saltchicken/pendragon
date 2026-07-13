@@ -114,6 +114,10 @@ class LiveEditorWindow(QMainWindow):
     def _gui_add_operation(self):
         op_name = self.edit_panel.op_selector.currentText()
         insert_idx = self.viewer.current_step
+        
+        # Advance the viewer index so the UI rebuilds for the new operation
+        self.viewer.current_step += 1
+        
         self.controller.add_operation(insert_idx, op_name)
 
     def _gui_remove_operation(self):
