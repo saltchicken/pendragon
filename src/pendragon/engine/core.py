@@ -1,5 +1,5 @@
 import inspect
-from typing import Generator, Optional
+from typing import Generator, List, Optional
 
 from loguru import logger
 from shapely.geometry import LineString
@@ -34,9 +34,37 @@ class PendragonEngine:
                                    operation_name="base_geometry")
         self.store: StateStore = store or InMemoryStateStore(base_state)
 
+    # --- Law of Demeter Accessors ---
+
+    def get_operation(self, index: int) -> Optional[PipelineOperation]:
+        """Safely fetches an operation by index."""
+        if 0 <= index < len(self.operations):
+            return self.operations[index]
+        return None
+
+    def get_operation_count(self) -> int:
+        """Returns the total number of operations in the pipeline."""
+        return len(self.operations)
+
+    def get_operations(self) -> List[PipelineOperation]:
+        """Returns a shallow copy of the operations to prevent direct mutation."""
+        return self.operations.copy()
+        
+    def update_recipe(self, new_recipe: list) -> bool:
+        """Updates the recipe and rebuilds operations without wiping the state store."""
+        self.recipe = new_recipe
+        return self.build_pipeline()
+
+    def get_final_lines(self) -> list[LineString]:
+        """Returns the geometry of the most recently computed state."""
+        if len(self.store) > 0:
+            return self.store.get_last().lines
+        return []
+
+    # --------------------------------
+
     def load_recipe(self, new_recipe: list) -> bool:
         self.recipe = new_recipe
-        # Reset the store instead of overwriting a native list
         self.store.reset(
             PipelineState(boundary=self.boundary,
                           operation_name="base_geometry"))
@@ -49,7 +77,6 @@ class PendragonEngine:
         return success
 
     def build_pipeline(self) -> bool:
-        """Instantiates operations based on the current recipe."""
         self.operations.clear()
 
         for step in self.recipe:
@@ -58,7 +85,6 @@ class PendragonEngine:
                 logger.error(f"Invalid step configuration, missing 'operation' key: {step}")
                 return False
 
-            # 2. Query the instance-owned registry
             op_info = self.registry.get(op_name)
             if not op_info:
                 logger.error(f"Operation '{op_name}' not found in registry.")
@@ -85,21 +111,19 @@ class PendragonEngine:
     def go_to_step(self, target_step: int) -> PipelineState:
         for _ in self.compute_to_generator(target_step):
             pass
-
         target = min(target_step, len(self.store) - 1)
         return self.store.get(target)
 
     def compute_to_generator(
             self, target_step: int) -> Generator[PipelineState, None, None]:
-        target_step = min(target_step, len(self.operations))
+        target_step = min(target_step, self.get_operation_count())
         empty_context = PipelineContext()
 
-        # Start computing from the end of our valid cached history
         start_idx = len(self.store) - 1
 
         for i in range(start_idx, target_step):
             op = self.operations[i]
-            current_state = self.store.get_last()  # Fetch from store
+            current_state = self.store.get_last()
             logger.info(f"Computing operation {i}: {op.__class__.__name__}")
 
             sig = inspect.signature(op.process)
@@ -108,11 +132,10 @@ class PendragonEngine:
             else:
                 new_state = op.process(current_state)
 
-            self.store.append(new_state)  # Save to store
+            self.store.append(new_state)
             yield new_state
 
     def run(self) -> list[LineString]:
-        for _ in self.compute_to_generator(len(self.operations)):
+        for _ in self.compute_to_generator(self.get_operation_count()):
             pass
-
-        return self.store.get_last().lines if len(self.store) > 0 else []
+        return self.get_final_lines()

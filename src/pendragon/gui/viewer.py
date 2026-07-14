@@ -2,6 +2,7 @@ import numpy as np
 from vispy import scene
 from shapely.geometry import MultiPolygon, Polygon
 
+
 class PipelineViewer(scene.SceneCanvas):
 
     def __init__(self, engine):
@@ -11,7 +12,7 @@ class PipelineViewer(scene.SceneCanvas):
                          show=True)
         self.unfreeze()
         self.engine = engine
-        self.current_step = min(1, len(self.engine.operations))
+        self.current_step = min(1, self.engine.get_operation_count())
         self.show_vertices = False
         self.show_final_view = False
 
@@ -41,7 +42,6 @@ class PipelineViewer(scene.SceneCanvas):
         self.freeze()
         self.update_view()
 
-        # Update: Use the store's length and .get() method
         if len(self.engine.store) > 0:
             first_state = self.engine.store.get(0)
             if first_state.boundary:
@@ -54,7 +54,7 @@ class PipelineViewer(scene.SceneCanvas):
                 pass
 
     def step_forward(self):
-        max_step = len(self.engine.operations)
+        max_step = self.engine.get_operation_count()
         if self.current_step < max_step:
             self.current_step += 1
             self.update_view()
@@ -82,7 +82,6 @@ class PipelineViewer(scene.SceneCanvas):
                 self.close()
 
     def set_live_vectors(self, pos, connect):
-        """Injects pre-computed numpy arrays directly into the GPU."""
         if len(pos) > 0:
             self.lines_visual.set_data(pos=pos, connect=connect)
             self.lines_visual.visible = True
@@ -100,17 +99,11 @@ class PipelineViewer(scene.SceneCanvas):
             self.vertices_visual.visible = False
 
     def set_live_lines(self, lines):
-        """
-        Used by local step-scrubbing. Converts Shapely objects on the fly,
-        then routes them to the vectorized renderer.
-        """
         if not lines:
             self.set_live_vectors(np.empty((0, 2)), np.empty((0, 2)))
             return
 
-        coords_list = [
-            np.array(line.coords, dtype=np.float32) for line in lines
-        ]
+        coords_list = [np.array(line.coords, dtype=np.float32) for line in lines]
         stacked_pos = np.vstack(coords_list)
 
         lengths = [len(c) for c in coords_list]
@@ -119,28 +112,21 @@ class PipelineViewer(scene.SceneCanvas):
 
         for n in lengths:
             if n > 1:
-                starts = np.arange(current_idx,
-                                   current_idx + n - 1,
-                                   dtype=np.uint32)
+                starts = np.arange(current_idx, current_idx + n - 1, dtype=np.uint32)
                 ends = starts + 1
                 connect_blocks.append(np.column_stack((starts, ends)))
             current_idx += n
 
-        final_connect = np.vstack(
-            connect_blocks) if connect_blocks else np.empty(
-                (0, 2), dtype=np.uint32)
-
+        final_connect = np.vstack(connect_blocks) if connect_blocks else np.empty((0, 2), dtype=np.uint32)
         self.set_live_vectors(stacked_pos, final_connect)
 
     def update_view(self):
-        target_step = len(self.engine.operations) if self.show_final_view else self.current_step
-
-        # Update: Safely cap the display step and use .get()
+        target_step = self.engine.get_operation_count() if self.show_final_view else self.current_step
         display_step = min(target_step, len(self.engine.store) - 1)
         state = self.engine.store.get(display_step)
 
         total_vertices = sum(len(line.coords) for line in state.lines)
-        total_ops = len(self.engine.operations)
+        total_ops = self.engine.get_operation_count()
 
         if self.on_stats_updated:
             self.on_stats_updated(self.current_step,
@@ -155,7 +141,6 @@ class PipelineViewer(scene.SceneCanvas):
             elif isinstance(state.boundary, MultiPolygon):
                 polygons = list(state.boundary.geoms)
 
-            # --- FAST VECTORIZED BOUNDARY PREP ---
             coords_list = []
             for poly in polygons:
                 coords_list.append(np.array(poly.exterior.coords))
@@ -170,17 +155,13 @@ class PipelineViewer(scene.SceneCanvas):
 
                 for n in lengths:
                     if n > 1:
-                        # Rapidly generate [0,1], [1,2], [2,3] index pairs
                         starts = np.arange(current_idx, current_idx + n - 1)
                         ends = starts + 1
                         connect_blocks.append(np.column_stack((starts, ends)))
                     current_idx += n
 
-                b_connect = np.vstack(
-                    connect_blocks) if connect_blocks else np.empty((0, 2))
-
-                self.boundary_visual.set_data(pos=stacked_b_pos,
-                                              connect=b_connect)
+                b_connect = np.vstack(connect_blocks) if connect_blocks else np.empty((0, 2))
+                self.boundary_visual.set_data(pos=stacked_b_pos, connect=b_connect)
                 self.boundary_visual.visible = True
             else:
                 self.boundary_visual.visible = False

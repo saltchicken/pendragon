@@ -10,21 +10,16 @@ from pendragon.gui.worker import PipelineStreamingThread
 
 
 class PipelineController(QObject):
-    """ViewModel/Controller: Manages engine state, worker threads, and recipe logic."""
-
-    # Signals to update the UI
-    computation_started = pyqtSignal(int)  # Emits start index
-    computation_finished = pyqtSignal(object)  # Emits new store
+    computation_started = pyqtSignal(int)
+    computation_finished = pyqtSignal(object)
     computation_error = pyqtSignal(str)
     computation_cancelled = pyqtSignal()
     step_streamed = pyqtSignal(dict)
-
     ui_rebuild_requested = pyqtSignal()
 
     def __init__(self, engine: PendragonEngine):
         super().__init__()
         self.engine = engine
-
         self.worker_thread = None
         self._is_computing = False
         self._computation_queued = False
@@ -36,7 +31,6 @@ class PipelineController(QObject):
         self.debounce_timer.timeout.connect(self._execute_recalculation)
 
     def trigger_computation(self):
-        """Centralized queue manager. Prevents overlapping threads and freezes."""
         if self._is_computing:
             self._computation_queued = True
             return
@@ -46,7 +40,6 @@ class PipelineController(QObject):
         self._pending_op_index = None
 
         self.computation_started.emit(start_index)
-
         current_recipe = self.get_current_recipe()
         prior_store = self.engine.store
 
@@ -59,7 +52,6 @@ class PipelineController(QObject):
         self.worker_thread.finished.connect(self._on_calculation_finished)
         self.worker_thread.error.connect(self._on_calculation_error)
         self.worker_thread.cancelled.connect(self._on_calculation_cancelled)
-
         self.worker_thread.start()
 
     def cancel_computation(self):
@@ -67,9 +59,11 @@ class PipelineController(QObject):
             self.worker_thread.cancel()
 
     def update_parameter(self, op_index: int, field_name: str, new_value):
-        operation = self.engine.operations[op_index]
-        setattr(operation.config, field_name, new_value)
+        operation = self.engine.get_operation(op_index)
+        if not operation or not operation.config:
+            return
 
+        setattr(operation.config, field_name, new_value)
         self.engine.invalidate_from(op_index)
 
         if self._pending_op_index is None:
@@ -80,25 +74,25 @@ class PipelineController(QObject):
 
     def update_nested_parameter(self, op_index: int, parent_dict_name: str,
                                 sub_field_name: str, new_value):
-        operation = self.engine.operations[op_index]
+        operation = self.engine.get_operation(op_index)
+        if not operation or not operation.config:
+            return
+
         if hasattr(operation.config, parent_dict_name):
             target_dict = getattr(operation.config, parent_dict_name)
             if isinstance(target_dict, dict):
                 target_dict[sub_field_name] = new_value
-
                 self.engine.invalidate_from(op_index)
 
                 if self._pending_op_index is None:
                     self._pending_op_index = op_index
                 else:
-                    self._pending_op_index = min(self._pending_op_index,
-                                                 op_index)
+                    self._pending_op_index = min(self._pending_op_index, op_index)
                 self.debounce_timer.start()
 
     def get_current_recipe(self) -> list:
         current_recipe = []
-        for op in self.engine.operations:
-            # Safely grab the plugin name attached by the decorator
+        for op in self.engine.get_operations():
             op_name = getattr(op.__class__, '_plugin_name', None)
             if not op_name:
                 continue
@@ -110,14 +104,10 @@ class PipelineController(QObject):
         return current_recipe
 
     def reload_pipeline(self, new_recipe: list, valid_history_idx: int = 0):
-        """Overrides the current recipe and asks the engine to validate/build ops."""
-        self.engine.recipe = new_recipe
-        success = self.engine.build_pipeline()
-
+        success = self.engine.update_recipe(new_recipe)
         if success:
             self.engine.invalidate_from(valid_history_idx)
             self._pending_op_index = valid_history_idx
-
             self.ui_rebuild_requested.emit()
             self.trigger_computation()
         else:
@@ -142,8 +132,7 @@ class PipelineController(QObject):
                 new_recipe = yaml.safe_load(f)
 
             if not isinstance(new_recipe, list):
-                logger.error(
-                    "Invalid recipe format: must be a list of operations.")
+                logger.error("Invalid recipe format: must be a list of operations.")
                 return False
 
             success = self.engine.load_recipe(new_recipe)
@@ -168,7 +157,7 @@ class PipelineController(QObject):
             logger.error(f"Failed to save recipe: {e}")
 
     def export_gcode_to_file(self, file_path: str):
-        final_lines = self.engine.store.get_last().lines
+        final_lines = self.engine.get_final_lines()
         export_gcode(final_lines, file_path)
 
     # --- Internal Callbacks ---
@@ -193,7 +182,6 @@ class PipelineController(QObject):
         self.computation_cancelled.emit()
 
     def finalize_state(self):
-        """Checks if a queued computation needs to start after the previous one finishes."""
         if self._computation_queued:
             self._computation_queued = False
             self.trigger_computation()
