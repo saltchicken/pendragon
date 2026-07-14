@@ -1,6 +1,7 @@
 import numpy as np
+from shapely.geometry import MultiPolygon
+from shapely.geometry import Polygon
 from vispy import scene
-from shapely.geometry import MultiPolygon, Polygon
 
 
 class PipelineViewer(scene.SceneCanvas):
@@ -103,7 +104,9 @@ class PipelineViewer(scene.SceneCanvas):
             self.set_live_vectors(np.empty((0, 2)), np.empty((0, 2)))
             return
 
-        coords_list = [np.array(line.coords, dtype=np.float32) for line in lines]
+        coords_list = [
+            np.array(line.coords, dtype=np.float32) for line in lines
+        ]
         stacked_pos = np.vstack(coords_list)
 
         lengths = [len(c) for c in coords_list]
@@ -112,16 +115,21 @@ class PipelineViewer(scene.SceneCanvas):
 
         for n in lengths:
             if n > 1:
-                starts = np.arange(current_idx, current_idx + n - 1, dtype=np.uint32)
+                starts = np.arange(current_idx,
+                                   current_idx + n - 1,
+                                   dtype=np.uint32)
                 ends = starts + 1
                 connect_blocks.append(np.column_stack((starts, ends)))
             current_idx += n
 
-        final_connect = np.vstack(connect_blocks) if connect_blocks else np.empty((0, 2), dtype=np.uint32)
+        final_connect = np.vstack(
+            connect_blocks) if connect_blocks else np.empty(
+                (0, 2), dtype=np.uint32)
         self.set_live_vectors(stacked_pos, final_connect)
 
     def update_view(self):
-        target_step = self.engine.get_operation_count() if self.show_final_view else self.current_step
+        target_step = self.engine.get_operation_count(
+        ) if self.show_final_view else self.current_step
         display_step = min(target_step, len(self.engine.store) - 1)
         state = self.engine.store.get(display_step)
 
@@ -160,8 +168,10 @@ class PipelineViewer(scene.SceneCanvas):
                         connect_blocks.append(np.column_stack((starts, ends)))
                     current_idx += n
 
-                b_connect = np.vstack(connect_blocks) if connect_blocks else np.empty((0, 2))
-                self.boundary_visual.set_data(pos=stacked_b_pos, connect=b_connect)
+                b_connect = np.vstack(
+                    connect_blocks) if connect_blocks else np.empty((0, 2))
+                self.boundary_visual.set_data(pos=stacked_b_pos,
+                                              connect=b_connect)
                 self.boundary_visual.visible = True
             else:
                 self.boundary_visual.visible = False

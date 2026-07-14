@@ -14,11 +14,10 @@ from pendragon.gui.controller import PipelineController
 from pendragon.gui.panels import ActionPanel
 from pendragon.gui.panels import EditPanel
 from pendragon.gui.panels import ProgressPanel
-from pendragon.gui.panels import StatsPanel
 from pendragon.gui.panels import PropertiesPanel
-from pendragon.gui.viewer import PipelineViewer
-
+from pendragon.gui.panels import StatsPanel
 from pendragon.gui.utils import load_stylesheet
+from pendragon.gui.viewer import PipelineViewer
 
 
 class LiveEditorWindow(QMainWindow):
@@ -27,7 +26,7 @@ class LiveEditorWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Pendragon Live Editor")
         self.controller = controller
-        
+
         self.setStyleSheet(load_stylesheet("style.qss"))
 
         self._setup_ui()
@@ -80,11 +79,12 @@ class LiveEditorWindow(QMainWindow):
 
     def _connect_signals(self):
         # UI Component Signals
-        self.progress_panel.btn_cancel.clicked.connect(self.controller.cancel_computation)
-        
+        self.progress_panel.btn_cancel.clicked.connect(
+            self.controller.cancel_computation)
+
         self.show_vertices_checkbox.toggled.connect(self._on_vertices_toggled)
         self.final_view_checkbox.toggled.connect(self._on_view_mode_toggled)
-        
+
         self.btn_prev.clicked.connect(self.viewer.step_backward)
         self.btn_next.clicked.connect(self.viewer.step_forward)
 
@@ -127,13 +127,15 @@ class LiveEditorWindow(QMainWindow):
 
     def _gui_save_recipe(self):
         file_path, _ = QFileDialog.getSaveFileName(
-            self, "Save Recipe", "preset.yaml", "YAML Files (*.yaml *.yml);;All Files (*)")
+            self, "Save Recipe", "preset.yaml",
+            "YAML Files (*.yaml *.yml);;All Files (*)")
         if file_path:
             self.controller.save_recipe_to_file(file_path)
 
     def _gui_export_gcode(self):
         file_path, _ = QFileDialog.getSaveFileName(
-            self, "Export G-Code", "output.nc", "G-Code Files (*.nc *.gcode);;All Files (*)")
+            self, "Export G-Code", "output.nc",
+            "G-Code Files (*.nc *.gcode);;All Files (*)")
         if file_path:
             self.controller.export_gcode_to_file(file_path)
 
@@ -153,33 +155,39 @@ class LiveEditorWindow(QMainWindow):
 
     def _on_compute_start(self, start_index: int):
         self.progress_panel.btn_cancel.setEnabled(True)
-        self.progress_panel.btn_cancel.setStyleSheet("background-color: #ff4444; color: white; font-weight: bold;")
+        self.progress_panel.btn_cancel.setStyleSheet(
+            "background-color: #ff4444; color: white; font-weight: bold;")
         self.progress_panel.bar.setValue(start_index)
         self.progress_panel.bar.setFormat("Initializing...")
 
     def _on_step_streamed(self, state_data):
-        step, total, op_name = state_data["step"], state_data["total"], state_data["op_name"]
+        step, total, op_name = state_data["step"], state_data[
+            "total"], state_data["op_name"]
         safe_total = max(1, total)
         self.progress_panel.bar.setMaximum(safe_total)
         self.progress_panel.bar.setValue(step)
-        self.progress_panel.bar.setFormat(f"{step} / {total} ({op_name}) - Rendering...")
+        self.progress_panel.bar.setFormat(
+            f"{step} / {total} ({op_name}) - Rendering...")
         QApplication.processEvents()
 
         if self.viewer.show_final_view or step == self.viewer.current_step:
-            self.stats_panel.update_stats(
-                step, total, op_name, state_data["line_count"], len(state_data["pos"]), False
-            )
-            self.viewer.set_live_vectors(state_data["pos"], state_data["connect"])
+            self.stats_panel.update_stats(step, total, op_name,
+                                          state_data["line_count"],
+                                          len(state_data["pos"]), False)
+            self.viewer.set_live_vectors(state_data["pos"],
+                                         state_data["connect"])
         self.progress_panel.bar.setFormat(f"{step} / {total} ({op_name})")
 
     def _on_compute_finish(self, final_store):
         self.progress_panel.btn_cancel.setEnabled(False)
-        self.progress_panel.btn_cancel.setStyleSheet("background-color: #8b0000; color: #aaaaaa; font-weight: bold;")
+        self.progress_panel.btn_cancel.setStyleSheet(
+            "background-color: #8b0000; color: #aaaaaa; font-weight: bold;")
         self.progress_panel.bar.setValue(self.progress_panel.bar.maximum())
         self.progress_panel.bar.setFormat("Finalizing Display...")
         QApplication.processEvents()
 
-        target = self.controller.get_operation_count() if self.viewer.show_final_view else self.viewer.current_step
+        target = self.controller.get_operation_count(
+        ) if self.viewer.show_final_view else self.viewer.current_step
         self.viewer.current_step = min(target, len(final_store) - 1)
         self.viewer.update_view()
 
@@ -199,7 +207,8 @@ class LiveEditorWindow(QMainWindow):
 
     def _disable_cancel(self):
         self.progress_panel.btn_cancel.setEnabled(False)
-        self.progress_panel.btn_cancel.setStyleSheet("background-color: #8b0000; color: #aaaaaa; font-weight: bold;")
+        self.progress_panel.btn_cancel.setStyleSheet(
+            "background-color: #8b0000; color: #aaaaaa; font-weight: bold;")
 
     def build_ui_for_current_step(self):
         self.properties_panel.rebuild_for_step(self.viewer.current_step)

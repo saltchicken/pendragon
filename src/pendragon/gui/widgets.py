@@ -19,24 +19,37 @@ class WidgetFactory:
     """A factory for creating standardized PyQt UI widgets from Pydantic fields."""
 
     @classmethod
-    def build_field_widget(cls, field_name, field_info, current_value, update_callback, registry=None, parent=None):
+    def build_field_widget(cls,
+                           field_name,
+                           field_info,
+                           current_value,
+                           update_callback,
+                           registry=None,
+                           parent=None):
         origin = get_origin(field_info.annotation)
         annotation = field_info.annotation
 
         if origin is Literal:
-            return cls.build_literal_widget(current_value, field_info, update_callback)
+            return cls.build_literal_widget(current_value, field_info,
+                                            update_callback)
 
         dispatch_table = {
-            float: partial(cls.build_float_widget, current_value, field_info, update_callback),
-            int: partial(cls.build_int_widget, current_value, update_callback),
-            bool: partial(cls.build_bool_widget, current_value, update_callback),
-            str: partial(cls.build_str_widget, field_name, field_info, current_value, update_callback, registry, parent)
+            float:
+                partial(cls.build_float_widget, current_value, field_info,
+                        update_callback),
+            int:
+                partial(cls.build_int_widget, current_value, update_callback),
+            bool:
+                partial(cls.build_bool_widget, current_value, update_callback),
+            str:
+                partial(cls.build_str_widget, field_name, field_info,
+                        current_value, update_callback, registry, parent)
         }
 
         builder = dispatch_table.get(annotation)
         if builder:
             return builder()
-        
+
         return None
 
     @staticmethod
@@ -80,12 +93,17 @@ class WidgetFactory:
             value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
             slider.sliderMoved.connect(
-                partial(WidgetFactory._update_float_label, lbl=value_label, v_min=val_min, r_span=range_span)
-            )
+                partial(WidgetFactory._update_float_label,
+                        lbl=value_label,
+                        v_min=val_min,
+                        r_span=range_span))
             slider.valueChanged.connect(
-                partial(WidgetFactory._update_float_value, lbl=value_label, v_min=val_min, r_span=range_span, cb=update_callback)
-            )
-            
+                partial(WidgetFactory._update_float_value,
+                        lbl=value_label,
+                        v_min=val_min,
+                        r_span=range_span,
+                        cb=update_callback))
+
             h_layout.addWidget(slider)
             h_layout.addWidget(value_label)
 
@@ -111,7 +129,8 @@ class WidgetFactory:
 
         spin_box = QSpinBox()
         spin_box.setRange(0, 10000)
-        spin_box.setValue(int(current_value) if current_value is not None else 0)
+        spin_box.setValue(
+            int(current_value) if current_value is not None else 0)
 
         # Spinbox valueChanged emits an int directly
         spin_box.valueChanged.connect(update_callback)
@@ -133,8 +152,7 @@ class WidgetFactory:
         checkbox.setChecked(bool(current_value))
 
         checkbox.stateChanged.connect(
-            partial(WidgetFactory._update_bool_value, cb=update_callback)
-        )
+            partial(WidgetFactory._update_bool_value, cb=update_callback))
 
         h_layout.addWidget(checkbox)
         return container
@@ -173,7 +191,12 @@ class WidgetFactory:
             le.setText(file_path)
 
     @staticmethod
-    def build_str_widget(field_name, field_info, current_value, update_callback, registry=None, parent=None):
+    def build_str_widget(field_name,
+                         field_info,
+                         current_value,
+                         update_callback,
+                         registry=None,
+                         parent=None):
         container = QWidget()
         h_layout = QHBoxLayout(container)
         h_layout.setContentsMargins(0, 0, 0, 0)
@@ -200,10 +223,12 @@ class WidgetFactory:
 
             if widget_type == "file_picker":
                 browse_btn = QPushButton("Browse...")
-                
+
                 browse_btn.clicked.connect(
-                    partial(WidgetFactory._open_file_dialog, le=widget, p=parent, field_name=field_name)
-                )
+                    partial(WidgetFactory._open_file_dialog,
+                            le=widget,
+                            p=parent,
+                            field_name=field_name))
                 h_layout.addWidget(browse_btn)
 
         return container

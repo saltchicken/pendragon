@@ -1,4 +1,3 @@
-
 from loguru import logger
 from shapely.geometry import LineString
 

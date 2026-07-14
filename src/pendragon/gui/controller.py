@@ -1,4 +1,6 @@
-from enum import Enum, auto
+from enum import auto
+from enum import Enum
+
 from loguru import logger
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtCore import QObject
@@ -29,7 +31,7 @@ class PipelineController(QObject):
         super().__init__()
         self.engine = engine
         self.worker_thread = None
-        
+
         # State Machine Tracking
         self._state = ControllerState.IDLE
         self._computation_queued = False
@@ -52,6 +54,7 @@ class PipelineController(QObject):
 
     def get_operation_info(self, name: str):
         return self.engine.registry.get(name)
+
     # --------------------------------
 
     def trigger_computation(self):
@@ -68,12 +71,10 @@ class PipelineController(QObject):
         current_recipe = self.get_current_recipe()
         prior_store = self.engine.store
 
-        self.worker_thread = PipelineStreamingThread(
-            current_recipe,
-            self.engine.boundary,
-            prior_history=prior_store,
-            start_index=start_index
-        )
+        self.worker_thread = PipelineStreamingThread(current_recipe,
+                                                     self.engine.boundary,
+                                                     prior_history=prior_store,
+                                                     start_index=start_index)
 
         self.worker_thread.step_completed.connect(self.step_streamed.emit)
         self.worker_thread.finished.connect(self._on_calculation_finished)
@@ -83,7 +84,8 @@ class PipelineController(QObject):
 
     def cancel_computation(self):
         # State Machine: Only cancel if we are actively computing
-        if self._state == ControllerState.COMPUTING and self.worker_thread and self.worker_thread.isRunning():
+        if self._state == ControllerState.COMPUTING and self.worker_thread and self.worker_thread.isRunning(
+        ):
             self._state = ControllerState.CANCELLING
             self.worker_thread.cancel()
 
@@ -116,7 +118,8 @@ class PipelineController(QObject):
                 if self._pending_op_index is None:
                     self._pending_op_index = op_index
                 else:
-                    self._pending_op_index = min(self._pending_op_index, op_index)
+                    self._pending_op_index = min(self._pending_op_index,
+                                                 op_index)
                 self.debounce_timer.start()
 
     def get_current_recipe(self) -> list:
@@ -161,7 +164,8 @@ class PipelineController(QObject):
                 new_recipe = yaml.safe_load(f)
 
             if not isinstance(new_recipe, list):
-                logger.error("Invalid recipe format: must be a list of operations.")
+                logger.error(
+                    "Invalid recipe format: must be a list of operations.")
                 return False
 
             success = self.engine.load_recipe(new_recipe)
@@ -203,7 +207,7 @@ class PipelineController(QObject):
     def _on_calculation_error(self, error_msg):
         # State Machine: Reset to IDLE, clear queue on hard errors
         self._state = ControllerState.IDLE
-        self._computation_queued = False 
+        self._computation_queued = False
         logger.error(f"Background pipeline failed: {error_msg}")
         self.computation_error.emit(error_msg)
 
@@ -212,7 +216,7 @@ class PipelineController(QObject):
         self._state = ControllerState.IDLE
         logger.warning("Pipeline calculation cancelled by user.")
         self.computation_cancelled.emit()
-        
+
         if self._computation_queued:
             self._computation_queued = False
             self.trigger_computation()
@@ -224,7 +228,8 @@ class PipelineController(QObject):
             self.trigger_computation()
 
     def shutdown(self):
-        if self._state != ControllerState.IDLE and self.worker_thread and self.worker_thread.isRunning():
+        if self._state != ControllerState.IDLE and self.worker_thread and self.worker_thread.isRunning(
+        ):
             self._state = ControllerState.CANCELLING
             self.worker_thread.cancel()
             self.worker_thread.quit()

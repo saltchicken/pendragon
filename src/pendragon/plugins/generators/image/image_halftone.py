@@ -55,7 +55,7 @@ class ImageHalftoneGen(PipelineOperation):
         registry = PluginRegistry()
         registry.discover()
         op_info = registry.get(cfg.generator)
-        
+
         if not op_info:
             logger.error(f"Halftone sub-generator '{cfg.generator}' not found.")
             return state

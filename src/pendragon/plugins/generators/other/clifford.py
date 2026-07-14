@@ -17,8 +17,10 @@ class CliffordConfig(CenteredPluginConfig):
     b: float = Field(default=-1.8, description="Parameter B (chaotic variance)")
     c: float = Field(default=1.6, description="Parameter C (chaotic variance)")
     d: float = Field(default=0.9, description="Parameter D (chaotic variance)")
-    iterations: int = Field(default=15000, description="Number of points to calculate")
-    scale: float = Field(default=35.0, description="Size multiplier for the attractor")
+    iterations: int = Field(default=15000,
+                            description="Number of points to calculate")
+    scale: float = Field(default=35.0,
+                         description="Size multiplier for the attractor")
 
 
 @register_operation("clifford", config_class=CliffordConfig)
@@ -30,7 +32,7 @@ class CliffordGen(PipelineOperation):
                 context: Optional[PipelineContext] = None) -> PipelineState:
         cfg = self.config or CliffordConfig()
         ctx = context or PipelineContext()
-        
+
         # Resolve dynamic variables
         a = ctx.variables.get("a", cfg.a)
         b = ctx.variables.get("b", cfg.b)
@@ -39,8 +41,12 @@ class CliffordGen(PipelineOperation):
         iters = ctx.variables.get("iterations", cfg.iterations)
         scale = ctx.variables.get("scale", cfg.scale)
 
-        cx = ctx.variables.get("center_x", ctx.local_center_x if ctx.local_center_x is not None else cfg.center_x)
-        cy = ctx.variables.get("center_y", ctx.local_center_y if ctx.local_center_y is not None else cfg.center_y)
+        cx = ctx.variables.get(
+            "center_x", ctx.local_center_x
+            if ctx.local_center_x is not None else cfg.center_x)
+        cy = ctx.variables.get(
+            "center_y", ctx.local_center_y
+            if ctx.local_center_y is not None else cfg.center_y)
 
         # Default to bounding box center if not provided
         if cx is None or cy is None:
@@ -57,15 +63,15 @@ class CliffordGen(PipelineOperation):
             # Calculate the next coordinate in the chaotic system
             next_x = math.sin(a * y) + c * math.cos(a * x)
             next_y = math.sin(b * x) + d * math.cos(b * y)
-            
+
             x, y = next_x, next_y
-            
+
             # Scale and translate to the canvas center
             points.append((cx + x * scale, cy + y * scale))
 
         # We keep this as one giant continuous line for plotter efficiency
         attractor_line = LineString(points)
-        
+
         # Clip it to the current boundary so it doesn't wander off the page
         effective_boundary = self.get_effective_boundary(state)
         clipped = attractor_line.intersection(effective_boundary)
@@ -77,7 +83,9 @@ class CliffordGen(PipelineOperation):
             elif clipped.geom_type == 'MultiLineString':
                 new_lines.extend(list(clipped.geoms))
 
-        logger.success(f"Clifford Attractor generated with {len(new_lines)} path segments.")
+        logger.success(
+            f"Clifford Attractor generated with {len(new_lines)} path segments."
+        )
         return PipelineState(boundary=state.boundary,
                              lines=state.lines + new_lines,
                              operation_name="clifford")

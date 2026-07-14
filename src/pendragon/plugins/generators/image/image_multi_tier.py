@@ -9,33 +9,29 @@ from pendragon.engine import PipelineContext
 from pendragon.engine import PipelineOperation
 from pendragon.engine import PipelineState
 from pendragon.engine import register_operation
-from pendragon.engine.registry import BasePluginConfig, PluginRegistry
+from pendragon.engine.registry import BasePluginConfig
+from pendragon.engine.registry import PluginRegistry
 from pendragon.utils import ImageSampler
 
 
 class ImageMultiTierConfig(BasePluginConfig):
-    source_image: str = Field(
-        default="", 
-        description="Path to the source image.", 
-        json_schema_extra={"widget": "file_picker"}
-    )
-    cell_size: float = Field(
-        default=5.0, 
-        description="Size of the grid cells."
-    )
-    
+    source_image: str = Field(default="",
+                              description="Path to the source image.",
+                              json_schema_extra={"widget": "file_picker"})
+    cell_size: float = Field(default=5.0, description="Size of the grid cells.")
+
     # Tier 1 (Darkest)
     tier_1_op: str = Field(default="spiral")
     tier_1_settings: dict = Field(default_factory=dict)
-    
+
     # Tier 2 (Mid-Dark)
     tier_2_op: str = Field(default="concentric")
     tier_2_settings: dict = Field(default_factory=dict)
-    
+
     # Tier 3 (Mid-Light)
     tier_3_op: str = Field(default="grid_lines")
     tier_3_settings: dict = Field(default_factory=dict)
-    
+
     # Tier 4 (Lightest)
     tier_4_op: str = Field(default="")
     tier_4_settings: dict = Field(default_factory=dict)
@@ -48,27 +44,28 @@ class ImageMultiTierGen(PipelineOperation):
     to each cell based on the darkness threshold (0.0 to 1.0).
     """
 
-    def _load_generator(self, op_name: str, settings: dict, registry: PluginRegistry):
+    def _load_generator(self, op_name: str, settings: dict,
+                        registry: PluginRegistry):
         if not op_name or op_name.lower() == "none":
             return None
-        
+
         op_info = registry.get(op_name)
         if not op_info:
             logger.warning(f"Operation '{op_name}' not found in registry.")
             return None
-            
+
         PluginClass = op_info["class"]
         ConfigClass = op_info["config"]
-        
+
         config = ConfigClass(**settings) if ConfigClass else None
         return PluginClass(config=config)
 
     def process(self,
                 state: PipelineState,
                 context: Optional[PipelineContext] = None) -> PipelineState:
-        
+
         cfg = self.config or ImageMultiTierConfig()
-        
+
         if not cfg.source_image:
             logger.warning("No source image provided for image_multi_tier.")
             return state
@@ -78,20 +75,24 @@ class ImageMultiTierGen(PipelineOperation):
 
         logger.info(f"Loading Multi-Tier image: {cfg.source_image}")
         sampler = ImageSampler(cfg.source_image, effective_boundary.bounds)
-        
+
         # Instantiate and discover plugins for this operation
         registry = PluginRegistry()
         registry.discover()
-        
+
         # Pre-instantiate the generators to avoid rebuilding them thousands of times
-        tier_1_gen = self._load_generator(cfg.tier_1_op, cfg.tier_1_settings, registry) # 0.75 - 1.0
-        tier_2_gen = self._load_generator(cfg.tier_2_op, cfg.tier_2_settings, registry) # 0.50 - 0.75
-        tier_3_gen = self._load_generator(cfg.tier_3_op, cfg.tier_3_settings, registry) # 0.25 - 0.50
-        tier_4_gen = self._load_generator(cfg.tier_4_op, cfg.tier_4_settings, registry) # 0.00 - 0.25
+        tier_1_gen = self._load_generator(cfg.tier_1_op, cfg.tier_1_settings,
+                                          registry)  # 0.75 - 1.0
+        tier_2_gen = self._load_generator(cfg.tier_2_op, cfg.tier_2_settings,
+                                          registry)  # 0.50 - 0.75
+        tier_3_gen = self._load_generator(cfg.tier_3_op, cfg.tier_3_settings,
+                                          registry)  # 0.25 - 0.50
+        tier_4_gen = self._load_generator(cfg.tier_4_op, cfg.tier_4_settings,
+                                          registry)  # 0.00 - 0.25
 
         new_lines = []
         cell_size = cfg.cell_size
-        
+
         cols = math.ceil((maxx - minx) / cell_size)
         rows = math.ceil((maxy - miny) / cell_size)
 
@@ -102,15 +103,16 @@ class ImageMultiTierGen(PipelineOperation):
                 x = minx + (col * cell_size)
                 y = miny + (row * cell_size)
                 cx, cy = x + (cell_size / 2), y + (cell_size / 2)
-                
+
                 # Check if cell center is inside the main boundary
                 import shapely.geometry
-                if not effective_boundary.contains(shapely.geometry.Point(cx, cy)):
+                if not effective_boundary.contains(
+                        shapely.geometry.Point(cx, cy)):
                     continue
 
                 # Sample the image (returns 0.0 for white, 1.0 for black)
                 darkness = sampler.get_darkness(cx, cy)
-                
+
                 # Determine which generator to use based on the quartile
                 active_gen = None
                 if darkness >= 0.75:
@@ -121,26 +123,28 @@ class ImageMultiTierGen(PipelineOperation):
                     active_gen = tier_3_gen
                 else:
                     active_gen = tier_4_gen
-                
+
                 if active_gen:
                     # Create the local bounding box for this cell
-                    cell_poly = Polygon([
-                        (x, y), (x + cell_size, y), 
-                        (x + cell_size, y + cell_size), (x, y + cell_size), 
-                        (x, y)
-                    ])
-                    
+                    cell_poly = Polygon([(x, y), (x + cell_size, y),
+                                         (x + cell_size, y + cell_size),
+                                         (x, y + cell_size), (x, y)])
+
                     # Create isolated state and context for the sub-generator
                     sub_state = PipelineState(boundary=cell_poly)
-                    sub_ctx = PipelineContext(local_center_x=cx, local_center_y=cy)
-                    
+                    sub_ctx = PipelineContext(local_center_x=cx,
+                                              local_center_y=cy)
+
                     try:
                         result_state = active_gen.process(sub_state, sub_ctx)
                         new_lines.extend(result_state.lines)
                     except Exception as e:
-                        logger.error(f"Error running {active_gen.__class__.__name__} at cell ({x},{y}): {e}")
+                        logger.error(
+                            f"Error running {active_gen.__class__.__name__} at cell ({x},{y}): {e}"
+                        )
 
-        logger.success(f"Multi-tier image processing generated {len(new_lines)} segments.")
+        logger.success(
+            f"Multi-tier image processing generated {len(new_lines)} segments.")
         return PipelineState(boundary=state.boundary,
                              lines=state.lines + new_lines,
                              operation_name="image_multi_tier")
@@ -172,13 +176,14 @@ class ImageMultiTierGen(PipelineOperation):
         def trigger_recalc():
             # 1. Invalidate the engine cache from this step onward
             window.controller.engine.invalidate_from(op_index)
-            
+
             # 2. Update the controller's pending index
             if window.controller._pending_op_index is None:
                 window.controller._pending_op_index = op_index
             else:
-                window.controller._pending_op_index = min(window.controller._pending_op_index, op_index)
-                
+                window.controller._pending_op_index = min(
+                    window.controller._pending_op_index, op_index)
+
             # 3. Trigger the controller's debounce timer
             window.controller.debounce_timer.start()
 
@@ -186,20 +191,23 @@ class ImageMultiTierGen(PipelineOperation):
         img_layout = QHBoxLayout()
         img_layout.addWidget(QLabel("Source Image:"))
         img_line = QLineEdit(self.config.source_image)
-        
+
         def update_img(text):
             self.config.source_image = text
             trigger_recalc()
-            
+
         img_line.textChanged.connect(update_img)
         img_layout.addWidget(img_line)
 
         btn_browse = QPushButton("Browse...")
+
         def browse_file():
-            path, _ = QFileDialog.getOpenFileName(window, "Select Image", "", "Images (*.png *.jpg *.jpeg);;All Files (*)")
+            path, _ = QFileDialog.getOpenFileName(
+                window, "Select Image", "",
+                "Images (*.png *.jpg *.jpeg);;All Files (*)")
             if path:
                 img_line.setText(path)
-                
+
         btn_browse.clicked.connect(browse_file)
         img_layout.addWidget(btn_browse)
         layout.addLayout(img_layout)
@@ -211,21 +219,19 @@ class ImageMultiTierGen(PipelineOperation):
         cs_spin.setRange(0.1, 1000.0)
         cs_spin.setSingleStep(0.5)
         cs_spin.setValue(self.config.cell_size)
-        
+
         def update_cs(val):
             self.config.cell_size = val
             trigger_recalc()
-            
+
         cs_spin.valueChanged.connect(update_cs)
         cs_layout.addWidget(cs_spin)
         layout.addLayout(cs_layout)
 
         # --- 3. Dynamic Tier Layouts ---
         tier_names = [
-            "Tier 1 (Darkest: 75%-100%)", 
-            "Tier 2 (Mid-Dark: 50%-75%)",
-            "Tier 3 (Mid-Light: 25%-50%)", 
-            "Tier 4 (Lightest: 0%-25%)"
+            "Tier 1 (Darkest: 75%-100%)", "Tier 2 (Mid-Dark: 50%-75%)",
+            "Tier 3 (Mid-Light: 25%-50%)", "Tier 4 (Lightest: 0%-25%)"
         ]
 
         # Grab the registry directly from the active engine
@@ -236,8 +242,10 @@ class ImageMultiTierGen(PipelineOperation):
             op_attr = f"tier_{i}_op"
             settings_attr = f"tier_{i}_settings"
 
-            group = QGroupBox(tier_names[i-1])
-            group.setStyleSheet("QGroupBox { border: 1px solid #444; border-radius: 4px; padding-top: 15px; margin-top: 10px; }")
+            group = QGroupBox(tier_names[i - 1])
+            group.setStyleSheet(
+                "QGroupBox { border: 1px solid #444; border-radius: 4px; padding-top: 15px; margin-top: 10px; }"
+            )
             group_layout = QFormLayout(group)
 
             combo = QComboBox()
@@ -251,15 +259,19 @@ class ImageMultiTierGen(PipelineOperation):
 
             # Callback factory to trap the correct tier variables
             def make_combo_cb(op_key, set_key):
+
                 def on_change(text):
                     new_val = "" if text == "None" else text
                     setattr(self.config, op_key, new_val)
                     setattr(self.config, set_key, {})  # Clear out old settings
-                    window.build_ui_for_current_step() # Redraw the whole UI panel
+                    window.build_ui_for_current_step(
+                    )  # Redraw the whole UI panel
                     trigger_recalc()
+
                 return on_change
 
-            combo.currentTextChanged.connect(make_combo_cb(op_attr, settings_attr))
+            combo.currentTextChanged.connect(
+                make_combo_cb(op_attr, settings_attr))
             group_layout.addRow("Generator:", combo)
 
             # Delegate standard setting fields back to Pendragon's WidgetFactory
@@ -268,22 +280,32 @@ class ImageMultiTierGen(PipelineOperation):
                 current_settings = getattr(self.config, settings_attr)
 
                 if ConfigClass:
-                    for field_name, field_info in ConfigClass.model_fields.items():
+                    for field_name, field_info in ConfigClass.model_fields.items(
+                    ):
                         # Extract the existing value or fall back to the plugin's default
-                        val = current_settings.get(field_name, field_info.default if field_info.default is not None else 0.0)
+                        val = current_settings.get(
+                            field_name, field_info.default
+                            if field_info.default is not None else 0.0)
 
                         def make_setting_cb(t_idx, f_name):
+
                             def cb(new_val):
-                                target_dict = getattr(self.config, f"tier_{t_idx}_settings")
+                                target_dict = getattr(self.config,
+                                                      f"tier_{t_idx}_settings")
                                 target_dict[f_name] = new_val
                                 trigger_recalc()
+
                             return cb
 
                         widget_container = WidgetFactory.build_field_widget(
-                            field_name, field_info, val, make_setting_cb(i, field_name), parent=window
-                        )
+                            field_name,
+                            field_info,
+                            val,
+                            make_setting_cb(i, field_name),
+                            parent=window)
                         if widget_container:
-                            group_layout.addRow(f"↳ {field_name}", widget_container)
+                            group_layout.addRow(f"↳ {field_name}",
+                                                widget_container)
 
             layout.addWidget(group)
 

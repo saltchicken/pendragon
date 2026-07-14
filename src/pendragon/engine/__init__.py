@@ -4,8 +4,8 @@ from .mixins import CenteredPluginConfig
 from .models import PipelineContext
 from .models import PipelineState
 from .registry import BasePluginConfig
-from .registry import PluginRegistry
 from .registry import PipelineOperation
+from .registry import PluginRegistry
 from .registry import register_operation
 from .runner import PipelineRunner
 from .schema import generate_recipe_schema

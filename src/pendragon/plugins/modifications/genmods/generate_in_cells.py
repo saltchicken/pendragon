@@ -135,9 +135,10 @@ class GenerateInCellsOp(PipelineOperation):
         registry = PluginRegistry()
         registry.discover()
         op_info = registry.get(cfg.generator)
-        
+
         if not op_info:
-            logger.error(f"Sub-generator '{cfg.generator}' not found in registry.")
+            logger.error(
+                f"Sub-generator '{cfg.generator}' not found in registry.")
             return state
 
         SubGenClass = op_info["class"]

@@ -15,29 +15,23 @@ from pendragon.engine import register_operation
 
 
 class TransformConfig(BaseModel):
-    translate_x: float = Field(
-        default=0.0, description="Translation along the X axis."
-    )
-    translate_y: float = Field(
-        default=0.0, description="Translation along the Y axis."
-    )
+    translate_x: float = Field(default=0.0,
+                               description="Translation along the X axis.")
+    translate_y: float = Field(default=0.0,
+                               description="Translation along the Y axis.")
     rotation: float = Field(
-        default=0.0, description="Rotation angle in degrees (counter-clockwise)."
-    )
+        default=0.0,
+        description="Rotation angle in degrees (counter-clockwise).")
     rotation_origin: str = Field(
-        default="center", 
-        description="Origin point for rotation ('center', 'centroid', etc)."
-    )
-    scale_x: float = Field(
-        default=1.0, description="Scaling multiplier for the X axis."
-    )
-    scale_y: float = Field(
-        default=1.0, description="Scaling multiplier for the Y axis."
-    )
+        default="center",
+        description="Origin point for rotation ('center', 'centroid', etc).")
+    scale_x: float = Field(default=1.0,
+                           description="Scaling multiplier for the X axis.")
+    scale_y: float = Field(default=1.0,
+                           description="Scaling multiplier for the Y axis.")
     scale_origin: str = Field(
-        default="center", 
-        description="Origin point for scaling ('center', 'centroid', etc)."
-    )
+        default="center",
+        description="Origin point for scaling ('center', 'centroid', etc).")
 
 
 @register_operation("transform", config_class=TransformConfig)
@@ -82,7 +76,7 @@ class TransformMod(PipelineOperation):
 
         # 3. Pack lines into a single geometry to preserve relative coordinates
         geom = MultiLineString(valid_lines)
-            
+
         # Scale
         if sx != 1.0 or sy != 1.0:
             geom = scale(geom, xfact=sx, yfact=sy, origin=final_scale_orig)

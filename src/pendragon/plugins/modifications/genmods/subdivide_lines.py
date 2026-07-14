@@ -1,4 +1,3 @@
-
 from loguru import logger
 from pydantic import Field
 from shapely.geometry import LineString

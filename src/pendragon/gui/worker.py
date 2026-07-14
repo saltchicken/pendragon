@@ -9,7 +9,8 @@ from pendragon.engine import PipelineRunner
 
 def _vectorize_lines(lines):
     if not lines:
-        return np.empty((0, 2), dtype=np.float32), np.empty((0, 2), dtype=np.uint32)
+        return np.empty((0, 2), dtype=np.float32), np.empty((0, 2),
+                                                            dtype=np.uint32)
 
     coords_list = [np.array(line.coords, dtype=np.float32) for line in lines]
     stacked_pos = np.vstack(coords_list)
@@ -20,13 +21,17 @@ def _vectorize_lines(lines):
 
     for n in lengths:
         if n > 1:
-            starts = np.arange(current_idx, current_idx + n - 1, dtype=np.uint32)
+            starts = np.arange(current_idx,
+                               current_idx + n - 1,
+                               dtype=np.uint32)
             ends = starts + 1
             connect_blocks.append(np.column_stack((starts, ends)))
         current_idx += n
 
-    final_connect = np.vstack(connect_blocks) if connect_blocks else np.empty((0, 2), dtype=np.uint32)
+    final_connect = np.vstack(connect_blocks) if connect_blocks else np.empty(
+        (0, 2), dtype=np.uint32)
     return stacked_pos, final_connect
+
 
 def vispy_formatter(state):
     pos, connect = _vectorize_lines(state.lines)
@@ -37,25 +42,29 @@ def vispy_formatter(state):
         "connect": connect
     }
 
+
 class PipelineStreamingThread(QThread):
     step_completed = pyqtSignal(dict)
     # Update: Changed from list to object to accept the StateStore
-    finished = pyqtSignal(object) 
+    finished = pyqtSignal(object)
     error = pyqtSignal(str)
     cancelled = pyqtSignal()
 
-    def __init__(self, recipe, boundary, prior_history=None, start_index=0, target_fps=30):
+    def __init__(self,
+                 recipe,
+                 boundary,
+                 prior_history=None,
+                 start_index=0,
+                 target_fps=30):
         super().__init__()
         self.frame_time = 1.0 / target_fps
         self._is_cancelled = False
-        
-        self.runner = PipelineRunner(
-            recipe=recipe, 
-            boundary=boundary, 
-            prior_history=prior_history, 
-            start_index=start_index, 
-            formatter=vispy_formatter
-        )
+
+        self.runner = PipelineRunner(recipe=recipe,
+                                     boundary=boundary,
+                                     prior_history=prior_history,
+                                     start_index=start_index,
+                                     formatter=vispy_formatter)
 
     def cancel(self):
         self._is_cancelled = True
@@ -77,16 +86,24 @@ class PipelineStreamingThread(QThread):
 
             if event["type"] == "DONE":
                 if pending_data:
-                    self.step_completed.emit({"step": pending_data["step"], "total": pending_data["total"], **pending_data["data"]})
+                    self.step_completed.emit({
+                        "step": pending_data["step"],
+                        "total": pending_data["total"],
+                        **pending_data["data"]
+                    })
                 # Update: Read the store payload emitted by the new runner
-                self.finished.emit(event["store"]) 
+                self.finished.emit(event["store"])
                 return
 
             if event["type"] == "FRAME":
                 pending_data = event
                 current_time = time.time()
-                
+
                 if current_time - last_emit_time >= self.frame_time:
-                    self.step_completed.emit({"step": pending_data["step"], "total": pending_data["total"], **pending_data["data"]})
+                    self.step_completed.emit({
+                        "step": pending_data["step"],
+                        "total": pending_data["total"],
+                        **pending_data["data"]
+                    })
                     last_emit_time = current_time
                     pending_data = None

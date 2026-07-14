@@ -7,7 +7,8 @@ from shapely.geometry import Polygon
 
 from .models import PipelineContext
 from .models import PipelineState
-from .registry import PipelineOperation, PluginRegistry
+from .registry import PipelineOperation
+from .registry import PluginRegistry
 from .store import InMemoryStateStore
 from .store import StateStore
 
@@ -22,7 +23,8 @@ class PendragonEngine:
                  registry: Optional[PluginRegistry] = None):
 
         self.recipe = recipe
-        self.boundary = boundary or Polygon([(0, 0), (200, 0), (200, 200), (0, 200), (0, 0)])
+        self.boundary = boundary or Polygon([(0, 0), (200, 0), (200, 200),
+                                             (0, 200), (0, 0)])
         self.interactive = interactive
         self.operations: list[PipelineOperation] = []
 
@@ -49,7 +51,7 @@ class PendragonEngine:
     def get_operations(self) -> List[PipelineOperation]:
         """Returns a shallow copy of the operations to prevent direct mutation."""
         return self.operations.copy()
-        
+
     def update_recipe(self, new_recipe: list) -> bool:
         """Updates the recipe and rebuilds operations without wiping the state store."""
         self.recipe = new_recipe
@@ -82,7 +84,9 @@ class PendragonEngine:
         for step in self.recipe:
             op_name = step.get("operation")
             if not op_name:
-                logger.error(f"Invalid step configuration, missing 'operation' key: {step}")
+                logger.error(
+                    f"Invalid step configuration, missing 'operation' key: {step}"
+                )
                 return False
 
             op_info = self.registry.get(op_name)
