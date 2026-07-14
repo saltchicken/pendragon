@@ -72,7 +72,7 @@ class LiveEditorWindow(QMainWindow):
         self.action_panel.btn_export.clicked.connect(self._gui_export_gcode)
         self.control_layout.addWidget(self.action_panel)
 
-        op_names = self.controller.engine.registry.get_operation_names()
+        op_names = self.controller.get_available_operations()
         self.edit_panel = EditPanel(op_names=op_names)
         self.edit_panel.btn_add.clicked.connect(self._gui_add_operation)
         self.edit_panel.btn_remove.clicked.connect(self._gui_remove_operation)
@@ -110,7 +110,7 @@ class LiveEditorWindow(QMainWindow):
             self, "Load Recipe", "", "YAML Files (*.yaml *.yml);;All Files (*)")
         if file_path:
             if self.controller.load_recipe_from_file(file_path):
-                self.viewer.current_step = self.controller.engine.get_operation_count()
+                self.viewer.current_step = self.controller.get_operation_count()
 
     def _gui_save_recipe(self):
         file_path, _ = QFileDialog.getSaveFileName(
@@ -133,7 +133,7 @@ class LiveEditorWindow(QMainWindow):
         self.viewer.update_view()
 
     def _on_ui_rebuild(self):
-        max_step = self.controller.engine.get_operation_count()
+        max_step = self.controller.get_operation_count()
         if self.viewer.current_step > max_step:
             self.viewer.current_step = max_step
         self.build_ui_for_current_step()
@@ -166,7 +166,7 @@ class LiveEditorWindow(QMainWindow):
         self.progress_panel.bar.setFormat("Finalizing Display...")
         QApplication.processEvents()
 
-        target = self.controller.engine.get_operation_count() if self.viewer.show_final_view else self.viewer.current_step
+        target = self.controller.get_operation_count() if self.viewer.show_final_view else self.viewer.current_step
         self.viewer.current_step = min(target, len(final_store) - 1)
         self.viewer.update_view()
 

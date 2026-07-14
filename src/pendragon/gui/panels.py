@@ -94,11 +94,12 @@ class PropertiesPanel(QWidget):
                 child.widget().deleteLater()
 
         op_index = current_step - 1
-        if op_index < 0 or op_index >= self.controller.engine.get_operation_count():
+        
+        if op_index < 0 or op_index >= self.controller.get_operation_count():
             self.form_layout.addRow(QLabel("No configurable parameters for this state."))
             return
 
-        operation = self.controller.engine.get_operation(op_index)
+        operation = self.controller.get_operation(op_index)
         if not operation or not operation.config:
             self.form_layout.addRow(QLabel(f"{operation.__class__.__name__} has no config."))
             return
@@ -124,7 +125,8 @@ class PropertiesPanel(QWidget):
                 elif hasattr(operation.config, "generator"):
                     registry_key = getattr(operation.config, "generator")
 
-                op_info = self.controller.engine.registry.get(registry_key) if registry_key else None
+                op_info = self.controller.get_operation_info(registry_key) if registry_key else None
+                
                 if op_info and op_info["config"]:
                     sub_config_class = op_info["config"]
                     self.form_layout.addRow(QLabel(f"<br><i>Nested Context: {registry_key} ({field_name})</i>"))
@@ -136,6 +138,8 @@ class PropertiesPanel(QWidget):
                         def nested_update_callback(val, parent_dict=field_name, fname=sub_field_name, idx=op_index):
                             self.controller.update_nested_parameter(idx, parent_dict, fname, val)
 
+                        # Note: We are keeping the registry pass-through for WidgetFactory for now, 
+                        # but ideally, this should also be refactored to pass a list of strings instead of the registry object.
                         sub_container = WidgetFactory.build_field_widget(
                             sub_field_name, sub_field_info, sub_current_value, nested_update_callback, 
                             registry=self.controller.engine.registry, parent=self
@@ -149,7 +153,7 @@ class PropertiesPanel(QWidget):
 
             if field_info.annotation == str:
                 def root_update_callback(text, fname=field_name, idx=op_index, wtype=widget_type):
-                    op = self.controller.engine.get_operation(idx)
+                    op = self.controller.get_operation(idx)
                     if op and getattr(op.config, fname) == text:
                         return
                     self.controller.update_parameter(idx, fname, text)

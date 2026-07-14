@@ -30,6 +30,18 @@ class PipelineController(QObject):
         self.debounce_timer.setInterval(300)
         self.debounce_timer.timeout.connect(self._execute_recalculation)
 
+    def get_operation_count(self) -> int:
+        return self.engine.get_operation_count()
+
+    def get_operation(self, index: int):
+        return self.engine.get_operation(index)
+
+    def get_available_operations(self) -> list[str]:
+        return self.engine.registry.get_operation_names()
+
+    def get_operation_info(self, name: str):
+        return self.engine.registry.get(name)
+
     def trigger_computation(self):
         if self._is_computing:
             self._computation_queued = True
