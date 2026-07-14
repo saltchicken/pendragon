@@ -3,7 +3,6 @@ from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtWidgets import QCheckBox
 from PyQt5.QtWidgets import QFileDialog
-from PyQt5.QtWidgets import QFormLayout
 from PyQt5.QtWidgets import QHBoxLayout
 from PyQt5.QtWidgets import QLabel
 from PyQt5.QtWidgets import QMainWindow
@@ -16,8 +15,8 @@ from pendragon.gui.panels import ActionPanel
 from pendragon.gui.panels import EditPanel
 from pendragon.gui.panels import ProgressPanel
 from pendragon.gui.panels import StatsPanel
+from pendragon.gui.panels import PropertiesPanel
 from pendragon.gui.viewer import PipelineViewer
-from pendragon.gui.widgets import WidgetFactory
 
 from pendragon.gui.utils import load_stylesheet
 
@@ -87,10 +86,9 @@ class LiveEditorWindow(QMainWindow):
         self.edit_panel.btn_remove.clicked.connect(self._gui_remove_operation)
         self.control_layout.addWidget(self.edit_panel)
 
-        # 7. Dynamic Form Area
-        self.dynamic_form_widget = QWidget()
-        self.form_layout = QFormLayout(self.dynamic_form_widget)
-        self.control_layout.addWidget(self.dynamic_form_widget)
+        # 7. Properties Editor Panel
+        self.properties_panel = PropertiesPanel(self.controller)
+        self.control_layout.addWidget(self.properties_panel)
 
         # --- Bind Viewer Callbacks ---
         self.viewer.on_step_changed = self.build_ui_for_current_step
@@ -216,94 +214,8 @@ class LiveEditorWindow(QMainWindow):
     # --- Dynamic Form Builder ---
 
     def build_ui_for_current_step(self):
-        """Constructs the property editor based on the engine's current operation config."""
-        self.control_layout.removeWidget(self.dynamic_form_widget)
-        self.dynamic_form_widget.deleteLater()
-
-        self.dynamic_form_widget = QWidget()
-        self.form_layout = QFormLayout(self.dynamic_form_widget)
-        self.control_layout.addWidget(self.dynamic_form_widget)
-
-        op_index = self.viewer.current_step - 1
-        if op_index < 0 or op_index >= len(self.controller.engine.operations):
-            self.form_layout.addRow(QLabel("No configurable parameters for this state."))
-            return
-
-        operation = self.controller.engine.operations[op_index]
-        if not operation.config:
-            self.form_layout.addRow(QLabel(f"{operation.__class__.__name__} has no config."))
-            return
-
-        self.form_layout.addRow(QLabel(f"<b>Editing: {operation.__class__.__name__}</b>"))
-
-        # --- PLUGIN UI DELEGATION HOOK ---
-        if hasattr(operation, "build_custom_ui"):
-            custom_widget = operation.build_custom_ui(self, op_index)
-            if custom_widget:
-                self.form_layout.addRow(custom_widget)
-                return
-        # ---------------------------------
-
-        for field_name, field_info in operation.config.model_fields.items():
-            current_value = getattr(operation.config, field_name)
-            
-            # 1. Handle Nested Configs (Dictionaries)
-            if isinstance(current_value, dict) or field_info.annotation == dict or getattr(field_info.annotation, '__origin__', None) is dict:
-                registry_key = None
-                prefix = field_name.split('_')[0] if '_' in field_name else ""
-                if prefix and hasattr(operation.config, prefix):
-                    registry_key = getattr(operation.config, prefix)
-                elif hasattr(operation.config, "generator"):
-                    registry_key = getattr(operation.config, "generator")
-
-                # Grab the op info from the engine's registry instance
-                op_info = self.controller.engine.registry.get(registry_key) if registry_key else None
-
-                if op_info and op_info["config"]:
-                    sub_config_class = op_info["config"]
-                    self.form_layout.addRow(QLabel(f"<br><i>Nested Context: {registry_key} ({field_name})</i>"))
-
-                    for sub_field_name, sub_field_info in sub_config_class.model_fields.items():
-                        sub_current_value = current_value.get(
-                            sub_field_name, sub_field_info.default if sub_field_info.default is not None else 0.0)
-
-                        def nested_update_callback(val, parent_dict=field_name, fname=sub_field_name, idx=op_index):
-                            self.controller.update_nested_parameter(idx, parent_dict, fname, val)
-
-                        sub_container = WidgetFactory.build_field_widget(
-                            sub_field_name, sub_field_info, sub_current_value, nested_update_callback, 
-                            registry=self.controller.engine.registry, parent=self
-                        )
-                        if sub_container:
-                            self.form_layout.addRow(f"↳ {sub_field_name}", sub_container)
-                continue
-
-            # 2. Handle Standard Config Fields via WidgetFactory
-            schema_extra = field_info.json_schema_extra or {}
-            widget_type = schema_extra.get("widget")
-
-            if field_info.annotation == str:
-                def root_update_callback(text, fname=field_name, idx=op_index, wtype=widget_type):
-                    op = self.controller.engine.operations[idx]
-                    if getattr(op.config, fname) == text:
-                        return
-                    self.controller.update_parameter(idx, fname, text)
-                    
-                    if wtype == "operation_selector":
-                        settings_key = f"{fname}_settings"
-                        if hasattr(op.config, settings_key):
-                            setattr(op.config, settings_key, {})
-                        QTimer.singleShot(0, self.build_ui_for_current_step)
-            else:
-                def root_update_callback(val, fname=field_name, idx=op_index):
-                    self.controller.update_parameter(idx, fname, val)
-
-            container = WidgetFactory.build_field_widget(
-                field_name, field_info, current_value, root_update_callback, 
-                registry=self.controller.engine.registry, parent=self
-            )
-            if container:
-                self.form_layout.addRow(field_name, container)
+        """Delegates to the PropertiesPanel to construct the property editor."""
+        self.properties_panel.rebuild_for_step(self.viewer.current_step)
 
     def closeEvent(self, event):
         self.controller.shutdown()
