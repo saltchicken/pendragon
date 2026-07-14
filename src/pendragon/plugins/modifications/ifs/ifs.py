@@ -159,13 +159,13 @@ class IFSMod(PipelineOperation):
             self.config.transforms.append(
                 IFSTransform(matrix=[1.0, 0.0, 0.0, 1.0, 0.0, 0.0],
                              variation="linear"))
-            window.build_ui_for_current_step()
+            window.controller.ui_rebuild_requested.emit()
             trigger_recalc()
 
         def remove_transform(idx):
             if 0 <= idx < len(self.config.transforms):
                 self.config.transforms.pop(idx)
-                window.build_ui_for_current_step()
+                window.controller.ui_rebuild_requested.emit()
                 trigger_recalc()
 
         # --- 1. Iterations Spinner ---

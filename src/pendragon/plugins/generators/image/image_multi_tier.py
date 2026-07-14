@@ -264,8 +264,7 @@ class ImageMultiTierGen(PipelineOperation):
                     new_val = "" if text == "None" else text
                     setattr(self.config, op_key, new_val)
                     setattr(self.config, set_key, {})  # Clear out old settings
-                    window.build_ui_for_current_step(
-                    )  # Redraw the whole UI panel
+                    window.controller.ui_rebuild_requested.emit()  # Redraw the whole UI panel
                     trigger_recalc()
 
                 return on_change
