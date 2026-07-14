@@ -1,3 +1,5 @@
+from functools import partial
+
 from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QComboBox
 from PyQt5.QtWidgets import QFormLayout
@@ -88,22 +90,13 @@ class PropertiesPanel(QWidget):
         self.form_layout.setContentsMargins(0, 0, 0, 0)
 
     def rebuild_for_step(self, current_step: int):
-        while self.form_layout.count():
-            child = self.form_layout.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
+        self._clear_layout()
 
         op_index = current_step - 1
-        
-        if op_index < 0 or op_index >= self.controller.get_operation_count():
-            self.form_layout.addRow(QLabel("No configurable parameters for this state."))
+        if not self._is_valid_operation(op_index):
             return
 
         operation = self.controller.get_operation(op_index)
-        if not operation or not operation.config:
-            self.form_layout.addRow(QLabel(f"{operation.__class__.__name__} has no config."))
-            return
-
         self.form_layout.addRow(QLabel(f"<b>Editing: {operation.__class__.__name__}</b>"))
 
         # --- PLUGIN UI DELEGATION HOOK ---
@@ -111,65 +104,104 @@ class PropertiesPanel(QWidget):
             custom_widget = operation.build_custom_ui(self, op_index)
             if custom_widget:
                 self.form_layout.addRow(custom_widget)
-                return
+            return
         # ---------------------------------
 
+        self._build_pydantic_ui(operation, op_index)
+
+    def _clear_layout(self):
+        while self.form_layout.count():
+            child = self.form_layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+
+    def _is_valid_operation(self, op_index: int) -> bool:
+        if op_index < 0 or op_index >= self.controller.get_operation_count():
+            self.form_layout.addRow(QLabel("No configurable parameters for this state."))
+            return False
+
+        operation = self.controller.get_operation(op_index)
+        if not operation or not operation.config:
+            self.form_layout.addRow(QLabel(f"{operation.__class__.__name__} has no config."))
+            return False
+            
+        return True
+
+    def _build_pydantic_ui(self, operation, op_index: int):
         for field_name, field_info in operation.config.model_fields.items():
             current_value = getattr(operation.config, field_name)
-            
-            if isinstance(current_value, dict) or field_info.annotation == dict or getattr(field_info.annotation, '__origin__', None) is dict:
-                registry_key = None
-                prefix = field_name.split('_')[0] if '_' in field_name else ""
-                if prefix and hasattr(operation.config, prefix):
-                    registry_key = getattr(operation.config, prefix)
-                elif hasattr(operation.config, "generator"):
-                    registry_key = getattr(operation.config, "generator")
 
-                op_info = self.controller.get_operation_info(registry_key) if registry_key else None
-                
-                if op_info and op_info["config"]:
-                    sub_config_class = op_info["config"]
-                    self.form_layout.addRow(QLabel(f"<br><i>Nested Context: {registry_key} ({field_name})</i>"))
-
-                    for sub_field_name, sub_field_info in sub_config_class.model_fields.items():
-                        sub_current_value = current_value.get(
-                            sub_field_name, sub_field_info.default if sub_field_info.default is not None else 0.0)
-
-                        def nested_update_callback(val, parent_dict=field_name, fname=sub_field_name, idx=op_index):
-                            self.controller.update_nested_parameter(idx, parent_dict, fname, val)
-
-                        # Note: We are keeping the registry pass-through for WidgetFactory for now, 
-                        # but ideally, this should also be refactored to pass a list of strings instead of the registry object.
-                        sub_container = WidgetFactory.build_field_widget(
-                            sub_field_name, sub_field_info, sub_current_value, nested_update_callback, 
-                            registry=self.controller.engine.registry, parent=self
-                        )
-                        if sub_container:
-                            self.form_layout.addRow(f"↳ {sub_field_name}", sub_container)
-                continue
-
-            schema_extra = field_info.json_schema_extra or {}
-            widget_type = schema_extra.get("widget")
-
-            if field_info.annotation == str:
-                def root_update_callback(text, fname=field_name, idx=op_index, wtype=widget_type):
-                    op = self.controller.get_operation(idx)
-                    if op and getattr(op.config, fname) == text:
-                        return
-                    self.controller.update_parameter(idx, fname, text)
-                    
-                    if wtype == "operation_selector" and op:
-                        settings_key = f"{fname}_settings"
-                        if hasattr(op.config, settings_key):
-                            setattr(op.config, settings_key, {})
-                        QTimer.singleShot(0, lambda: self.rebuild_for_step(current_step))
-            else:
-                def root_update_callback(val, fname=field_name, idx=op_index):
-                    self.controller.update_parameter(idx, fname, val)
-
-            container = WidgetFactory.build_field_widget(
-                field_name, field_info, current_value, root_update_callback, 
-                registry=self.controller.engine.registry, parent=self
+            is_nested_dict = (
+                isinstance(current_value, dict) or 
+                field_info.annotation == dict or 
+                getattr(field_info.annotation, '__origin__', None) is dict
             )
-            if container:
-                self.form_layout.addRow(field_name, container)
+
+            if is_nested_dict:
+                self._build_nested_fields(operation, op_index, field_name, current_value)
+            else:
+                self._build_standard_field(operation, op_index, field_name, field_info, current_value)
+
+    def _build_nested_fields(self, operation, op_index: int, field_name: str, current_value: dict):
+        registry_key = None
+        prefix = field_name.split('_')[0] if '_' in field_name else ""
+        
+        if prefix and hasattr(operation.config, prefix):
+            registry_key = getattr(operation.config, prefix)
+        elif hasattr(operation.config, "generator"):
+            registry_key = getattr(operation.config, "generator")
+
+        op_info = self.controller.get_operation_info(registry_key) if registry_key else None
+
+        if op_info and op_info["config"]:
+            sub_config_class = op_info["config"]
+            self.form_layout.addRow(QLabel(f"<br><i>Nested Context: {registry_key} ({field_name})</i>"))
+
+            for sub_field_name, sub_field_info in sub_config_class.model_fields.items():
+                sub_current_value = current_value.get(
+                    sub_field_name, sub_field_info.default if sub_field_info.default is not None else 0.0)
+
+                update_cb = partial(
+                    self.controller.update_nested_parameter, 
+                    op_index, 
+                    field_name, 
+                    sub_field_name
+                )
+
+                sub_container = WidgetFactory.build_field_widget(
+                    sub_field_name, sub_field_info, sub_current_value, update_cb, 
+                    registry=self.controller.engine.registry, parent=self
+                )
+                if sub_container:
+                    self.form_layout.addRow(f"↳ {sub_field_name}", sub_container)
+
+    def _build_standard_field(self, operation, op_index: int, field_name: str, field_info, current_value):
+        schema_extra = field_info.json_schema_extra or {}
+        widget_type = schema_extra.get("widget")
+
+        if field_info.annotation == str:
+            update_cb = partial(self._handle_string_update, op_index, field_name, widget_type)
+        else:
+            update_cb = partial(self.controller.update_parameter, op_index, field_name)
+
+        container = WidgetFactory.build_field_widget(
+            field_name, field_info, current_value, update_cb, 
+            registry=self.controller.engine.registry, parent=self
+        )
+        
+        if container:
+            self.form_layout.addRow(field_name, container)
+
+    def _handle_string_update(self, op_index: int, field_name: str, widget_type: str, text: str):
+        op = self.controller.get_operation(op_index)
+        if op and getattr(op.config, field_name) == text:
+            return
+            
+        self.controller.update_parameter(op_index, field_name, text)
+
+        if widget_type == "operation_selector" and op:
+            settings_key = f"{field_name}_settings"
+            if hasattr(op.config, settings_key):
+                setattr(op.config, settings_key, {})
+            # Current step is op_index + 1
+            QTimer.singleShot(0, partial(self.rebuild_for_step, op_index + 1))

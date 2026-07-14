@@ -1,3 +1,4 @@
+from functools import partial
 from typing import get_args, get_origin, Literal
 
 from PyQt5.QtCore import Qt
@@ -22,18 +23,32 @@ class WidgetFactory:
         origin = get_origin(field_info.annotation)
         annotation = field_info.annotation
 
-        if annotation == float:
-            return cls.build_float_widget(current_value, field_info, update_callback)
-        elif annotation == int:
-            return cls.build_int_widget(current_value, update_callback)
-        elif annotation == bool:
-            return cls.build_bool_widget(current_value, update_callback)
-        elif origin is Literal:
+        if origin is Literal:
             return cls.build_literal_widget(current_value, field_info, update_callback)
-        elif annotation == str:
-            return cls.build_str_widget(field_name, field_info, current_value, update_callback, registry, parent)
+
+        dispatch_table = {
+            float: partial(cls.build_float_widget, current_value, field_info, update_callback),
+            int: partial(cls.build_int_widget, current_value, update_callback),
+            bool: partial(cls.build_bool_widget, current_value, update_callback),
+            str: partial(cls.build_str_widget, field_name, field_info, current_value, update_callback, registry, parent)
+        }
+
+        builder = dispatch_table.get(annotation)
+        if builder:
+            return builder()
         
         return None
+
+    @staticmethod
+    def _update_float_label(val, lbl, v_min, r_span):
+        real_val = v_min + (val / 100.0) * r_span
+        lbl.setText(f"{real_val:.2f}")
+
+    @staticmethod
+    def _update_float_value(val, lbl, v_min, r_span, cb):
+        real_val = v_min + (val / 100.0) * r_span
+        lbl.setText(f"{real_val:.2f}")
+        cb(real_val)
 
     @staticmethod
     def build_float_widget(current_value, field_info, update_callback):
@@ -55,10 +70,7 @@ class WidgetFactory:
             slider.setMaximum(100)
             slider.setTracking(False)
 
-            # Prevent division by zero if bounds are equal
             range_span = val_max - val_min if val_max > val_min else 1.0
-
-            # Clamp the initial value to prevent UI mapping glitches
             clamped_val = max(val_min, min(val_max, current_value))
             current_percent = int(((clamped_val - val_min) / range_span) * 100)
             slider.setValue(current_percent)
@@ -67,17 +79,13 @@ class WidgetFactory:
             value_label.setMinimumWidth(35)
             value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
-            def update_label_only(val, lbl=value_label, v_min=val_min, r_span=range_span):
-                real_val = v_min + (val / 100.0) * r_span
-                lbl.setText(f"{real_val:.2f}")
-
-            def update_value_wrapper(val, lbl=value_label, v_min=val_min, r_span=range_span, cb=update_callback):
-                real_val = v_min + (val / 100.0) * r_span
-                lbl.setText(f"{real_val:.2f}")
-                cb(real_val)  # Emit back to caller
-
-            slider.sliderMoved.connect(update_label_only)
-            slider.valueChanged.connect(update_value_wrapper)
+            slider.sliderMoved.connect(
+                partial(WidgetFactory._update_float_label, lbl=value_label, v_min=val_min, r_span=range_span)
+            )
+            slider.valueChanged.connect(
+                partial(WidgetFactory._update_float_value, lbl=value_label, v_min=val_min, r_span=range_span, cb=update_callback)
+            )
+            
             h_layout.addWidget(slider)
             h_layout.addWidget(value_label)
 
@@ -89,10 +97,8 @@ class WidgetFactory:
             spin_box.setValue(current_value)
             spin_box.setKeyboardTracking(False)
 
-            def update_spin_wrapper(val, cb=update_callback):
-                cb(val)  # Emit back to caller
-
-            spin_box.valueChanged.connect(update_spin_wrapper)
+            # DoubleSpinBox valueChanged emits a float directly
+            spin_box.valueChanged.connect(update_callback)
             h_layout.addWidget(spin_box)
 
         return container
@@ -107,13 +113,15 @@ class WidgetFactory:
         spin_box.setRange(0, 10000)
         spin_box.setValue(int(current_value) if current_value is not None else 0)
 
-        def update_int_wrapper(val, cb=update_callback):
-            cb(val)
-
-        spin_box.valueChanged.connect(update_int_wrapper)
+        # Spinbox valueChanged emits an int directly
+        spin_box.valueChanged.connect(update_callback)
 
         h_layout.addWidget(spin_box)
         return container
+
+    @staticmethod
+    def _update_bool_value(state, cb):
+        cb(bool(state))
 
     @staticmethod
     def build_bool_widget(current_value, update_callback):
@@ -124,10 +132,9 @@ class WidgetFactory:
         checkbox = QCheckBox()
         checkbox.setChecked(bool(current_value))
 
-        def update_bool_wrapper(state, cb=update_callback):
-            cb(bool(state))
-
-        checkbox.stateChanged.connect(update_bool_wrapper)
+        checkbox.stateChanged.connect(
+            partial(WidgetFactory._update_bool_value, cb=update_callback)
+        )
 
         h_layout.addWidget(checkbox)
         return container
@@ -151,13 +158,19 @@ class WidgetFactory:
 
         combo_box.blockSignals(False)
 
-        def update_literal_wrapper(text, cb=update_callback):
-            cb(text)
-
-        combo_box.currentTextChanged.connect(update_literal_wrapper)
+        # currentTextChanged emits a string directly
+        combo_box.currentTextChanged.connect(update_callback)
 
         h_layout.addWidget(combo_box)
         return container
+
+    @staticmethod
+    def _open_file_dialog(le, p, field_name):
+        file_path, _ = QFileDialog.getOpenFileName(
+            p, f"Select {field_name}", "",
+            "Images (*.png *.jpg *.jpeg);;All Files (*)")
+        if file_path:
+            le.setText(file_path)
 
     @staticmethod
     def build_str_widget(field_name, field_info, current_value, update_callback, registry=None, parent=None):
@@ -168,9 +181,6 @@ class WidgetFactory:
         schema_extra = field_info.json_schema_extra or {}
         widget_type = schema_extra.get("widget")
 
-        def update_value(text, cb=update_callback):
-            cb(text)
-
         if widget_type == "operation_selector":
             widget = QComboBox()
             widget.blockSignals(True)
@@ -180,25 +190,20 @@ class WidgetFactory:
                 widget.setCurrentText(str(current_value))
             widget.blockSignals(False)
 
-            widget.currentTextChanged.connect(update_value)
+            widget.currentTextChanged.connect(update_callback)
             h_layout.addWidget(widget)
 
         else:
             widget = QLineEdit(str(current_value or ""))
-            widget.textChanged.connect(update_value)
+            widget.textChanged.connect(update_callback)
             h_layout.addWidget(widget)
 
             if widget_type == "file_picker":
                 browse_btn = QPushButton("Browse...")
-
-                def open_file_dialog(checked=False, le=widget, p=parent):
-                    file_path, _ = QFileDialog.getOpenFileName(
-                        p, f"Select {field_name}", "",
-                        "Images (*.png *.jpg *.jpeg);;All Files (*)")
-                    if file_path:
-                        le.setText(file_path)
-
-                browse_btn.clicked.connect(open_file_dialog)
+                
+                browse_btn.clicked.connect(
+                    partial(WidgetFactory._open_file_dialog, le=widget, p=parent, field_name=field_name)
+                )
                 h_layout.addWidget(browse_btn)
 
         return container

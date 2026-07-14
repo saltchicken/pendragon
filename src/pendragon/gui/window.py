@@ -30,6 +30,13 @@ class LiveEditorWindow(QMainWindow):
         
         self.setStyleSheet(load_stylesheet("style.qss"))
 
+        self._setup_ui()
+        self._connect_signals()
+
+        self.build_ui_for_current_step()
+        self.controller.trigger_computation()
+
+    def _setup_ui(self):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QHBoxLayout(central_widget)
@@ -46,54 +53,60 @@ class LiveEditorWindow(QMainWindow):
         self.control_layout.addWidget(self.stats_panel)
 
         self.progress_panel = ProgressPanel()
-        self.progress_panel.btn_cancel.clicked.connect(self.controller.cancel_computation)
         self.control_layout.addWidget(self.progress_panel)
 
         self.show_vertices_checkbox = QCheckBox("Show Vertices")
-        self.show_vertices_checkbox.toggled.connect(self._on_vertices_toggled)
         self.control_layout.addWidget(self.show_vertices_checkbox)
 
         self.final_view_checkbox = QCheckBox("Show Final View")
-        self.final_view_checkbox.toggled.connect(self._on_view_mode_toggled)
         self.control_layout.addWidget(self.final_view_checkbox)
 
         self.nav_layout = QHBoxLayout()
         self.btn_prev = QPushButton("Previous Step")
         self.btn_next = QPushButton("Next Step")
-        self.btn_prev.clicked.connect(self.viewer.step_backward)
-        self.btn_next.clicked.connect(self.viewer.step_forward)
         self.nav_layout.addWidget(self.btn_prev)
         self.nav_layout.addWidget(self.btn_next)
         self.control_layout.addLayout(self.nav_layout)
 
         self.action_panel = ActionPanel()
-        self.action_panel.btn_load.clicked.connect(self._gui_load_recipe)
-        self.action_panel.btn_save.clicked.connect(self._gui_save_recipe)
-        self.action_panel.btn_export.clicked.connect(self._gui_export_gcode)
         self.control_layout.addWidget(self.action_panel)
 
         op_names = self.controller.get_available_operations()
         self.edit_panel = EditPanel(op_names=op_names)
-        self.edit_panel.btn_add.clicked.connect(self._gui_add_operation)
-        self.edit_panel.btn_remove.clicked.connect(self._gui_remove_operation)
         self.control_layout.addWidget(self.edit_panel)
 
         self.properties_panel = PropertiesPanel(self.controller)
         self.control_layout.addWidget(self.properties_panel)
 
+    def _connect_signals(self):
+        # UI Component Signals
+        self.progress_panel.btn_cancel.clicked.connect(self.controller.cancel_computation)
+        
+        self.show_vertices_checkbox.toggled.connect(self._on_vertices_toggled)
+        self.final_view_checkbox.toggled.connect(self._on_view_mode_toggled)
+        
+        self.btn_prev.clicked.connect(self.viewer.step_backward)
+        self.btn_next.clicked.connect(self.viewer.step_forward)
+
+        self.action_panel.btn_load.clicked.connect(self._gui_load_recipe)
+        self.action_panel.btn_save.clicked.connect(self._gui_save_recipe)
+        self.action_panel.btn_export.clicked.connect(self._gui_export_gcode)
+
+        self.edit_panel.btn_add.clicked.connect(self._gui_add_operation)
+        self.edit_panel.btn_remove.clicked.connect(self._gui_remove_operation)
+
+        # Viewer Event Bindings
         self.viewer.on_step_changed = self.build_ui_for_current_step
         self.viewer.on_close_requested = self.close
         self.viewer.on_stats_updated = self.stats_panel.update_stats
 
+        # Controller Bindings
         self.controller.computation_started.connect(self._on_compute_start)
         self.controller.step_streamed.connect(self._on_step_streamed)
         self.controller.computation_finished.connect(self._on_compute_finish)
         self.controller.computation_error.connect(self._on_compute_error)
         self.controller.computation_cancelled.connect(self._on_compute_cancel)
         self.controller.ui_rebuild_requested.connect(self._on_ui_rebuild)
-
-        self.build_ui_for_current_step()
-        self.controller.trigger_computation()
 
     def _gui_add_operation(self):
         op_name = self.edit_panel.op_selector.currentText()
