@@ -1,3 +1,4 @@
+from enum import Enum, auto
 from loguru import logger
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtCore import QObject
@@ -7,6 +8,13 @@ import yaml
 from pendragon.engine import PendragonEngine
 from pendragon.export import export_gcode
 from pendragon.gui.worker import PipelineStreamingThread
+
+
+class ControllerState(Enum):
+    """Defines the mutually exclusive states of the pipeline runner."""
+    IDLE = auto()
+    COMPUTING = auto()
+    CANCELLING = auto()
 
 
 class PipelineController(QObject):
@@ -21,7 +29,9 @@ class PipelineController(QObject):
         super().__init__()
         self.engine = engine
         self.worker_thread = None
-        self._is_computing = False
+        
+        # State Machine Tracking
+        self._state = ControllerState.IDLE
         self._computation_queued = False
         self._pending_op_index = None
 
@@ -30,6 +40,7 @@ class PipelineController(QObject):
         self.debounce_timer.setInterval(300)
         self.debounce_timer.timeout.connect(self._execute_recalculation)
 
+    # --- Law of Demeter Accessors ---
     def get_operation_count(self) -> int:
         return self.engine.get_operation_count()
 
@@ -41,13 +52,15 @@ class PipelineController(QObject):
 
     def get_operation_info(self, name: str):
         return self.engine.registry.get(name)
+    # --------------------------------
 
     def trigger_computation(self):
-        if self._is_computing:
+        # State Machine: Route or queue the execution request
+        if self._state != ControllerState.IDLE:
             self._computation_queued = True
             return
 
-        self._is_computing = True
+        self._state = ControllerState.COMPUTING
         start_index = self._pending_op_index if self._pending_op_index is not None else 0
         self._pending_op_index = None
 
@@ -55,10 +68,12 @@ class PipelineController(QObject):
         current_recipe = self.get_current_recipe()
         prior_store = self.engine.store
 
-        self.worker_thread = PipelineStreamingThread(current_recipe,
-                                                     self.engine.boundary,
-                                                     prior_history=prior_store,
-                                                     start_index=start_index)
+        self.worker_thread = PipelineStreamingThread(
+            current_recipe,
+            self.engine.boundary,
+            prior_history=prior_store,
+            start_index=start_index
+        )
 
         self.worker_thread.step_completed.connect(self.step_streamed.emit)
         self.worker_thread.finished.connect(self._on_calculation_finished)
@@ -67,7 +82,9 @@ class PipelineController(QObject):
         self.worker_thread.start()
 
     def cancel_computation(self):
-        if self.worker_thread and self.worker_thread.isRunning():
+        # State Machine: Only cancel if we are actively computing
+        if self._state == ControllerState.COMPUTING and self.worker_thread and self.worker_thread.isRunning():
+            self._state = ControllerState.CANCELLING
             self.worker_thread.cancel()
 
     def update_parameter(self, op_index: int, field_name: str, new_value):
@@ -178,28 +195,37 @@ class PipelineController(QObject):
             self.trigger_computation()
 
     def _on_calculation_finished(self, final_store):
-        self._is_computing = False
+        # State Machine: Reset to IDLE, Window handles queue check via finalize_state
+        self._state = ControllerState.IDLE
         self.engine.store = final_store
         self.computation_finished.emit(final_store)
 
     def _on_calculation_error(self, error_msg):
-        self._is_computing = False
+        # State Machine: Reset to IDLE, clear queue on hard errors
+        self._state = ControllerState.IDLE
+        self._computation_queued = False 
         logger.error(f"Background pipeline failed: {error_msg}")
         self.computation_error.emit(error_msg)
 
     def _on_calculation_cancelled(self):
-        self._is_computing = False
-        self._computation_queued = False
+        # State Machine: Reset to IDLE, instantly process queue if modifications happened during cancel
+        self._state = ControllerState.IDLE
         logger.warning("Pipeline calculation cancelled by user.")
         self.computation_cancelled.emit()
+        
+        if self._computation_queued:
+            self._computation_queued = False
+            self.trigger_computation()
 
     def finalize_state(self):
+        # State Machine: Called by window when visualization is fully ready
         if self._computation_queued:
             self._computation_queued = False
             self.trigger_computation()
 
     def shutdown(self):
-        if self.worker_thread and self.worker_thread.isRunning():
+        if self._state != ControllerState.IDLE and self.worker_thread and self.worker_thread.isRunning():
+            self._state = ControllerState.CANCELLING
             self.worker_thread.cancel()
             self.worker_thread.quit()
             self.worker_thread.wait(1000)
