@@ -1,10 +1,28 @@
 import time
+from dataclasses import dataclass
 
 import numpy as np
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtCore import QThread
 
 from pendragon.engine import PipelineRunner
+
+
+@dataclass
+class FrameData:
+    """Type-safe payload for the vectorized geometry data."""
+    op_name: str
+    line_count: int
+    pos: np.ndarray
+    connect: np.ndarray
+
+
+@dataclass
+class StreamEvent:
+    """Type-safe payload for cross-thread pipeline progress communication."""
+    step: int
+    total: int
+    data: FrameData
 
 
 def _vectorize_lines(lines):
@@ -33,19 +51,19 @@ def _vectorize_lines(lines):
     return stacked_pos, final_connect
 
 
-def vispy_formatter(state):
+def vispy_formatter(state) -> FrameData:
     pos, connect = _vectorize_lines(state.lines)
-    return {
-        "op_name": state.operation_name,
-        "line_count": len(state.lines),
-        "pos": pos,
-        "connect": connect
-    }
+    return FrameData(
+        op_name=state.operation_name,
+        line_count=len(state.lines),
+        pos=pos,
+        connect=connect
+    )
 
 
 class PipelineStreamingThread(QThread):
-    step_completed = pyqtSignal(dict)
-    # Update: Changed from list to object to accept the StateStore
+    # Using 'object' allows passing custom Python objects safely in PyQt5
+    step_completed = pyqtSignal(object) 
     finished = pyqtSignal(object)
     error = pyqtSignal(str)
     cancelled = pyqtSignal()
@@ -86,12 +104,11 @@ class PipelineStreamingThread(QThread):
 
             if event["type"] == "DONE":
                 if pending_data:
-                    self.step_completed.emit({
-                        "step": pending_data["step"],
-                        "total": pending_data["total"],
-                        **pending_data["data"]
-                    })
-                # Update: Read the store payload emitted by the new runner
+                    self.step_completed.emit(StreamEvent(
+                        step=pending_data["step"],
+                        total=pending_data["total"],
+                        data=pending_data["data"]
+                    ))
                 self.finished.emit(event["store"])
                 return
 
@@ -100,10 +117,10 @@ class PipelineStreamingThread(QThread):
                 current_time = time.time()
 
                 if current_time - last_emit_time >= self.frame_time:
-                    self.step_completed.emit({
-                        "step": pending_data["step"],
-                        "total": pending_data["total"],
-                        **pending_data["data"]
-                    })
+                    self.step_completed.emit(StreamEvent(
+                        step=pending_data["step"],
+                        total=pending_data["total"],
+                        data=pending_data["data"]
+                    ))
                     last_emit_time = current_time
                     pending_data = None

@@ -10,6 +10,7 @@ import yaml
 from pendragon.engine import PendragonEngine
 from pendragon.export import export_gcode
 from pendragon.gui.worker import PipelineStreamingThread
+from pendragon.gui.worker import StreamEvent
 
 
 class ControllerState(Enum):
@@ -24,7 +25,7 @@ class PipelineController(QObject):
     computation_finished = pyqtSignal(object)
     computation_error = pyqtSignal(str)
     computation_cancelled = pyqtSignal()
-    step_streamed = pyqtSignal(dict)
+    step_streamed = pyqtSignal(object)
     ui_rebuild_requested = pyqtSignal()
 
     def __init__(self, engine: PendragonEngine):

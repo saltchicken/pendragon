@@ -160,9 +160,12 @@ class LiveEditorWindow(QMainWindow):
         self.progress_panel.bar.setValue(start_index)
         self.progress_panel.bar.setFormat("Initializing...")
 
-    def _on_step_streamed(self, state_data):
-        step, total, op_name = state_data["step"], state_data[
-            "total"], state_data["op_name"]
+    def _on_step_streamed(self, event):
+        # Access attributes directly from the StreamEvent and nested FrameData objects
+        step = event.step
+        total = event.total
+        op_name = event.data.op_name
+        
         safe_total = max(1, total)
         self.progress_panel.bar.setMaximum(safe_total)
         self.progress_panel.bar.setValue(step)
@@ -172,10 +175,10 @@ class LiveEditorWindow(QMainWindow):
 
         if self.viewer.show_final_view or step == self.viewer.current_step:
             self.stats_panel.update_stats(step, total, op_name,
-                                          state_data["line_count"],
-                                          len(state_data["pos"]), False)
-            self.viewer.set_live_vectors(state_data["pos"],
-                                         state_data["connect"])
+                                          event.data.line_count,
+                                          len(event.data.pos), False)
+            self.viewer.set_live_vectors(event.data.pos,
+                                         event.data.connect)
         self.progress_panel.bar.setFormat(f"{step} / {total} ({op_name})")
 
     def _on_compute_finish(self, final_store):
