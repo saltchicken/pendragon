@@ -171,7 +171,6 @@ class LiveEditorWindow(QMainWindow):
         self.progress_panel.bar.setValue(step)
         self.progress_panel.bar.setFormat(
             f"{step} / {total} ({op_name}) - Rendering...")
-        QApplication.processEvents()
 
         if self.viewer.show_final_view or step == self.viewer.current_step:
             self.stats_panel.update_stats(step, total, op_name,
@@ -187,7 +186,6 @@ class LiveEditorWindow(QMainWindow):
             "background-color: #8b0000; color: #aaaaaa; font-weight: bold;")
         self.progress_panel.bar.setValue(self.progress_panel.bar.maximum())
         self.progress_panel.bar.setFormat("Finalizing Display...")
-        QApplication.processEvents()
 
         target = self.controller.get_operation_count(
         ) if self.viewer.show_final_view else self.viewer.current_step
